@@ -9,7 +9,7 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        string serverUrl = "http://localhost:5245/weatherforecast"; // change if your server uses a different URL
+        string serverUrl = "http://192.168.0.33:5000/weatherforecast"; // change if your server uses a different URL
 
         using HttpClient client = new HttpClient();
 
