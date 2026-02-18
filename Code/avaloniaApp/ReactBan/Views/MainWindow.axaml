@@ -23,21 +23,73 @@
         </Grid.RowDefinitions>
 
         <!-- grid that contains header elements -->
-        <Grid Grid.Row="0" Background="LightBlue">
+        <Grid Grid.Row="0" Background="#27D3F5">
             <Image Source="avares://ReactBan/Assets/avalonia-logo.ico"
                 Width="100"
                 Height="60"
                 Stretch="Uniform"
-                Margin="20,0, 750,0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Margin="10,0,0,0"
+                
                 />
-            <TextBlock Text="ReactBan" FontSize="24" VerticalAlignment="Center" Margin="80,10,0,0"/>
+            <TextBlock Text="Secure Vote" FontSize="35" 
+                    Foreground="White"
+                    VerticalAlignment="Center" 
+                    HorizontalAlignment="Left"
+                    Margin="80,4,0,0"/>
         </Grid>
 
 
 
         <!-- grid that contains the main content -->
-    <Grid Grid.Row="1" Background="White" > 
-            
+        <Grid Grid.Row="1" Background="#f6f2e6" > 
+
+                <StackPanel>
+                    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black"/>
+                </StackPanel>
+
+
+            <Button 
+                Command="{Binding GetServerInfoCommand}"
+                Background="LightBlue"  
+                Width="100"
+                Height="100" 
+                HorizontalAlignment="Center" 
+                VerticalAlignment="Center"
+                Margin="0,0,250,0"
+                BorderThickness="2"
+                BorderBrush="Black"
+                FontSize="20"
+                >
+
+                <StackPanel>
+                    <TextBlock Text="Personal" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Vote" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+                </StackPanel>
+            </Button>
+
+            <Button
+                Command="{Binding ResetCommand}"
+                Background="LightBlue"  
+                Width="100"
+                Height="100" 
+                HorizontalAlignment="Center" 
+                VerticalAlignment="Center"
+                Margin="250,0,0,0"
+                BorderThickness="2"
+                BorderBrush="Black"
+                FontSize="20"
+                >
+
+                <StackPanel>
+                    <TextBlock Text="Proxy" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Vote" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+                </StackPanel>
+
+
+            </Button>
+
         </Grid>
 
 

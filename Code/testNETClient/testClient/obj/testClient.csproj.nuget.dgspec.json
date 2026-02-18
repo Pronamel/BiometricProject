@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\testNETClient\\testclient\\testClient.csproj": {}
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\code\\testnetclient\\testclient\\testClient.csproj": {}
   },
   "projects": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\testNETClient\\testclient\\testClient.csproj": {
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\code\\testnetclient\\testclient\\testClient.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\testNETClient\\testclient\\testClient.csproj",
+        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\code\\testnetclient\\testclient\\testClient.csproj",
         "projectName": "testClient",
-        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\testNETClient\\testclient\\testClient.csproj",
+        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\code\\testnetclient\\testclient\\testClient.csproj",
         "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\testNETClient\\testclient\\obj\\",
+        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\code\\testnetclient\\testclient\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",
