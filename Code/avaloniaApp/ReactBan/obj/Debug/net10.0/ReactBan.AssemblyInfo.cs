@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ReactBan")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f93a45b4be1a233ed0302a6751a22bb6c77ea04e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+12788d5f07acf94cff0c21e3bd159f6ac6bbb857")]
 [assembly: System.Reflection.AssemblyProductAttribute("ReactBan")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ReactBan")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
