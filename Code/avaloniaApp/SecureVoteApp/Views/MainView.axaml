@@ -1,0 +1,50 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:SecureVoteApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
+            x:Class="SecureVoteApp.Views.MainView"
+            x:DataType="vm:MainWindowViewModel">
+
+    <Grid Background="#f6f2e6" > 
+
+        <StackPanel>
+            <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black"/>
+        </StackPanel>
+
+        <Button 
+            Command="{Binding OpenNINEntryCommand}"
+            Background="purple"  
+            Width="100"
+            Height="100" 
+            HorizontalAlignment="Center" 
+            VerticalAlignment="Center"
+            Margin="0,0,250,0"
+            BorderThickness="2"
+            BorderBrush="Black"
+            FontSize="20">
+            <StackPanel>
+                <TextBlock Text="Personal" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+                <TextBlock Text="Vote" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+            </StackPanel>
+        </Button>
+
+        <Button
+            Command="{Binding ResetCommand}"
+            Background="green"  
+            Width="100"
+            Height="100" 
+            HorizontalAlignment="Center" 
+            VerticalAlignment="Center"
+            Margin="250,0,0,0"
+            BorderThickness="2"
+            BorderBrush="Black"
+            FontSize="20">
+            <StackPanel>
+                <TextBlock Text="Proxy" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+                <TextBlock Text="Vote" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+            </StackPanel>
+        </Button>
+    </Grid>
+</UserControl>
