@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace SecureVoteApp.Views;
 
-public partial class MainView : UserControl
+public partial class PersonalOrProxyView : UserControl
 {
-    public MainView()
+    public PersonalOrProxyView()
     {
         InitializeComponent();
     }

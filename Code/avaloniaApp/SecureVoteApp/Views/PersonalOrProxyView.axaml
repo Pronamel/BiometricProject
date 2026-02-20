@@ -4,13 +4,22 @@
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
-            x:Class="SecureVoteApp.Views.MainView"
-            x:DataType="vm:MainWindowViewModel">
+            x:Class="SecureVoteApp.Views.PersonalOrProxyView"
+            x:DataType="vm:PersonalOrProxyViewModel"
+            
+            >
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+            to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:PersonalOrProxyViewModel/>
+    </Design.DataContext>
+    
 
     <Grid Background="#f6f2e6" > 
 
         <StackPanel>
-            <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black"/>
+            <TextBlock Text="hellow" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black"/>
         </StackPanel>
 
         <Button 

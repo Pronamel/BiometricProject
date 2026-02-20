@@ -26,11 +26,11 @@ build_property.EnableCodeStyleSeverity =
 [C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/App.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/MainView.axaml]
-build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
-
 [C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/MainWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/NINEntryView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/PersonalOrProxyView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

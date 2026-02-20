@@ -7,48 +7,109 @@
             x:Class="SecureVoteApp.Views.NINEntryView"
             x:DataType="vm:NINEntryViewModel">
 
+    
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+            to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:NINEntryViewModel/>
+    </Design.DataContext>
+
     <Grid Background="#f6f2e6">
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
-            
-            <TextBlock Text="Enter Your NIN Details" 
-                       FontSize="24" 
-                       FontWeight="Bold" 
-                       HorizontalAlignment="Center"
-                       Margin="0,0,0,30" 
-                       Foreground="#333"/>
-            
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        
+        <TextBlock Grid.ColumnSpan="2" 
+                   Text="Enter Voter Details" 
+                   FontSize="24" 
+                   FontWeight="Bold" 
+                   HorizontalAlignment="Center"
+                   Margin="0,20,0,30" 
+                   Foreground="#333"/>
+
+        <!-- Left Grid -->
+        <StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
+             
             <StackPanel Spacing="15">
-                <StackPanel>
-                    <TextBlock Text="National Identity Number:" 
-                               FontWeight="Medium" 
-                               Foreground="#333" 
-                               Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35"/>
-                </StackPanel>
-                
                 <StackPanel>
                     <TextBlock Text="Full Name:" 
                                FontWeight="Medium" 
                                Foreground="#333" 
-                               Margin="0,0,0,5"/>
+                               Margin="0,35,0,5"/>
                     <TextBox Width="300" Height="35"/>
                 </StackPanel>
                 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,30,0,0">
+                <StackPanel>
+                    <TextBlock Text="Date of Birth:" 
+                               FontWeight="Medium" 
+                               Foreground="#333" 
+                               Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="National Insurance Number:" 
+                               FontWeight="Medium" 
+                               Foreground="#333" 
+                               Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <Button Content="{Binding BlueTextHave}" 
+                            Width="300" 
+                            Height="30"
+                            Background="transparent"
+                            FontSize="12"
+                            Margin="-5,-15,0,0"
+                            Foreground="skyblue"
+                            Command="{Binding BlueTextPressCommand}"/>
+                </StackPanel>
+                
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Spacing="20" Margin="0,30,0,0">
                     <Button Content="Back" 
-                            Width="80" 
+                            Width="50" 
                             Height="35"
                             Background="LightGray"
                             FontSize="14"
                             Command="{Binding BackCommand}"/>
-                    <Button Content="Continue" 
-                            Width="80" 
+                    <Button Content="Authenticate" 
+                            Width="110" 
                             Height="35"
-                            Background="LightBlue"
+                            Background="Green"
+                            Foreground="White"
                             FontSize="14"
                             Command="{Binding ContinueCommand}"/>
                 </StackPanel>
             </StackPanel>
         </StackPanel>
+
+        <!-- Right Grid  -->
+        <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20">
+            
+             
+            <StackPanel Spacing="15">
+                <StackPanel>
+                    <TextBlock Text="Date Of Birth:" 
+                               FontWeight="Medium" 
+                               Foreground="#333" 
+                               Margin="0,35,0,5"
+                               IsVisible="{Binding DateOfBirthVisible}"/>
+                    <TextBox Width="300" 
+                             Height="35"
+                             Watermark="DD/MM/YYYY"
+                             IsVisible="{Binding DateOfBirthVisible}"/>
+                </StackPanel>
+                
+                
+            </StackPanel>
+        </StackPanel>
     </Grid>
+
+    
+        
+
+
+
 </UserControl>

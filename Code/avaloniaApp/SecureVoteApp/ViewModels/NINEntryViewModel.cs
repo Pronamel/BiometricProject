@@ -9,10 +9,18 @@ using SecureVoteApp.Views;
 using Avalonia.Controls;
 namespace SecureVoteApp.ViewModels;
 
-public partial class NINEntryViewModel : ViewModelBase
+public partial class NINEntryViewModel : ObservableObject
 {
     private readonly INavigationService _navigationService;
+
+    // Observable properties for proper data binding
+    [ObservableProperty]
+    private string blueTextHave = "I don't have a National Insurance Number";
     
+    [ObservableProperty]
+    private bool dateOfBirthVisible = false;
+
+    //NAVIGATION FUNCTIONS
     public NINEntryViewModel()
     {
         _navigationService = Navigation.Instance;
@@ -28,5 +36,26 @@ public partial class NINEntryViewModel : ViewModelBase
     private void Continue()
     {
         _navigationService.NavigateToMain();
+    }
+
+
+
+    //BUTTON FUNCTIONS
+
+    [RelayCommand]
+    private void BlueTextPress()
+    {
+        if (!DateOfBirthVisible)
+        {
+            // Show the date of birth field and change text to toggle back
+            DateOfBirthVisible = true;
+            BlueTextHave = "I do have a National Insurance Number";
+        }
+        else
+        {
+            // Hide the date of birth field and change text to original
+            DateOfBirthVisible = false;
+            BlueTextHave = "I don't have a National Insurance Number";
+        }
     }
 }

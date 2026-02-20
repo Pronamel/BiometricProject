@@ -8,6 +8,11 @@ public interface INavigationService
 {
     void NavigateToMain();
     void NavigateToNINEntry();
+    void NavigateToPersonalOrProxy();
+    void NavigateToBallot();
+    void NavigateToConfirmation();
+    void NavigateToResults();
+    void NavigateToSettings();
     void NavigateToView(UserControl view);
     
     // Events to notify when navigation happens
@@ -21,27 +26,41 @@ public class NavigationService : INavigationService
     public event Action<UserControl>? NavigationRequested;
     
     // Store references to views for reuse
-    private UserControl? _mainView;
     private UserControl? _ninEntryView;
+    private UserControl? _personalOrProxyView;
+    private UserControl? _ballotView;
+    private UserControl? _confirmationView;
+    private UserControl? _resultsView;
+    private UserControl? _settingsView;
     
     // Reference to MainWindowViewModel to access views
-    private Func<UserControl>? _getMainView;
     private Func<UserControl>? _getNINEntryView;
+    private Func<UserControl>? _getPersonalOrProxyView;
+    private Func<UserControl>? _getBallotView;
+    private Func<UserControl>? _getConfirmationView;
+    private Func<UserControl>? _getResultsView;
+    private Func<UserControl>? _getSettingsView;
     
     // Initialize with view factory methods
-    public void Initialize(Func<UserControl> getMainView, Func<UserControl> getNINEntryView)
+    public void Initialize(
+        Func<UserControl> getNINEntryView, 
+        Func<UserControl> getPersonalOrProxyView,
+        Func<UserControl> getBallotView,
+        Func<UserControl> getConfirmationView,
+        Func<UserControl> getResultsView,
+        Func<UserControl> getSettingsView)
     {
-        _getMainView = getMainView;
         _getNINEntryView = getNINEntryView;
+        _getPersonalOrProxyView = getPersonalOrProxyView;
+        _getBallotView = getBallotView;
+        _getConfirmationView = getConfirmationView;
+        _getResultsView = getResultsView;
+        _getSettingsView = getSettingsView;
     }
     
     public void NavigateToMain()
     {
-        if (_mainView == null && _getMainView != null)
-            _mainView = _getMainView();
-            
-        if (_mainView != null)
-            NavigationRequested?.Invoke(_mainView);
+        NavigateToPersonalOrProxy();
     }
     
     public void NavigateToNINEntry()
@@ -51,6 +70,51 @@ public class NavigationService : INavigationService
             
         if (_ninEntryView != null)
             NavigationRequested?.Invoke(_ninEntryView);
+    }
+    
+    public void NavigateToPersonalOrProxy()
+    {
+        if (_personalOrProxyView == null && _getPersonalOrProxyView != null)
+            _personalOrProxyView = _getPersonalOrProxyView();
+            
+        if (_personalOrProxyView != null)
+            NavigationRequested?.Invoke(_personalOrProxyView);
+    }
+    
+    public void NavigateToBallot()
+    {
+        if (_ballotView == null && _getBallotView != null)
+            _ballotView = _getBallotView();
+            
+        if (_ballotView != null)
+            NavigationRequested?.Invoke(_ballotView);
+    }
+    
+    public void NavigateToConfirmation()
+    {
+        if (_confirmationView == null && _getConfirmationView != null)
+            _confirmationView = _getConfirmationView();
+            
+        if (_confirmationView != null)
+            NavigationRequested?.Invoke(_confirmationView);
+    }
+    
+    public void NavigateToResults()
+    {
+        if (_resultsView == null && _getResultsView != null)
+            _resultsView = _getResultsView();
+            
+        if (_resultsView != null)
+            NavigationRequested?.Invoke(_resultsView);
+    }
+    
+    public void NavigateToSettings()
+    {
+        if (_settingsView == null && _getSettingsView != null)
+            _settingsView = _getSettingsView();
+            
+        if (_settingsView != null)
+            NavigationRequested?.Invoke(_settingsView);
     }
     
     public void NavigateToView(UserControl view)
