@@ -30,9 +30,9 @@ public partial class PersonalOrProxyViewModel : ViewModelBase
     }
     
     [RelayCommand]
-    private void Reset()
+    private void OpenProxyVote()
     {
-        _navigationService.NavigateToMain();
+        _navigationService.NavigateToProxyVoteDetails();
     }
 }
 

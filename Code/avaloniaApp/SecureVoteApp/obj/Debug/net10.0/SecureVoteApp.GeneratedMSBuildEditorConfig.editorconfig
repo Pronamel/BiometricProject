@@ -34,3 +34,6 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/PersonalOrProxyView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/ProxyVoteDetails.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

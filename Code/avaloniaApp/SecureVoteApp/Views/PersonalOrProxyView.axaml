@@ -40,7 +40,7 @@
         </Button>
 
         <Button
-            Command="{Binding ResetCommand}"
+            Command="{Binding OpenProxyVoteCommand}"
             Background="green"  
             Width="100"
             Height="100" 

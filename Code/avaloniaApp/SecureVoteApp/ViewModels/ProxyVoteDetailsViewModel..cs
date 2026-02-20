@@ -9,7 +9,7 @@ using SecureVoteApp.Views;
 using Avalonia.Controls;
 namespace SecureVoteApp.ViewModels;
 
-public partial class NINEntryViewModel : ViewModelBase
+public partial class ProxyVoteDetailsViewModel : ViewModelBase
 {
     private readonly INavigationService _navigationService;
 
@@ -27,7 +27,7 @@ public partial class NINEntryViewModel : ViewModelBase
     
   
     
-    public NINEntryViewModel()
+    public ProxyVoteDetailsViewModel()
     {
         _navigationService = Navigation.Instance;
     }

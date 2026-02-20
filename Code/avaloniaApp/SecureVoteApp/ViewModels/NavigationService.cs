@@ -9,6 +9,7 @@ public interface INavigationService
     void NavigateToMain();
     void NavigateToNINEntry();
     void NavigateToPersonalOrProxy();
+    void NavigateToProxyVoteDetails();
     void NavigateToBallot();
     void NavigateToConfirmation();
     void NavigateToResults();
@@ -28,6 +29,7 @@ public class NavigationService : INavigationService
     // Store references to views for reuse
     private UserControl? _ninEntryView;
     private UserControl? _personalOrProxyView;
+    private UserControl? _proxyVoteDetailsView;
     private UserControl? _ballotView;
     private UserControl? _confirmationView;
     private UserControl? _resultsView;
@@ -36,6 +38,7 @@ public class NavigationService : INavigationService
     // Reference to MainWindowViewModel to access views
     private Func<UserControl>? _getNINEntryView;
     private Func<UserControl>? _getPersonalOrProxyView;
+    private Func<UserControl>? _getProxyVoteDetailsView;
     private Func<UserControl>? _getBallotView;
     private Func<UserControl>? _getConfirmationView;
     private Func<UserControl>? _getResultsView;
@@ -45,6 +48,7 @@ public class NavigationService : INavigationService
     public void Initialize(
         Func<UserControl> getNINEntryView, 
         Func<UserControl> getPersonalOrProxyView,
+        Func<UserControl> getProxyVoteDetailsView,
         Func<UserControl> getBallotView,
         Func<UserControl> getConfirmationView,
         Func<UserControl> getResultsView,
@@ -52,6 +56,7 @@ public class NavigationService : INavigationService
     {
         _getNINEntryView = getNINEntryView;
         _getPersonalOrProxyView = getPersonalOrProxyView;
+        _getProxyVoteDetailsView = getProxyVoteDetailsView;
         _getBallotView = getBallotView;
         _getConfirmationView = getConfirmationView;
         _getResultsView = getResultsView;
@@ -79,6 +84,15 @@ public class NavigationService : INavigationService
             
         if (_personalOrProxyView != null)
             NavigationRequested?.Invoke(_personalOrProxyView);
+    }
+    
+    public void NavigateToProxyVoteDetails()
+    {
+        if (_proxyVoteDetailsView == null && _getProxyVoteDetailsView != null)
+            _proxyVoteDetailsView = _getProxyVoteDetailsView();
+            
+        if (_proxyVoteDetailsView != null)
+            NavigationRequested?.Invoke(_proxyVoteDetailsView);
     }
     
     public void NavigateToBallot()
