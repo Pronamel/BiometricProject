@@ -25,7 +25,6 @@ public partial class ProxyVoteDetailsViewModel : ViewModelBase
     [ObservableProperty]
     private bool textBoxEnabled = true;
     
-  
     
     public ProxyVoteDetailsViewModel()
     {
@@ -39,10 +38,12 @@ public partial class ProxyVoteDetailsViewModel : ViewModelBase
     }
     
     [RelayCommand]
-    private void Continue()
+    private void Authenticate()
     {
-        _navigationService.NavigateToMain();
+        _navigationService.NavigateToAuthenticateUser();
     }
+
+    
 
     [RelayCommand]
     private void BlueTextPress()

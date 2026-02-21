@@ -25,7 +25,6 @@ public partial class NINEntryViewModel : ViewModelBase
     [ObservableProperty]
     private bool textBoxEnabled = true;
     
-  
     
     public NINEntryViewModel()
     {
@@ -41,7 +40,7 @@ public partial class NINEntryViewModel : ViewModelBase
     [RelayCommand]
     private void Continue()
     {
-        _navigationService.NavigateToMain();
+        _navigationService.NavigateToAuthenticateUser();
     }
 
     [RelayCommand]

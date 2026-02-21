@@ -32,7 +32,7 @@
         <StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
             <StackPanel Spacing="20">
                 <StackPanel>
-                    <TextBlock Text="Full Name:" 
+                    <TextBlock Text="Full Name" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -40,7 +40,7 @@
                 </StackPanel>
                 
                 <StackPanel>
-                    <TextBlock Text="Date of Birth:" 
+                    <TextBlock Text="Address" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -48,7 +48,7 @@
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="National Insurance Number:" 
+                    <TextBlock Text="National Insurance Number" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -56,7 +56,7 @@
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Address:" 
+                    <TextBlock Text="Date Of Birth" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -71,7 +71,7 @@
         <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
             <StackPanel Spacing="20">
                 <StackPanel>
-                    <TextBlock Text="Phone Number:" 
+                    <TextBlock Text="Proxy Fullname" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -79,7 +79,7 @@
                 </StackPanel>
                 
                 <StackPanel>
-                    <TextBlock Text="Email Address:" 
+                    <TextBlock Text="Proxy Address" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -87,7 +87,7 @@
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Postal Code:" 
+                    <TextBlock Text="Reason for Proxy Vote:" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -102,13 +102,13 @@
                             Background="LightGray"
                             FontSize="14"
                             Command="{Binding BackCommand}"/>
-                    <Button Content="Submit" 
+                    <Button Content="Authenticate >" 
                             Width="120" 
                             Height="35"
                             Background="Green"
                             Foreground="White"
                             FontSize="14"
-                            Command="{Binding ContinueCommand}"/>
+                            Command="{Binding AuthenticateCommand}"/>
                 </StackPanel>
             </StackPanel>
         </StackPanel>

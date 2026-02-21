@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:SecureVoteApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
+            x:Class="SecureVoteApp.Views.AuthenticateUserView"
+            x:DataType="vm:AuthenticateUserViewModel">
+
+    
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+            to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:AuthenticateUserViewModel/>
+    </Design.DataContext>
+
+
+    <Grid Background="#f6f2e6">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
+            <Image Source="avares://SecureVoteApp/Assets/fingerPrint.png"
+                Width="180"
+                Height="180"
+                Stretch="Uniform"/>
+            <StackPanel>   
+                <TextBlock Text="Place finger on the scanner"
+                        FontSize="35"
+                        Foreground="Black"
+                        HorizontalAlignment="Center"/>
+                <TextBlock Text="Press lightly and hold for 3 seconds" 
+                        FontSize="20"
+                        Foreground="Black"
+                        HorizontalAlignment="Center"/>
+            </StackPanel>
+
+        </StackPanel>
+    </Grid>
+
+    
+
+        
+    
+
+    
+        
+
+
+
+</UserControl>
