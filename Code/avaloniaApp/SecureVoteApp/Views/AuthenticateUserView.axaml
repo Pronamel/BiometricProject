@@ -17,7 +17,29 @@
 
     <Grid Background="#f6f2e6">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-            <Image Source="avares://SecureVoteApp/Assets/fingerPrint.png"
+            <!-- Buttons for scan results -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
+                <Button Content="Fail Scan" 
+                        Background="Red" 
+                        Foreground="White"
+                        Width="100" 
+                        Height="40"
+                        FontSize="14"
+                        FontWeight="Bold"
+                        Command="{Binding ScanFingerPrintInvalidCommand}"/>
+
+
+                <Button Content="Good Scan" 
+                        Background="Green" 
+                        Foreground="White"
+                        Width="100" 
+                        Height="40"
+                        FontSize="14"
+                        FontWeight="Bold"
+                        Command="{Binding ScanFingerPrintValidCommand}"/>
+            </StackPanel>
+            
+            <Image Source="{Binding ImageSource}"
                 Width="180"
                 Height="180"
                 Stretch="Uniform"/>
@@ -30,19 +52,13 @@
                         FontSize="20"
                         Foreground="Black"
                         HorizontalAlignment="Center"/>
+
+                <TextBlock Text="{Binding StatusMessage}" 
+                        FontSize="18"
+                        Foreground="red"
+                        HorizontalAlignment="Center"/>
             </StackPanel>
 
         </StackPanel>
     </Grid>
-
-    
-
-        
-    
-
-    
-        
-
-
-
 </UserControl>

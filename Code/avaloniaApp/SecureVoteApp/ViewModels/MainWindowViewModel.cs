@@ -15,6 +15,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly PersonalOrProxyView _personalOrProxyView;
     private readonly ProxyVoteDetailsView _proxyVoteDetailsView;
     private readonly AuthenticateUserView _authenticateUserView;
+    private readonly BallotPaperView _ballotPaperView;
     
     // Navigation service
     private readonly INavigationService _navigationService;
@@ -40,6 +41,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _personalOrProxyView = new PersonalOrProxyView { DataContext = new PersonalOrProxyViewModel() };
         _proxyVoteDetailsView = new ProxyVoteDetailsView { DataContext = new ProxyVoteDetailsViewModel() };
         _authenticateUserView = new AuthenticateUserView { DataContext = new AuthenticateUserViewModel() };
+        _ballotPaperView = new BallotPaperView { DataContext = new BallotPaperViewModel() };
         
         // TODO: Initialize navigation service with all view factories when ready
         // For now, simplified initialization
@@ -48,7 +50,7 @@ public partial class MainWindowViewModel : ViewModelBase
             () => _personalOrProxyView,
             () => _proxyVoteDetailsView,
             () => _authenticateUserView,
-            () => throw new NotImplementedException("BallotView not implemented yet"),
+            () => _ballotPaperView,
             () => throw new NotImplementedException("ConfirmationView not implemented yet"),
             () => throw new NotImplementedException("ResultsView not implemented yet"),
             () => throw new NotImplementedException("SettingsView not implemented yet")

@@ -7,5 +7,6 @@ public partial class AuthenticateUserView : UserControl
     public AuthenticateUserView()
     {
         InitializeComponent();
+        DataContext = new ViewModels.AuthenticateUserViewModel();
     }
 }
