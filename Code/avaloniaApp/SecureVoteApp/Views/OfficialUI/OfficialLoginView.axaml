@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:SecureVoteApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
+            x:Class="SecureVoteApp.Views.OfficialUI.OfficialLoginView"
+            x:DataType="vm:OfficialLoginViewModel">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+            to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:OfficialLoginViewModel/>
+    </Design.DataContext>
+
+    <Grid Background="#f6f2e6">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="25" Width="350">
+            
+            <!-- Official Login Title -->
+            <TextBlock Text="Official Login" 
+                       FontSize="32" 
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center" 
+                       Foreground="DarkSlateGray" 
+                       Margin="0,0,0,20"/>
+
+            <!-- Username Section -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Username" 
+                           FontSize="16" 
+                           FontWeight="SemiBold"
+                           Foreground="DarkSlateGray"/>
+                <TextBox Name="UsernameTextBox"
+                         Text="{Binding Username}"
+                         Background="White"
+                         BorderBrush="Gray"
+                         BorderThickness="2"
+                         CornerRadius="5"
+                         Padding="10"
+                         FontSize="14"
+                         Height="40"/>
+            </StackPanel>
+
+            <!-- Password Section -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Password" 
+                           FontSize="16" 
+                           FontWeight="SemiBold"
+                           Foreground="DarkSlateGray"/>
+                <TextBox Name="PasswordTextBox"
+                         Text="{Binding Password}"
+                         PasswordChar="*"
+                         Background="White"
+                         BorderBrush="Gray"
+                         BorderThickness="2"
+                         CornerRadius="5"
+                         Padding="10"
+                         FontSize="14"
+                         Height="40"/>
+            </StackPanel>
+
+            <!-- Authenticate Button -->
+            <Button Command="{Binding AuthenticateOfficialCommand}"
+                    Content="Authenticate >"
+                    Background="#0bac02"
+                    Foreground="White"
+                    FontSize="16"
+                    FontWeight="SemiBold"
+                    HorizontalAlignment="Center"
+                    Padding="30,12"
+                    CornerRadius="8"
+                    BorderThickness="2"
+                    BorderBrush="#000000"
+                    Margin="0,20,0,0"
+                    Cursor="Hand">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="#005A9E"/>
+                    </Style>
+                </Button.Styles>
+            </Button>
+
+        </StackPanel>
+    </Grid>
+</UserControl>

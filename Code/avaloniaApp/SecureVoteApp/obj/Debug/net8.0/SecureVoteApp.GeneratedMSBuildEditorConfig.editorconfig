@@ -26,23 +26,32 @@ build_property.EnableCodeStyleSeverity =
 [C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/App.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/AuthenticateUserView.axaml]
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/OfficialUI/OfficialAuthenticateView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/BallotPaperView.axaml]
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/OfficialUI/OfficialLoginView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/CandidateButtonControl.axaml]
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/OfficialUI/OfficialMenuView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/MainWindow.axaml]
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/VoterUI/AuthenticateUserView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/NINEntryView.axaml]
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/VoterUI/BallotPaperView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/PersonalOrProxyView.axaml]
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/VoterUI/CandidateButtonControl.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/ProxyVoteDetails.axaml]
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/VoterUI/MainWindow.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/VoterUI/NINEntryView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/VoterUI/PersonalOrProxyView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/avaloniaApp/SecureVoteApp/Views/VoterUI/ProxyVoteDetails.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

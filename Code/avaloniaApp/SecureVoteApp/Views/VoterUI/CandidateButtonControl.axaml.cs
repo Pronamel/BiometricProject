@@ -3,7 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using SecureVoteApp.ViewModels;
 
-namespace SecureVoteApp.Views;
+namespace SecureVoteApp.Views.VoterUI;
 
 public partial class CandidateButtonControl : UserControl
 {

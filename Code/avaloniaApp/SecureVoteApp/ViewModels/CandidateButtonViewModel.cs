@@ -5,6 +5,10 @@ namespace SecureVoteApp.ViewModels;
 
 public partial class CandidateButtonViewModel : ViewModelBase
 {
+    // ==========================================
+    // OBSERVABLE PROPERTIES
+    // ==========================================
+
     [ObservableProperty]
     private string candidateName = "";
 
@@ -17,9 +21,23 @@ public partial class CandidateButtonViewModel : ViewModelBase
     [ObservableProperty]
     private int candidateId;
 
+
+
+
+    // ==========================================
+    // COMPUTED PROPERTIES
+    // ==========================================
+
     public string DisplayText => $"{CandidateName}  {PartyName}";
     
     public string ButtonBackground => IsSelected ? "LightGreen" : "White";
+
+
+
+
+    // ==========================================
+    // CONSTRUCTORS
+    // ==========================================
 
     public CandidateButtonViewModel()
     {
@@ -36,6 +54,13 @@ public partial class CandidateButtonViewModel : ViewModelBase
         // Subscribe to selection changes from other buttons
         BallotPaperViewModel.SelectionChanged += OnSelectionChanged;
     }
+
+
+
+
+    // ==========================================
+    // EVENT HANDLING METHODS
+    // ==========================================
     
     private void OnSelectionChanged()
     {
@@ -43,6 +68,13 @@ public partial class CandidateButtonViewModel : ViewModelBase
         IsSelected = BallotPaperViewModel.SelectedCandidateId == CandidateId;
         OnPropertyChanged(nameof(ButtonBackground)); // Notify UI that background color changed
     }
+
+
+
+
+    // ==========================================
+    // COMMANDS
+    // ==========================================
 
     [RelayCommand]
     private void SelectCandidate()
@@ -55,7 +87,7 @@ public partial class CandidateButtonViewModel : ViewModelBase
         else
         {
             // Select this candidate (will automatically deselect others)
-            BallotPaperViewModel.SetSelectedCandidate(CandidateId);
+            BallotPaperViewModel.SetSelectedCandidate(CandidateId, CandidateName, PartyName);
         }
     }
 }

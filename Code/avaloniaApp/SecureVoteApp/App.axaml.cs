@@ -5,7 +5,7 @@ using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Markup.Xaml;
 using SecureVoteApp.ViewModels;
-using SecureVoteApp.Views;
+using SecureVoteApp.Views.VoterUI;
 
 namespace SecureVoteApp;
 

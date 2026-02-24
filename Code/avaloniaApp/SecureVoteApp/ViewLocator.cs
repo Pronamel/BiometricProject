@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using SecureVoteApp.ViewModels;
-using SecureVoteApp.Views;
+using SecureVoteApp.Views.VoterUI;
 
 namespace SecureVoteApp;
 

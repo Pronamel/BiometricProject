@@ -5,13 +5,25 @@ using CommunityToolkit.Mvvm.Input;
 using System.Text.Json;
 using System.Net.Http;
 using System.Reflection;
-using SecureVoteApp.Views;
+using SecureVoteApp.Views.VoterUI;
 using Avalonia.Controls;
+
 namespace SecureVoteApp.ViewModels;
 
 public partial class NINEntryViewModel : ViewModelBase
 {
+    // ==========================================
+    // PRIVATE READONLY FIELDS
+    // ==========================================
+
     private readonly INavigationService _navigationService;
+
+
+
+
+    // ==========================================
+    // OBSERVABLE PROPERTIES
+    // ==========================================
 
     // Public properties for compiled bindings
     [ObservableProperty]
@@ -24,12 +36,25 @@ public partial class NINEntryViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool textBoxEnabled = true;
-    
+
+
+
+
+    // ==========================================
+    // CONSTRUCTOR
+    // ==========================================
     
     public NINEntryViewModel()
     {
         _navigationService = Navigation.Instance;
     }
+
+
+
+
+    // ==========================================
+    // COMMANDS
+    // ==========================================
     
     [RelayCommand]
     private void Back()

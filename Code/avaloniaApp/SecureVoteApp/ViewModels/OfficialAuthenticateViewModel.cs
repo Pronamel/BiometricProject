@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SecureVoteApp.ViewModels;
 
-public partial class AuthenticateUserViewModel : ViewModelBase
+public partial class OfficialAuthenticateViewModel : ViewModelBase
 {
     // ==========================================
     // PRIVATE FIELDS
@@ -96,9 +96,11 @@ public partial class AuthenticateUserViewModel : ViewModelBase
         else if (scanResult == true)
         {
             SetImageSource("fingerPrintCorrect.png");
-            SetStatusMessage("Authentication successful. You may proceed to vote.");
+            SetStatusMessage("Authentication successful. Welcome, Official.");
             await Task.Delay(750);
-            _navigationService.NavigateToBallot();
+            // TODO: Navigate to official dashboard instead of ballot
+            // For now, navigate to main - update this when you create the official dashboard
+            _navigationService.NavigateToOfficialMenu();
         }
     }
 
@@ -114,7 +116,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public AuthenticateUserViewModel()
+    public OfficialAuthenticateViewModel()
     {
         _navigationService = Navigation.Instance;
         // Initialize with default fingerprint image
@@ -129,19 +131,19 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     // ==========================================
 
     [RelayCommand]
-    private void ScanFingerPrintValid()
+    private async Task ScanFingerPrintValid()
     {
         scannAttempts++;
         validFingerPrintScan = true;
-        attemptHandler(scannAttempts, validFingerPrintScan);
+        await attemptHandler(scannAttempts, validFingerPrintScan);
     }
 
     [RelayCommand]
-    private void ScanFingerPrintInvalid()
+    private async Task ScanFingerPrintInvalid()
     {
         scannAttempts++;
         validFingerPrintScan = false;
-        attemptHandler(scannAttempts, validFingerPrintScan);
+        await attemptHandler(scannAttempts, validFingerPrintScan);
     }
 
     [RelayCommand]
@@ -149,4 +151,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     {
         _navigationService.NavigateToMain();
     }
+
+
+    
 }

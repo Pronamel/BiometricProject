@@ -1,11 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
             xmlns:vm="using:SecureVoteApp.ViewModels"
-            xmlns:views="using:SecureVoteApp.Views"
+            xmlns:views="using:SecureVoteApp.Views.VoterUI"
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
-            x:Class="SecureVoteApp.Views.BallotPaperView"
+            x:Class="SecureVoteApp.Views.VoterUI.BallotPaperView"
             x:DataType="vm:BallotPaperViewModel">
 
     <Design.DataContext>
@@ -28,10 +28,11 @@
                            FontWeight="Bold"
                            Foreground="Black"
                            HorizontalAlignment="Left"/>
-                <TextBlock Text="Vote for ONE candidate by clicking the box next to their name"
+                <TextBlock Text="{Binding ReadingCandidateName}"
                            FontSize="16"
                            Foreground="Black"
                            HorizontalAlignment="Left"/>
+                
             </StackPanel>
         </Grid>
         

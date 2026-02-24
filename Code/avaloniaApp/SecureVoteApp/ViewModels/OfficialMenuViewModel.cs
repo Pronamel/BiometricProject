@@ -5,12 +5,12 @@ using CommunityToolkit.Mvvm.Input;
 using System.Text.Json;
 using System.Net.Http;
 using System.Reflection;
-using SecureVoteApp.Views.VoterUI;
+using SecureVoteApp.Views.OfficialUI;
 using Avalonia.Controls;
 
 namespace SecureVoteApp.ViewModels;
 
-public partial class PersonalOrProxyViewModel : ViewModelBase
+public partial class OfficialMenuViewModel : ViewModelBase
 {
     // ==========================================
     // PRIVATE READONLY FIELDS
@@ -18,36 +18,37 @@ public partial class PersonalOrProxyViewModel : ViewModelBase
 
     private readonly INavigationService _navigationService;
 
-
-
-
     // ==========================================
     // CONSTRUCTOR
     // ==========================================
     
-    public PersonalOrProxyViewModel()
+    public OfficialMenuViewModel()
     {
         _navigationService = Navigation.Instance;
     }
-
-
-
 
     // ==========================================
     // COMMANDS
     // ==========================================
     
     [RelayCommand]
-    private void OpenNINEntry()
+    private void VotingStart()
     {
-        _navigationService.NavigateToNINEntry();
+        // TODO: Navigate to manage screen
+        _navigationService.NavigateToPersonalOrProxy();
     }
     
     [RelayCommand]
-    private void OpenProxyVote()
+    private void Monitor()
     {
-        _navigationService.NavigateToProxyVoteDetails();
+        // TODO: Navigate to monitor screen
+        // _navigationService.NavigateToMonitor();
+    }
+    
+    [RelayCommand]
+    private void Reports()
+    {
+        // TODO: Navigate to reports screen
+        // _navigationService.NavigateToReports();
     }
 }
-
-

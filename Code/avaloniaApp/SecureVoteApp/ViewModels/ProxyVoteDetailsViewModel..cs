@@ -5,13 +5,25 @@ using CommunityToolkit.Mvvm.Input;
 using System.Text.Json;
 using System.Net.Http;
 using System.Reflection;
-using SecureVoteApp.Views;
+using SecureVoteApp.Views.VoterUI;
 using Avalonia.Controls;
+
 namespace SecureVoteApp.ViewModels;
 
 public partial class ProxyVoteDetailsViewModel : ViewModelBase
 {
+    // ==========================================
+    // PRIVATE READONLY FIELDS
+    // ==========================================
+
     private readonly INavigationService _navigationService;
+
+
+
+
+    // ==========================================
+    // OBSERVABLE PROPERTIES
+    // ==========================================
 
     // Public properties for compiled bindings
     [ObservableProperty]
@@ -24,12 +36,25 @@ public partial class ProxyVoteDetailsViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool textBoxEnabled = true;
-    
+
+
+
+
+    // ==========================================
+    // CONSTRUCTOR
+    // ==========================================
     
     public ProxyVoteDetailsViewModel()
     {
         _navigationService = Navigation.Instance;
     }
+
+
+
+
+    // ==========================================
+    // COMMANDS
+    // ==========================================
     
     [RelayCommand]
     private void Back()
@@ -42,8 +67,6 @@ public partial class ProxyVoteDetailsViewModel : ViewModelBase
     {
         _navigationService.NavigateToAuthenticateUser();
     }
-
-    
 
     [RelayCommand]
     private void BlueTextPress()

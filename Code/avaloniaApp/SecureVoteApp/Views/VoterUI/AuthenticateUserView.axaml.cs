@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace SecureVoteApp.Views;
+namespace SecureVoteApp.Views.VoterUI;
 
 public partial class AuthenticateUserView : UserControl
 {

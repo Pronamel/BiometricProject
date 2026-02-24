@@ -3,6 +3,10 @@ using Avalonia.Controls;
 
 namespace SecureVoteApp.ViewModels;
 
+// ==========================================
+// NAVIGATION SERVICE INTERFACE
+// ==========================================
+
 // Interface defining navigation methods
 public interface INavigationService
 {
@@ -11,6 +15,8 @@ public interface INavigationService
     void NavigateToPersonalOrProxy();
     void NavigateToProxyVoteDetails();
     void NavigateToAuthenticateUser();
+    void NavigateToOfficialAuthenticate();
+    void NavigateToOfficialMenu();
     void NavigateToBallot();
     void NavigateToConfirmation();
     void NavigateToResults();
@@ -21,31 +27,67 @@ public interface INavigationService
     event Action<UserControl>? NavigationRequested;
 }
 
+
+
+
+// ==========================================
+// NAVIGATION SERVICE IMPLEMENTATION
+// ==========================================
+
 // Implementation of the navigation service
 public class NavigationService : INavigationService
 {
+    // ==========================================
+    // EVENTS
+    // ==========================================
+
     // Event that the MainWindowViewModel will subscribe to
     public event Action<UserControl>? NavigationRequested;
+
+
+
+
+    // ==========================================
+    // PRIVATE FIELDS - VIEW STORAGE
+    // ==========================================
     
     // Store references to views for reuse
     private UserControl? _ninEntryView;
     private UserControl? _personalOrProxyView;
     private UserControl? _proxyVoteDetailsView;
     private UserControl? _authenticateUserView;
+    private UserControl? _officialAuthenticateView;
+    private UserControl? _officialMenuView;
     private UserControl? _ballotView;
     private UserControl? _confirmationView;
     private UserControl? _resultsView;
     private UserControl? _settingsView;
+
+
+
+
+    // ==========================================
+    // PRIVATE FIELDS - VIEW FACTORY FUNCTIONS
+    // ==========================================
     
     // Reference to MainWindowViewModel to access views
     private Func<UserControl>? _getNINEntryView;
     private Func<UserControl>? _getPersonalOrProxyView;
     private Func<UserControl>? _getProxyVoteDetailsView;
     private Func<UserControl>? _getAuthenticateUserView;
+    private Func<UserControl>? _getOfficialAuthenticateView;
+    private Func<UserControl>? _getOfficialMenuView;
     private Func<UserControl>? _getBallotView;
     private Func<UserControl>? _getConfirmationView;
     private Func<UserControl>? _getResultsView;
     private Func<UserControl>? _getSettingsView;
+
+
+
+
+    // ==========================================
+    // INITIALIZATION METHODS
+    // ==========================================
     
     // Initialize with view factory methods
     public void Initialize(
@@ -53,6 +95,8 @@ public class NavigationService : INavigationService
         Func<UserControl> getPersonalOrProxyView,
         Func<UserControl> getProxyVoteDetailsView,
         Func<UserControl> getAuthenticateUserView,
+        Func<UserControl> getOfficialAuthenticateView,
+        Func<UserControl> getOfficialMenuView,
         Func<UserControl> getBallotView,
         Func<UserControl> getConfirmationView,
         Func<UserControl> getResultsView,
@@ -62,11 +106,20 @@ public class NavigationService : INavigationService
         _getPersonalOrProxyView = getPersonalOrProxyView;
         _getProxyVoteDetailsView = getProxyVoteDetailsView;
         _getAuthenticateUserView = getAuthenticateUserView;
+        _getOfficialAuthenticateView = getOfficialAuthenticateView;
+        _getOfficialMenuView = getOfficialMenuView;
         _getBallotView = getBallotView;
         _getConfirmationView = getConfirmationView;
         _getResultsView = getResultsView;
         _getSettingsView = getSettingsView;
     }
+
+
+
+
+    // ==========================================
+    // NAVIGATION METHODS
+    // ==========================================
     
     public void NavigateToMain()
     {
@@ -107,6 +160,24 @@ public class NavigationService : INavigationService
 
         if (_authenticateUserView != null)
             NavigationRequested?.Invoke(_authenticateUserView);
+    }
+    
+    public void NavigateToOfficialAuthenticate()
+    {
+        if (_officialAuthenticateView == null && _getOfficialAuthenticateView != null)
+            _officialAuthenticateView = _getOfficialAuthenticateView();
+
+        if (_officialAuthenticateView != null)
+            NavigationRequested?.Invoke(_officialAuthenticateView);
+    }
+    
+    public void NavigateToOfficialMenu()
+    {
+        if (_officialMenuView == null && _getOfficialMenuView != null)
+            _officialMenuView = _getOfficialMenuView();
+
+        if (_officialMenuView != null)
+            NavigationRequested?.Invoke(_officialMenuView);
     }
     
     public void NavigateToBallot()
@@ -150,6 +221,13 @@ public class NavigationService : INavigationService
         NavigationRequested?.Invoke(view);
     }
 }
+
+
+
+
+// ==========================================
+// STATIC NAVIGATION ACCESS
+// ==========================================
 
 // Static access point for the navigation service
 public static class Navigation
