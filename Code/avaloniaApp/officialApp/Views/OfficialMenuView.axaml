@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:officialApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
+            x:Class="officialApp.Views.OfficialMenuView"
+            x:DataType="vm:OfficialMenuViewModel">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+            to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:OfficialMenuViewModel/>
+    </Design.DataContext>
+
+    <Grid Background="#f6f2e6">
+
+        <StackPanel>
+            <TextBlock Text="Official Admin Menu" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black"/>
+        </StackPanel>
+
+        <!-- Three orange buttons arranged horizontally -->
+        <StackPanel Orientation="Horizontal" 
+                   HorizontalAlignment="Center" 
+                   VerticalAlignment="Center"
+                   Spacing="30">
+            
+            <Button 
+                Command="{Binding VotingStartCommand}"
+                Background="#d97509"  
+                Width="120"
+                Height="100" 
+                BorderThickness="2"
+                BorderBrush="Black"
+                FontSize="20">
+                <StackPanel>
+                    <TextBlock Text="Start" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Voting" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Program" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                </StackPanel>
+            </Button>
+
+            <Button
+                Command="{Binding ManagerCommand}"
+                Background="#d97509"  
+                Width="120"
+                Height="100" 
+                BorderThickness="2"
+                BorderBrush="Black"
+                FontSize="20">
+                <StackPanel>
+                    <TextBlock Text="Polling" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="System" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Managment" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                </StackPanel>
+            </Button>
+
+            <Button
+                Command="{Binding ReportsCommand}"
+                Background="#d97509"  
+                Width="120"
+                Height="100" 
+                BorderThickness="2"
+                BorderBrush="Black"
+                FontSize="20">
+                <StackPanel>
+                    <TextBlock Text="Register" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Voters" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                </StackPanel>
+            </Button>
+            
+        </StackPanel>
+    </Grid>
+</UserControl>

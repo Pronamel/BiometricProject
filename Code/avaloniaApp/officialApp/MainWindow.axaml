@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:officialApp.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="officialApp.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Official Administration">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+            to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid>
+        <Grid.RowDefinitions> 
+            <RowDefinition Height="70"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header section -->
+        <Grid Grid.Row="0" Background="#d97509">
+            <TextBlock Text="Official Administration" FontSize="32" 
+                    Foreground="White"
+                    FontWeight="Bold"
+                    VerticalAlignment="Center" 
+                    HorizontalAlignment="Center"/>
+        </Grid>
+
+        <!-- Container for the current view -->
+        <ContentControl Grid.Row="1" 
+                        Content="{Binding CurrentView}"/>
+    </Grid>
+</Window>

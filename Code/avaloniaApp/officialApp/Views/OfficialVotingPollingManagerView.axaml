@@ -1,0 +1,170 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:officialApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
+            x:Class="officialApp.Views.OfficialVotingPollingManagerView"
+            x:DataType="vm:OfficialVotingPollingManagerViewModel">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+            to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:OfficialVotingPollingManagerViewModel/>
+    </Design.DataContext>
+
+    <Grid Background="#f6f2e6">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="10,10,10,5">
+            <TextBlock Text="Official Voting Polling Manager" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black" FontSize="18" FontWeight="Bold"/>
+        </StackPanel>
+
+        <!-- Main Content Area - Split Left/Right -->
+        <Grid Grid.Row="1" Margin="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Left Section -->
+            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                
+                <!-- System Health -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                    <TextBlock Text="System Health" VerticalAlignment="Center" FontSize="16" FontWeight="Bold" Margin="0,0,10,0"/>
+                    <Ellipse Width="20" Height="20" Fill="{Binding SystemHealthColor}" Stroke="Black" StrokeThickness="1"/>
+                </StackPanel>
+                
+                <!-- Half Vertical Space Box -->
+                <Border Background="LightGray" 
+                        BorderBrush="Black" 
+                        BorderThickness="1" 
+                        Height="200" 
+                        Margin="0,0,0,20">
+                    <TextBlock Text="{Binding HealthStatusText}" 
+                              HorizontalAlignment="Center" 
+                              VerticalAlignment="Center" 
+                              TextWrapping="Wrap"
+                              Margin="10"/>
+                </Border>
+                
+                <!-- Grid with Black Border -->
+                <Border BorderBrush="Black" 
+                        BorderThickness="2" 
+                        Background="White">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="3*"/>
+                            <RowDefinition Height="2*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- Top 60% - Text Area -->
+                        <ScrollViewer Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock Text="{Binding StatusMessages}" 
+                                      TextWrapping="Wrap" 
+                                      VerticalAlignment="Top"/>
+                        </ScrollViewer>
+                        
+                        <!-- Bottom 40% - TextBox and Button -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="6*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="4*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBox Grid.Column="0" 
+                                    Text="{Binding CommandInput}" 
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,5,0"/>
+                            
+                            <Button Grid.Column="2" 
+                                   Content="Execute" 
+                                   Command="{Binding ExecuteCommand}"
+                                   VerticalAlignment="Center"
+                                   Margin="5,0,0,0"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+                
+            </StackPanel>
+            
+            <!-- Right Section -->
+            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                
+                <!-- 8 Text Labels with TextBoxes -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="1"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="2*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- Row 1 -->
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Total Votes:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TotalVotes}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <Rectangle Grid.Row="1" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                    
+                    <!-- Row 2 -->
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Valid Votes:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ValidVotes}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <Rectangle Grid.Row="3" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                    
+                    <!-- Row 3 -->
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Invalid Votes:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding InvalidVotes}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <Rectangle Grid.Row="5" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                    
+                    <!-- Row 4 -->
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Registered Voters:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding RegisteredVoters}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <Rectangle Grid.Row="7" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                    
+                    <!-- Row 5 -->
+                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Turnout Rate:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding TurnoutRate}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <Rectangle Grid.Row="9" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                    
+                    <!-- Row 6 -->
+                    <TextBlock Grid.Row="10" Grid.Column="0" Text="Polling Start:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding PollingStartTime}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <Rectangle Grid.Row="11" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                    
+                    <!-- Row 7 -->
+                    <TextBlock Grid.Row="12" Grid.Column="0" Text="Polling End:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="12" Grid.Column="1" Text="{Binding PollingEndTime}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <Rectangle Grid.Row="13" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                    
+                    <!-- Row 8 -->
+                    <TextBlock Grid.Row="14" Grid.Column="0" Text="System Status:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="14" Grid.Column="1" Text="{Binding SystemStatus}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    
+                </Grid>
+                
+            </StackPanel>
+            
+        </Grid>
+        
+    </Grid>
+</UserControl>

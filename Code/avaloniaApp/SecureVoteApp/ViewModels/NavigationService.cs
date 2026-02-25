@@ -15,8 +15,6 @@ public interface INavigationService
     void NavigateToPersonalOrProxy();
     void NavigateToProxyVoteDetails();
     void NavigateToAuthenticateUser();
-    void NavigateToOfficialAuthenticate();
-    void NavigateToOfficialMenu();
     void NavigateToBallot();
     void NavigateToConfirmation();
     void NavigateToResults();
@@ -56,8 +54,6 @@ public class NavigationService : INavigationService
     private UserControl? _personalOrProxyView;
     private UserControl? _proxyVoteDetailsView;
     private UserControl? _authenticateUserView;
-    private UserControl? _officialAuthenticateView;
-    private UserControl? _officialMenuView;
     private UserControl? _ballotView;
     private UserControl? _confirmationView;
     private UserControl? _resultsView;
@@ -75,8 +71,6 @@ public class NavigationService : INavigationService
     private Func<UserControl>? _getPersonalOrProxyView;
     private Func<UserControl>? _getProxyVoteDetailsView;
     private Func<UserControl>? _getAuthenticateUserView;
-    private Func<UserControl>? _getOfficialAuthenticateView;
-    private Func<UserControl>? _getOfficialMenuView;
     private Func<UserControl>? _getBallotView;
     private Func<UserControl>? _getConfirmationView;
     private Func<UserControl>? _getResultsView;
@@ -95,8 +89,6 @@ public class NavigationService : INavigationService
         Func<UserControl> getPersonalOrProxyView,
         Func<UserControl> getProxyVoteDetailsView,
         Func<UserControl> getAuthenticateUserView,
-        Func<UserControl> getOfficialAuthenticateView,
-        Func<UserControl> getOfficialMenuView,
         Func<UserControl> getBallotView,
         Func<UserControl> getConfirmationView,
         Func<UserControl> getResultsView,
@@ -106,8 +98,6 @@ public class NavigationService : INavigationService
         _getPersonalOrProxyView = getPersonalOrProxyView;
         _getProxyVoteDetailsView = getProxyVoteDetailsView;
         _getAuthenticateUserView = getAuthenticateUserView;
-        _getOfficialAuthenticateView = getOfficialAuthenticateView;
-        _getOfficialMenuView = getOfficialMenuView;
         _getBallotView = getBallotView;
         _getConfirmationView = getConfirmationView;
         _getResultsView = getResultsView;
@@ -160,24 +150,6 @@ public class NavigationService : INavigationService
 
         if (_authenticateUserView != null)
             NavigationRequested?.Invoke(_authenticateUserView);
-    }
-    
-    public void NavigateToOfficialAuthenticate()
-    {
-        if (_officialAuthenticateView == null && _getOfficialAuthenticateView != null)
-            _officialAuthenticateView = _getOfficialAuthenticateView();
-
-        if (_officialAuthenticateView != null)
-            NavigationRequested?.Invoke(_officialAuthenticateView);
-    }
-    
-    public void NavigateToOfficialMenu()
-    {
-        if (_officialMenuView == null && _getOfficialMenuView != null)
-            _officialMenuView = _getOfficialMenuView();
-
-        if (_officialMenuView != null)
-            NavigationRequested?.Invoke(_officialMenuView);
     }
     
     public void NavigateToBallot()

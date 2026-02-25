@@ -1,7 +1,6 @@
 ﻿using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 using SecureVoteApp.Views.VoterUI;
-using SecureVoteApp.Views.OfficialUI;
 using Avalonia.Controls;
 
 namespace SecureVoteApp.ViewModels;
@@ -23,9 +22,6 @@ public partial class MainWindowViewModel : ViewModelBase
     // ==========================================
     
     // Views
-    private readonly OfficialLoginView _officialLoginView;
-    private readonly OfficialAuthenticateView _officialAuthenticateView;
-    private readonly OfficialMenuView _officialMenuView;
     private readonly NINEntryView _ninEntryView;
     private readonly PersonalOrProxyView _personalOrProxyView;
     private readonly ProxyVoteDetailsView _proxyVoteDetailsView;
@@ -51,9 +47,6 @@ public partial class MainWindowViewModel : ViewModelBase
         _navigationService.NavigationRequested += OnNavigationRequested;
         
         // Initialize views
-        _officialLoginView = new OfficialLoginView { DataContext = new OfficialLoginViewModel() };
-        _officialAuthenticateView = new OfficialAuthenticateView { DataContext = new OfficialAuthenticateViewModel() };
-        _officialMenuView = new OfficialMenuView { DataContext = new OfficialMenuViewModel() };
         _ninEntryView = new NINEntryView { DataContext = new NINEntryViewModel() };
         _personalOrProxyView = new PersonalOrProxyView { DataContext = new PersonalOrProxyViewModel() };
         _proxyVoteDetailsView = new ProxyVoteDetailsView { DataContext = new ProxyVoteDetailsViewModel() };
@@ -67,16 +60,14 @@ public partial class MainWindowViewModel : ViewModelBase
             () => _personalOrProxyView,
             () => _proxyVoteDetailsView,
             () => _authenticateUserView,
-            () => _officialAuthenticateView,
-            () => _officialMenuView,
             () => _ballotPaperView,
             () => throw new NotImplementedException("ConfirmationView not implemented yet"),
             () => throw new NotImplementedException("ResultsView not implemented yet"),
             () => throw new NotImplementedException("SettingsView not implemented yet")
         );
         
-        // Set initial view to Official Login
-        CurrentView = _officialLoginView;
+        // Set initial view to Personal or Proxy selection
+        CurrentView = _personalOrProxyView;
     }
 
 
