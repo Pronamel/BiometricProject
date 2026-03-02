@@ -1,0 +1,14 @@
+@Server_HostAddress = http://localhost:5165
+@Network_HostAddress = http://10.5.0.2:5165
+
+# Test locally (same machine)
+GET {{Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+# Test from network (other devices)  
+GET {{Network_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
