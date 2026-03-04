@@ -26,9 +26,9 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://10.5.0.2:5165/weatherforecast"; // Server IP here
+        _baseUrl = "http://54.164.138.8"; // Server IP here
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(10);
+        _httpClient.Timeout = TimeSpan.FromSeconds(3); // Increased timeout for remote server
         
         // Configure JSON serialization options
         _jsonOptions = new JsonSerializerOptions
@@ -44,23 +44,44 @@ public class ApiService : IApiService
         {
             System.Diagnostics.Debug.WriteLine($"Testing connection to: {_baseUrl}");
             
-            // Try multiple endpoints to test connection
-            var endpoints = new[] { "/api/health", "/api/weather", "/" };
+            // Try different common endpoints to test connectivity
+            var endpointsToTry = new[] 
+            { 
+                "/weatherforecast",
+                "/WeatherForecast", 
+                "/api/weatherforecast",
+                "/api/WeatherForecast",
+                "",  // Just the base URL
+                "/health",
+                "/api/health"
+            };
             
-            foreach (var endpoint in endpoints)
+            foreach (var endpoint in endpointsToTry)
             {
                 try
                 {
-                    var response = await _httpClient.GetAsync($"{_baseUrl}{endpoint}");
+                    var fullUrl = $"{_baseUrl}{endpoint}";
+                    System.Diagnostics.Debug.WriteLine($"Trying: {fullUrl}");
+                    
+                    var response = await _httpClient.GetAsync(fullUrl);
+                    System.Diagnostics.Debug.WriteLine($"Response: {response.StatusCode} - {response.ReasonPhrase}");
+                    
                     if (response.IsSuccessStatusCode)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Connection successful via endpoint: {endpoint}");
+                        System.Diagnostics.Debug.WriteLine($"✅ Connection successful via: {endpoint}");
+                        return true;
+                    }
+                    
+                    // Even 404s mean the server is responding
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"✅ Server is responding (404 on {endpoint})");
                         return true;
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed endpoint {endpoint}: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"❌ Failed {endpoint}: {ex.Message}");
                 }
             }
             
@@ -77,9 +98,9 @@ public class ApiService : IApiService
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine($"Requesting weather data from: {_baseUrl}/api/weather");
+            System.Diagnostics.Debug.WriteLine($"Requesting weather data from: {_baseUrl}/weatherforecast");
             
-            var response = await _httpClient.GetAsync($"{_baseUrl}/api/weather");
+            var response = await _httpClient.GetAsync($"{_baseUrl}/weatherforecast");
             
             if (response.IsSuccessStatusCode)
             {

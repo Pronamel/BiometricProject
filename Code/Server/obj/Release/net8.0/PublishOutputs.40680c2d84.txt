@@ -1,0 +1,12 @@
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Server.exe
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\appsettings.Development.json
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\appsettings.json
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\appsettings.Production.json
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Server.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Server.deps.json
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Server.runtimeconfig.json
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Server.pdb
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.OpenApi.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.Swagger.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.SwaggerGen.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.SwaggerUI.dll

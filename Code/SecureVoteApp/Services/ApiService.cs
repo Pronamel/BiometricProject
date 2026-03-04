@@ -26,9 +26,9 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://10.5.0.2:5165/weatherforecast"; // Server IP here
+        _baseUrl = "http://54.164.138.8"; // Server IP here
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(10);
+        _httpClient.Timeout = TimeSpan.FromSeconds(3);
         
         // Configure JSON serialization options
         _jsonOptions = new JsonSerializerOptions

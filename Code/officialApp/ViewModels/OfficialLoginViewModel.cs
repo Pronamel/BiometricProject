@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -31,6 +33,7 @@ public partial class OfficialLoginViewModel : ViewModelBase
 
     private readonly INavigationService _navigationService;
     private readonly ApiService _apiService;
+    private readonly ApiTestService _apiTestService;
 
     // ==========================================
     // CONSTRUCTOR
@@ -40,6 +43,7 @@ public partial class OfficialLoginViewModel : ViewModelBase
     {
         _navigationService = Navigation.Instance;
         _apiService = ApiService.Instance;
+        _apiTestService = new ApiTestService(_apiService);
     }
 
     // ==========================================
@@ -95,29 +99,40 @@ public partial class OfficialLoginViewModel : ViewModelBase
     {
         try
         {
-            ServerStatus = "Testing connection...";
+            ServerStatus = "Fetching server data...";
             
-            var isConnected = await _apiService.TestConnectionAsync();
+            var dataResults = new List<string>();
             
-            if (isConnected)
+            // Get weather data
+            var weatherData = await _apiService.GetWeatherDataAsync();
+            if (weatherData != null && weatherData.Count > 0)
             {
-                ServerStatus = "✅ Server connection: SUCCESS";
-                
-                // Also test getting weather data as a full API test
-                var weatherData = await _apiService.GetWeatherDataAsync();
-                if (weatherData != null && weatherData.Count > 0)
-                {
-                    ServerStatus = $"✅ Server connected - Received {weatherData.Count} records";
-                }
+                var weatherInfo = string.Join(", ", weatherData.Select(w => $"Temp: {w.TemperatureC}°C Summary: {w.Summary}"));
+                dataResults.Add($"Weather: [{weatherInfo}]");
             }
             else
             {
-                ServerStatus = "❌ Server connection: FAILED";
+                dataResults.Add("Weather: No data");
             }
+            
+            // Get candidates data
+            var candidates = await _apiService.GetCandidatesAsync();
+            if (candidates != null && candidates.Count > 0)
+            {
+                var candidatesInfo = string.Join(", ", candidates);
+                dataResults.Add($"Candidates: [{candidatesInfo}]");
+            }
+            else
+            {
+                dataResults.Add("Candidates: No data");
+            }
+            
+            // Combine all data with spaces
+            ServerStatus = string.Join(" | ", dataResults);
         }
         catch (Exception ex)
         {
-            ServerStatus = $"❌ Server error: {ex.Message}";
+            ServerStatus = $"❌ Error fetching data: {ex.Message}";
         }
     }
 }

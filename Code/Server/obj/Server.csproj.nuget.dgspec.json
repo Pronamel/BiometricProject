@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\Server\\Server.csproj": {}
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj": {}
   },
   "projects": {
-    "c:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\Server\\Server.csproj": {
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\Server\\Server.csproj",
+        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj",
         "projectName": "Server",
-        "projectPath": "c:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\Server\\Server.csproj",
+        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj",
         "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\Server\\obj\\",
+        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",

@@ -442,11 +442,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\Server\\Server.csproj",
+      "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\server\\Server.csproj",
       "projectName": "Server",
-      "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\Server\\Server.csproj",
+      "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\server\\Server.csproj",
       "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\Server\\obj\\",
+      "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\server\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",

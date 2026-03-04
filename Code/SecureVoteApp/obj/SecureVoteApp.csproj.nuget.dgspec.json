@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\securevoteapp\\SecureVoteApp.csproj": {}
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\SecureVoteApp\\SecureVoteApp.csproj": {}
   },
   "projects": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\securevoteapp\\SecureVoteApp.csproj": {
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\SecureVoteApp\\SecureVoteApp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\securevoteapp\\SecureVoteApp.csproj",
+        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\SecureVoteApp\\SecureVoteApp.csproj",
         "projectName": "SecureVoteApp",
-        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\securevoteapp\\SecureVoteApp.csproj",
+        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\SecureVoteApp\\SecureVoteApp.csproj",
         "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\avaloniaApp\\securevoteapp\\obj\\",
+        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\SecureVoteApp\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",

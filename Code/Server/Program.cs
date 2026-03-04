@@ -1,14 +1,30 @@
 var builder = WebApplication.CreateBuilder(args);
 
+// Force port 80 in all environments
+builder.WebHost.UseUrls("http://0.0.0.0:80");
+
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add CORS for local network access
+// Add CORS for production
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("ProductionCors", policy =>
+    {
+        // Replace with your actual domain(s) and client applications
+        policy.WithOrigins(
+                "http://yourdomain.com", 
+                "http://www.yourdomain.com"
+              )
+              .AllowAnyMethod() 
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+    
+    // Keep development policy for local testing
+    options.AddPolicy("DevelopmentCors", policy =>
     {
         policy.AllowAnyOrigin()
               .AllowAnyMethod() 
@@ -23,10 +39,26 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    
+    // Use permissive CORS in development
+    app.UseCors("DevelopmentCors");
+}
+else
+{
+    // Production configuration
+    app.UseExceptionHandler("/Error");
+    // app.UseHsts(); // Disabled for HTTP-only configuration
+    
+    // Use secure CORS in production
+    app.UseCors("ProductionCors");
 }
 
-// Enable CORS
-app.UseCors("AllowAll");
+// Enable HTTPS redirection in production (only if HTTPS is configured)
+// Commented out since we're running HTTP-only
+// if (!app.Environment.IsDevelopment())
+// {
+//     app.UseHttpsRedirection();
+// }
 
 // Add request logging middleware
 app.Use(async (context, next) =>
@@ -40,9 +72,6 @@ app.Use(async (context, next) =>
     
     await next();
 });
-
-// HTTPS redirection disabled for local network access
-// app.UseHttpsRedirection();
 
 var summaries = new[]
 {
@@ -77,20 +106,6 @@ app.MapGet("/weatherforecast/api/weather", () =>
     return forecast;
 })
 .WithName("GetWeatherForecastApi");
-
-app.MapGet("/weatherforecast/", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecastRoot");
 
 app.MapGet("/weatherforecast/api/health", () =>
 {

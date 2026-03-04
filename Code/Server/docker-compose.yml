@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  biometric-server:
+    build: .
+    container_name: biometric-server
+    ports:
+      - "80:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+    volumes:
+      - ./certs:/app/certs  # Mount for SSL certificates
+      - ./logs:/app/logs    # Mount for application logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/weatherforecast/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
