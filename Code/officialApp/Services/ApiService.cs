@@ -1,3 +1,8 @@
+
+// This service handles communication with the server for device management.
+// It provides methods to get device information, update it, and manage connected devices.
+
+
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -15,6 +20,18 @@ public class ApiService : IApiService
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
     private readonly JsonSerializerOptions _jsonOptions;
+    
+    // JWT Authentication fields
+    private string? _jwtToken;
+    private DateTime _tokenExpiry;
+    private string? _currentOfficialId;
+    private string? _currentStationId;
+    
+    // Authentication properties
+    public bool IsAuthenticated => 
+        !string.IsNullOrEmpty(_jwtToken) && DateTime.UtcNow < _tokenExpiry;
+    
+    public string? CurrentOfficialId => _currentOfficialId;
 
     static ApiService()
     {
@@ -26,7 +43,7 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://54.164.138.8"; // Server IP here
+        _baseUrl = "http://54.174.219.195"; // Server IP here
         
         _httpClient.Timeout = TimeSpan.FromSeconds(3); // Increased timeout for remote server
         
@@ -38,183 +55,185 @@ public class ApiService : IApiService
         };
     }
 
+    //--------------------------------------------
+    // JWT Authentication Methods
+    //--------------------------------------------
+
+    public async Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string? password = null)
+    {
+        try
+        {
+            var loginRequest = new OfficialLoginRequest
+            {
+                OfficialId = officialId,
+                StationId = stationId,
+                Password = password
+            };
+
+            var jsonContent = JsonSerializer.Serialize(loginRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending login request:");
+            Console.WriteLine($"  Official ID: '{officialId}'");
+            Console.WriteLine($"  Station ID: '{stationId}'");
+            Console.WriteLine($"  JSON: {jsonContent}");
+
+            var response = await _httpClient.PostAsync($"{_baseUrl}/auth/official-login", content);
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Response Status: {response.StatusCode}");
+            
+            var responseContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Response Body: {responseContent}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var loginResponse = JsonSerializer.Deserialize<OfficialLoginResponse>(responseContent, _jsonOptions);
+
+                if (loginResponse?.Success == true && !string.IsNullOrEmpty(loginResponse.Token))
+                {
+                    // Store authentication state
+                    _jwtToken = loginResponse.Token;
+                    _tokenExpiry = loginResponse.ExpiresAt;
+                    _currentOfficialId = loginResponse.OfficialId;
+                    _currentStationId = loginResponse.StationId;
+
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} logged in successfully");
+                    return loginResponse;
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Login error: {ex.Message}");
+            return null;
+        }
+    }
+
+    public void Logout()
+    {
+        _jwtToken = null;
+        _tokenExpiry = DateTime.MinValue;
+        _currentOfficialId = null;
+        _currentStationId = null;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official logged out");
+    }
+
+    private void AddAuthorizationHeader(HttpRequestMessage request)
+    {
+        if (!string.IsNullOrEmpty(_jwtToken) && DateTime.UtcNow < _tokenExpiry)
+        {
+            request.Headers.Add("Authorization", $"Bearer {_jwtToken}");
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendAuthenticatedGetAsync(string endpoint)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}{endpoint}");
+        AddAuthorizationHeader(request);
+        return await _httpClient.SendAsync(request);
+    }
+
+    private async Task<HttpResponseMessage> SendAuthenticatedPostAsync(string endpoint, HttpContent content)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}{endpoint}");
+        request.Content = content;
+        AddAuthorizationHeader(request);
+        return await _httpClient.SendAsync(request);
+    }
+
     public async Task<bool> TestConnectionAsync()
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine($"Testing connection to: {_baseUrl}");
-            
-            // Try different common endpoints to test connectivity
-            var endpointsToTry = new[] 
-            { 
-                "/weatherforecast",
-                "/WeatherForecast", 
-                "/api/weatherforecast",
-                "/api/WeatherForecast",
-                "",  // Just the base URL
-                "/health",
-                "/api/health"
-            };
-            
-            foreach (var endpoint in endpointsToTry)
-            {
-                try
-                {
-                    var fullUrl = $"{_baseUrl}{endpoint}";
-                    System.Diagnostics.Debug.WriteLine($"Trying: {fullUrl}");
-                    
-                    var response = await _httpClient.GetAsync(fullUrl);
-                    System.Diagnostics.Debug.WriteLine($"Response: {response.StatusCode} - {response.ReasonPhrase}");
-                    
-                    if (response.IsSuccessStatusCode)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"✅ Connection successful via: {endpoint}");
-                        return true;
-                    }
-                    
-                    // Even 404s mean the server is responding
-                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"✅ Server is responding (404 on {endpoint})");
-                        return true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"❌ Failed {endpoint}: {ex.Message}");
-                }
-            }
-            
-            return false;
+            var response = await _httpClient.GetAsync($"{_baseUrl}/securevote");
+            return response.IsSuccessStatusCode;
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"Connection test failed: {ex.Message}");
             return false;
         }
     }
 
-    public async Task<List<ServerResponse>?> GetWeatherDataAsync()
+    //--------------------------------------------
+    // Device Management API Methods
+    //--------------------------------------------
+
+    public async Task<bool> SendDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo)
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine($"Requesting weather data from: {_baseUrl}/weatherforecast");
+            var jsonContent = JsonSerializer.Serialize(deviceInfo, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
             
-            var response = await _httpClient.GetAsync($"{_baseUrl}/weatherforecast");
+            var response = await SendAuthenticatedPostAsync("/api/devices/sync", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<DeviceManagementInfo?> GetDeviceManagementInfoAsync()
+    {
+        try
+        {
+            var response = await SendAuthenticatedGetAsync("/api/devices/management-info");
             
             if (response.IsSuccessStatusCode)
             {
                 var jsonString = await response.Content.ReadAsStringAsync();
-                System.Diagnostics.Debug.WriteLine($"Received response: {jsonString}");
-                
-                var data = JsonSerializer.Deserialize<List<ServerResponse>>(jsonString, _jsonOptions);
-                System.Diagnostics.Debug.WriteLine($"Deserialized {data?.Count ?? 0} weather records");
-                
-                return data;
+                return JsonSerializer.Deserialize<DeviceManagementInfo>(jsonString, _jsonOptions);
             }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"Weather API request failed: {response.StatusCode} - {response.ReasonPhrase}");
-                return null;
-            }
-        }
-        catch (JsonException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"JSON Deserialization error: {ex.Message}");
+            
             return null;
         }
-        catch (HttpRequestException ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"HTTP request error: {ex.Message}");
-            return null;
-        }
-        catch (TaskCanceledException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Request timeout: {ex.Message}");
-            return null;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Unexpected API error: {ex.Message}");
             return null;
         }
     }
 
-    public async Task<bool> SubmitVoteAsync(string candidateName, string party)
-    {
-        try
-        {
-            var voteData = new { candidateName, party, timestamp = DateTime.UtcNow };
-            var json = JsonSerializer.Serialize(voteData, _jsonOptions);
-            
-            System.Diagnostics.Debug.WriteLine($"Submitting vote: {json}");
-            
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/vote", content);
-            
-            if (response.IsSuccessStatusCode)
-            {
-                System.Diagnostics.Debug.WriteLine("Vote submitted successfully");
-                return true;
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                System.Diagnostics.Debug.WriteLine($"Vote submission failed: {response.StatusCode} - {errorContent}");
-                return false;
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Vote submission error: {ex.Message}");
-            return false;
-        }
-    }
+    //--------------------------------------------
+    // Long Polling Methods  
+    //--------------------------------------------
 
-    public async Task<List<string>?> GetCandidatesAsync()
+    public async Task<OfficialRequestsResponse?> WaitForVoterRequestsAsync()
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine($"Requesting candidates from: {_baseUrl}/api/candidates");
-            
-            var response = await _httpClient.GetAsync($"{_baseUrl}/api/candidates");
+            var response = await SendAuthenticatedGetAsync("/api/official/wait-for-requests");
             
             if (response.IsSuccessStatusCode)
             {
                 var jsonString = await response.Content.ReadAsStringAsync();
-                System.Diagnostics.Debug.WriteLine($"Received candidates response: {jsonString}");
-                
-                var data = JsonSerializer.Deserialize<List<string>>(jsonString, _jsonOptions);
-                System.Diagnostics.Debug.WriteLine($"Deserialized {data?.Count ?? 0} candidates");
-                
-                return data;
+                return JsonSerializer.Deserialize<OfficialRequestsResponse>(jsonString, _jsonOptions);
             }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"Candidates API request failed: {response.StatusCode} - {response.ReasonPhrase}");
-                return null;
-            }
-        }
-        catch (JsonException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"JSON Deserialization error: {ex.Message}");
+            
             return null;
         }
-        catch (HttpRequestException ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"HTTP request error: {ex.Message}");
             return null;
         }
-        catch (TaskCanceledException ex)
+    }
+
+    public async Task<bool> GenerateAccessCodeAsync(string voterId)
+    {
+        try
         {
-            System.Diagnostics.Debug.WriteLine($"Request timeout: {ex.Message}");
-            return null;
+            var request = new GenerateCodeRequest { VoterId = voterId };
+            var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            var response = await SendAuthenticatedPostAsync("/api/official/generate-code", content);
+            return response.IsSuccessStatusCode;
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"Unexpected API error: {ex.Message}");
-            return null;
+            return false;
         }
     }
 }

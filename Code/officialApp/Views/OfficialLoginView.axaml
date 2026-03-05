@@ -24,14 +24,14 @@
                        Foreground="DarkSlateGray" 
                        Margin="0,0,0,20"/>
 
-            <!-- Username Section -->
+            <!-- Official ID Section -->
             <StackPanel Spacing="8">
-                <TextBlock Text="Username" 
+                <TextBlock Text="Official ID" 
                            FontSize="16" 
                            FontWeight="SemiBold"
                            Foreground="DarkSlateGray"/>
-                <TextBox Name="UsernameTextBox"
-                         Text="{Binding Username}"
+                <TextBox Name="OfficialIdTextBox"
+                         Text="{Binding OfficialId}"
                          Background="White"
                          BorderBrush="Gray"
                          BorderThickness="2"
@@ -41,9 +41,26 @@
                          Height="40"/>
             </StackPanel>
 
-            <!-- Password Section -->
+            <!-- Station ID Section -->
             <StackPanel Spacing="8">
-                <TextBlock Text="Password" 
+                <TextBlock Text="Station ID" 
+                           FontSize="16" 
+                           FontWeight="SemiBold"
+                           Foreground="DarkSlateGray"/>
+                <TextBox Name="StationIdTextBox"
+                         Text="{Binding StationId}"
+                         Background="White"
+                         BorderBrush="Gray"
+                         BorderThickness="2"
+                         CornerRadius="5"
+                         Padding="10"
+                         FontSize="14"
+                         Height="40"/>
+            </StackPanel>
+
+            <!-- Password Section (Optional) -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Password (Optional)" 
                            FontSize="16" 
                            FontWeight="SemiBold"
                            Foreground="DarkSlateGray"/>
@@ -59,13 +76,22 @@
                          Height="40"/>
             </StackPanel>
 
-            <!-- Server Status Display -->
-            <TextBlock Text="{Binding ServerStatus}"
+            <!-- Login Status Display -->
+            <TextBlock Text="{Binding LoginStatus}"
                        FontSize="14"
                        FontWeight="SemiBold"
                        HorizontalAlignment="Center"
                        Foreground="DarkSlateGray"
                        Margin="0,10,0,0"
+                       TextWrapping="Wrap"/>
+
+            <!-- Server Status Display -->
+            <TextBlock Text="{Binding ServerStatus}"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"
+                       Foreground="Gray"
+                       Margin="0,5,0,0"
                        TextWrapping="Wrap"/>
 
             <!-- Test Server Connection Button -->
@@ -90,8 +116,9 @@
             </Button>
 
             <!-- Authenticate Button -->
-            <Button Command="{Binding AuthenticateOfficialCommand}"
-                    Content="Authenticate >"
+            <Button Command="{Binding AuthenticateCommand}"
+                    Content="Login"
+                    IsEnabled="{Binding !IsLoggingIn}"
                     Background="#0bac02"
                     Foreground="White"
                     FontSize="16"
@@ -105,7 +132,12 @@
                     Cursor="Hand">
                 <Button.Styles>
                     <Style Selector="Button:pointerover">
-                        <Setter Property="Background" Value="#005A9E"/>
+                        <Setter Property="Background" Value="#098a02"/>
+                    </Style>
+                    <Style Selector="Button:disabled">
+                        <Setter Property="Background" Value="#cccccc"/>
+                        <Setter Property="Foreground" Value="#666666"/>
+                        <Setter Property="BorderBrush" Value="#999999"/>
                     </Style>
                 </Button.Styles>
             </Button>

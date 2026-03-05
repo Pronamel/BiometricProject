@@ -35,3 +35,11 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\server\obj\Release\net
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\server\obj\Release\net8.0\Server.genruntimeconfig.cache
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\server\obj\Release\net8.0\ref\Server.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\server\bin\Release\net8.0\appsettings.Production.json
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Microsoft.IdentityModel.Abstractions.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Microsoft.IdentityModel.Logging.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Microsoft.IdentityModel.Protocols.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Microsoft.IdentityModel.Tokens.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\System.IdentityModel.Tokens.Jwt.dll

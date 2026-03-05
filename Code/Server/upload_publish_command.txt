@@ -1,1 +1,0 @@
-scp -i "Server-Key.pem" -r . ec2-user@[Enter new IP in here (delete [] brackets)]:/home/ec2-user/serverSpace

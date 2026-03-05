@@ -1,13 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Text.Json;
-using System.Net.Http;
-using System.Reflection;
-using Avalonia.Controls;
 using officialApp.Services;
 
 namespace officialApp.ViewModels;
@@ -19,21 +13,30 @@ public partial class OfficialLoginViewModel : ViewModelBase
     // ==========================================
 
     [ObservableProperty]
-    private string username = "";
+    private string officialId = "";
 
     [ObservableProperty]  
+    private string stationId = "";
+
+    [ObservableProperty]
     private string password = "";
 
     [ObservableProperty]
     private string serverStatus = "Server status: Not tested";
+
+    [ObservableProperty]
+    private string loginStatus = "";
+
+    [ObservableProperty]
+    private bool isLoggingIn = false;
 
     // ==========================================
     // PRIVATE READONLY FIELDS
     // ==========================================
 
     private readonly INavigationService _navigationService;
-    private readonly ApiService _apiService;
-    private readonly ApiTestService _apiTestService;
+    private readonly IServerHandler _serverHandler;
+    private readonly IApiService _apiService;
 
     // ==========================================
     // CONSTRUCTOR
@@ -42,8 +45,8 @@ public partial class OfficialLoginViewModel : ViewModelBase
     public OfficialLoginViewModel()
     {
         _navigationService = Navigation.Instance;
+        _serverHandler = ServerHandler.Instance;
         _apiService = ApiService.Instance;
-        _apiTestService = new ApiTestService(_apiService);
     }
 
     // ==========================================
@@ -53,38 +56,55 @@ public partial class OfficialLoginViewModel : ViewModelBase
     [RelayCommand]
     private async Task Authenticate()
     {
+        if (IsLoggingIn) return;
+
         try
         {
-            // TODO: Implement authentication logic
-            // For now, just a placeholder
-            if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
+            IsLoggingIn = true;
+            LoginStatus = "Authenticating...";
+
+            // Validate input
+            if (string.IsNullOrWhiteSpace(OfficialId))
             {
-                // Could show error message
+                LoginStatus = "❌ Official ID is required";
                 return;
             }
 
-            // Simulate authentication delay
-            await Task.Delay(1000);
-
-            // TODO: Add actual authentication logic here
-            // For now, accept any non-empty username/password
-            if (Username.Length > 0 && Password.Length > 0)
+            if (string.IsNullOrWhiteSpace(StationId))
             {
-                // Authentication successful - proceed to biometric authentication
-                Console.WriteLine($"Official {Username} authenticated successfully");
+                LoginStatus = "❌ Station ID is required";
+                return;
+            }
+
+            // Attempt JWT authentication
+            var loginResponse = await _apiService.LoginAsync(OfficialId, StationId, Password);
+            
+            if (loginResponse != null && loginResponse.Success)
+            {
+                LoginStatus = $"✅ Authentication successful! Welcome, {loginResponse.OfficialId}";
+                Console.WriteLine($"Official {loginResponse.OfficialId} authenticated successfully at station {loginResponse.StationId}");
                 
-                // Navigate to official biometric authentication
+                // Wait a moment to show success message
+                await Task.Delay(1500);
+                
+                // Navigate to biometric authentication
                 _navigationService.NavigateToOfficialAuthenticate();
             }
             else
             {
-                // Authentication failed
-                Console.WriteLine("Authentication failed");
+                string errorMsg = loginResponse?.Success == false ? "Invalid credentials or unauthorized access" : "Authentication failed - no response";
+                LoginStatus = $"❌ {errorMsg}";
+                Console.WriteLine($"Authentication failed for {OfficialId}: {errorMsg}");
             }
         }
         catch (Exception ex)
         {
+            LoginStatus = $"❌ Authentication error: {ex.Message}";
             Console.WriteLine($"Authentication error: {ex.Message}");
+        }
+        finally
+        {
+            IsLoggingIn = false;
         }
     }
 
@@ -99,40 +119,34 @@ public partial class OfficialLoginViewModel : ViewModelBase
     {
         try
         {
-            ServerStatus = "Fetching server data...";
+            ServerStatus = "Testing connection...";
             
-            var dataResults = new List<string>();
-            
-            // Get weather data
-            var weatherData = await _apiService.GetWeatherDataAsync();
-            if (weatherData != null && weatherData.Count > 0)
+            // Test connection first
+            bool connected = await _serverHandler.TestConnectionAsync();
+            if (!connected)
             {
-                var weatherInfo = string.Join(", ", weatherData.Select(w => $"Temp: {w.TemperatureC}°C Summary: {w.Summary}"));
-                dataResults.Add($"Weather: [{weatherInfo}]");
+                ServerStatus = "❌ Server connection failed";
+                return;
+            }
+            
+            // Get device management info
+            var deviceInfo = await _serverHandler.GetDeviceManagementInfoAsync();
+            if (deviceInfo != null)
+            {
+                var deviceNames = deviceInfo.DeviceNames?.Count > 0 ? 
+                    string.Join(", ", deviceInfo.DeviceNames) : "No devices";
+                
+                ServerStatus = $"✅ Connected | Station: {deviceInfo.PollingStationID} | " +
+                             $"Devices: {deviceInfo.No_ConnectedDevices} ({deviceNames})";
             }
             else
             {
-                dataResults.Add("Weather: No data");
+                ServerStatus = "✅ Connected, but no device info available";
             }
-            
-            // Get candidates data
-            var candidates = await _apiService.GetCandidatesAsync();
-            if (candidates != null && candidates.Count > 0)
-            {
-                var candidatesInfo = string.Join(", ", candidates);
-                dataResults.Add($"Candidates: [{candidatesInfo}]");
-            }
-            else
-            {
-                dataResults.Add("Candidates: No data");
-            }
-            
-            // Combine all data with spaces
-            ServerStatus = string.Join(" | ", dataResults);
         }
         catch (Exception ex)
         {
-            ServerStatus = $"❌ Error fetching data: {ex.Message}";
+            ServerStatus = $"❌ Error: {ex.Message}";
         }
     }
 }

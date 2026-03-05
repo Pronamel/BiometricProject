@@ -6,7 +6,15 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Server.deps.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Server.runtimeconfig.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Server.pdb
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.IdentityModel.Abstractions.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.IdentityModel.Logging.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.IdentityModel.Protocols.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.IdentityModel.Tokens.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Microsoft.OpenApi.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.Swagger.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.SwaggerGen.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Swashbuckle.AspNetCore.SwaggerUI.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\System.IdentityModel.Tokens.Jwt.dll

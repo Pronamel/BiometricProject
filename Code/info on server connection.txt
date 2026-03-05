@@ -8,4 +8,11 @@ code for getting ec2-user
 
 
 uploading info to the server 
-	$ scp -i "C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server-Key.pem" -r . ec2-user@54.164.138.8:/home/ec2-user/serverSpace
+	scp -i "C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server-Key.pem" -r . ec2-user@54.174.219.195:/home/ec2-user/serverSpace
+
+start server
+	sudo dotnet Server.dll
+
+
+check date of file change 
+	ls -l 

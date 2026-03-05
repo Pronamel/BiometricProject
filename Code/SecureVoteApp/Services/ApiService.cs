@@ -26,7 +26,7 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://54.164.138.8"; // Server IP here
+        _baseUrl = "http://3.88.160.93"; // Server IP here
         
         _httpClient.Timeout = TimeSpan.FromSeconds(3);
         
