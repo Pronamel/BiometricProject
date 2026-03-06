@@ -7,7 +7,7 @@ namespace officialApp.Services;
 public interface IApiService
 {
     // Authentication
-    Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string? password = null);
+    Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string county, string systemCode, string? password = null);
     bool IsAuthenticated { get; }
     string? CurrentOfficialId { get; }
     void Logout();
@@ -20,4 +20,7 @@ public interface IApiService
     // Long Polling Methods
     Task<OfficialRequestsResponse?> WaitForVoterRequestsAsync();
     Task<bool> GenerateAccessCodeAsync(string voterId);
+    
+    // Vote Management
+    Task<VoteNotificationResponse?> CheckForVotesAsync();
 }

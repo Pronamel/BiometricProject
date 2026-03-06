@@ -2,10 +2,9 @@ using System;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Text.Json;
-using System.Net.Http;
-using System.Reflection;
-using Avalonia.Controls;
+using officialApp.Services;
+using officialApp.Models;
+using System.Threading;
 using Avalonia.Media;
 
 namespace officialApp.ViewModels;
@@ -17,6 +16,8 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
+    private readonly IApiService _apiService;
+    private CancellationTokenSource? _voteListeningCancellation;
 
     // ==========================================
     // OBSERVABLE PROPERTIES
@@ -59,6 +60,15 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
 
     [ObservableProperty]
     private string systemStatus = "Online";
+    
+    [ObservableProperty]
+    private int totalVotesCast = 0;
+    
+    [ObservableProperty]
+    private string lastVoteInfo = "No votes cast yet";
+    
+    [ObservableProperty] 
+    private bool isListeningForVotes = false;
 
     // ==========================================
     // CONSTRUCTOR
@@ -67,12 +77,90 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     public OfficialVotingPollingManagerViewModel()
     {
         _navigationService = Navigation.Instance;
+        _apiService = ApiService.Instance;
         InitializeSystemStatus();
+        
+        // Start listening for votes when this view model is created
+        _ = StartVoteListening();
     }
 
     // ==========================================
     // COMMANDS
     // ==========================================
+    
+    [RelayCommand]
+    private async Task StartVoteListening()
+    {
+        if (IsListeningForVotes) return;
+        
+        IsListeningForVotes = true;
+        _voteListeningCancellation = new CancellationTokenSource();
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official starting to listen for votes...");
+        
+        try
+        {
+            while (IsListeningForVotes && !_voteListeningCancellation.Token.IsCancellationRequested)
+            {
+                // Check for new votes through API
+                var voteResponse = await _apiService.CheckForVotesAsync();
+                
+                if (voteResponse?.Success == true && voteResponse.Count > 0)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received {voteResponse.Count} new votes");
+                    
+                    // Process each vote
+                    foreach (var vote in voteResponse.Votes)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Processing vote from Voter {vote.VoterId}: {vote.CandidateName} - {vote.PartyName}");
+                        OnVoteReceived(vote.CandidateName, vote.PartyName, vote.VoterId);
+                    }
+                }
+                
+                // Wait 2 seconds before checking again
+                await Task.Delay(2000, _voteListeningCancellation.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote listening was cancelled");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote listening error: {ex.Message}");
+        }
+        finally
+        {
+            IsListeningForVotes = false;
+        }
+    }
+    
+    // Method to be called when a vote is received
+    public void OnVoteReceived(string candidateName, string partyName, int voterId)
+    {
+        TotalVotesCast++;
+        
+        // Update the UI-bound properties
+        TotalVotes = TotalVotesCast.ToString();
+        ValidVotes = TotalVotesCast.ToString(); // Assuming all votes are valid for now
+        
+        LastVoteInfo = $"Vote #{TotalVotesCast}: {candidateName} - {partyName} (Voter ID: {voterId})";
+        
+        // Update status messages to show latest vote
+        StatusMessages = $"System initialized successfully.\nPolling stations online: 45/45\nLast update: {DateTime.Now:HH:mm:ss}\n\nLATEST VOTE:\n{LastVoteInfo}\nTotal Votes: {TotalVotesCast}";
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote received: {LastVoteInfo}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Total votes now: {TotalVotesCast}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] UI TotalVotes updated to: {TotalVotes}");
+    }
+    
+    [RelayCommand]
+    private void StopVoteListening()
+    {
+        IsListeningForVotes = false;
+        _voteListeningCancellation?.Cancel();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official stopped listening for votes");
+    }
     
     [RelayCommand]
     private void Execute()

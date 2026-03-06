@@ -10,6 +10,7 @@ namespace SecureVoteApp.ViewModels;
 // Interface defining navigation methods
 public interface INavigationService
 {
+    void NavigateToVoterLogin();
     void NavigateToMain();
     void NavigateToNINEntry();
     void NavigateToPersonalOrProxy();
@@ -50,6 +51,7 @@ public class NavigationService : INavigationService
     // ==========================================
     
     // Store references to views for reuse
+    private UserControl? _voterLoginView;
     private UserControl? _ninEntryView;
     private UserControl? _personalOrProxyView;
     private UserControl? _proxyVoteDetailsView;
@@ -67,6 +69,7 @@ public class NavigationService : INavigationService
     // ==========================================
     
     // Reference to MainWindowViewModel to access views
+    private Func<UserControl>? _getVoterLoginView;
     private Func<UserControl>? _getNINEntryView;
     private Func<UserControl>? _getPersonalOrProxyView;
     private Func<UserControl>? _getProxyVoteDetailsView;
@@ -85,6 +88,7 @@ public class NavigationService : INavigationService
     
     // Initialize with view factory methods
     public void Initialize(
+        Func<UserControl> getVoterLoginView,
         Func<UserControl> getNINEntryView, 
         Func<UserControl> getPersonalOrProxyView,
         Func<UserControl> getProxyVoteDetailsView,
@@ -94,6 +98,7 @@ public class NavigationService : INavigationService
         Func<UserControl> getResultsView,
         Func<UserControl> getSettingsView)
     {
+        _getVoterLoginView = getVoterLoginView;
         _getNINEntryView = getNINEntryView;
         _getPersonalOrProxyView = getPersonalOrProxyView;
         _getProxyVoteDetailsView = getProxyVoteDetailsView;
@@ -110,6 +115,15 @@ public class NavigationService : INavigationService
     // ==========================================
     // NAVIGATION METHODS
     // ==========================================
+    
+    public void NavigateToVoterLogin()
+    {
+        if (_voterLoginView == null && _getVoterLoginView != null)
+            _voterLoginView = _getVoterLoginView();
+            
+        if (_voterLoginView != null)
+            NavigationRequested?.Invoke(_voterLoginView);
+    }
     
     public void NavigateToMain()
     {

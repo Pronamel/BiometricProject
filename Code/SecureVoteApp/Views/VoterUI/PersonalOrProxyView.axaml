@@ -16,58 +16,52 @@
     </Design.DataContext>
     
 
-    <Grid Background="#f6f2e6" > 
+    <Grid Background="#f6f2e6">
+        
+        <!-- Title -->
+        <TextBlock Text="Select Vote Type" 
+                   FontSize="28" 
+                   FontWeight="Bold"
+                   HorizontalAlignment="Center" 
+                   VerticalAlignment="Top"
+                   Foreground="DarkSlateGray" 
+                   Margin="0,40,0,0"/>
 
-        <StackPanel>
-            <TextBlock Text="hellow" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black"/>
-            
-            <!-- Server Test Button -->
-            <Button 
-                Command="{Binding TestServerCommand}"
-                Background="blue"  
-                Width="150"
-                Height="40" 
-                HorizontalAlignment="Center" 
-                VerticalAlignment="Top"
-                Margin="0,20,0,20"
-                BorderThickness="2"
-                BorderBrush="Black"
-                FontSize="16">
-                <TextBlock Text="Test Server" HorizontalAlignment="Center" Foreground="white"/>
-            </Button>
-        </StackPanel>
-
+        <!-- Personal Vote Button -->
         <Button 
             Command="{Binding OpenNINEntryCommand}"
             Background="purple"  
-            Width="100"
-            Height="100" 
+            Width="120"
+            Height="120" 
             HorizontalAlignment="Center" 
             VerticalAlignment="Center"
-            Margin="0,0,250,0"
+            Margin="0,0,200,0"
             BorderThickness="2"
             BorderBrush="Black"
-            FontSize="20">
+            FontSize="18"
+            CornerRadius="10">
             <StackPanel>
-                <TextBlock Text="Personal" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
-                <TextBlock Text="Vote" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+                <TextBlock Text="Personal" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                <TextBlock Text="Vote" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
             </StackPanel>
         </Button>
 
+        <!-- Proxy Vote Button -->
         <Button
             Command="{Binding OpenProxyVoteCommand}"
             Background="green"  
-            Width="100"
-            Height="100" 
+            Width="120"
+            Height="120" 
             HorizontalAlignment="Center" 
             VerticalAlignment="Center"
-            Margin="250,0,0,0"
+            Margin="200,0,0,0"
             BorderThickness="2"
             BorderBrush="Black"
-            FontSize="20">
+            FontSize="18"
+            CornerRadius="10">
             <StackPanel>
-                <TextBlock Text="Proxy" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
-                <TextBlock Text="Vote" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="white"/>
+                <TextBlock Text="Proxy" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                <TextBlock Text="Vote" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
             </StackPanel>
         </Button>
     </Grid>

@@ -43,9 +43,9 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://54.174.219.195"; // Server IP here
+        _baseUrl = "http://localhost:5000"; // Local server
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(3); // Increased timeout for remote server
+        _httpClient.Timeout = TimeSpan.FromSeconds(3); // Timeout for local server
         
         // Configure JSON serialization options
         _jsonOptions = new JsonSerializerOptions
@@ -59,7 +59,7 @@ public class ApiService : IApiService
     // JWT Authentication Methods
     //--------------------------------------------
 
-    public async Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string? password = null)
+    public async Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string county, string systemCode, string? password = null)
     {
         try
         {
@@ -67,6 +67,8 @@ public class ApiService : IApiService
             {
                 OfficialId = officialId,
                 StationId = stationId,
+                County = county,
+                SystemCode = systemCode,
                 Password = password
             };
 
@@ -110,7 +112,33 @@ public class ApiService : IApiService
             return null;
         }
     }
+    public async Task<VoteNotificationResponse?> CheckForVotesAsync()
+    {
+        try
+        {
+            if (!IsAuthenticated)
+            {
+                Console.WriteLine("Not authenticated for vote checking");
+                return null;
+            }
 
+            var response = await SendAuthenticatedGetAsync("/api/official/wait-for-votes");
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var voteResponse = JsonSerializer.Deserialize<VoteNotificationResponse>(responseContent, _jsonOptions);
+                return voteResponse;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Vote checking error: {ex.Message}");
+            return null;
+        }
+    }
     public void Logout()
     {
         _jwtToken = null;
@@ -157,43 +185,21 @@ public class ApiService : IApiService
     }
 
     //--------------------------------------------
-    // Device Management API Methods
+    // Device Management API Methods (DISABLED - removed from server)
     //--------------------------------------------
 
+    // NOTE: Device management functionality has been removed from the server
+    // These methods are kept for reference but will return false/null
     public async Task<bool> SendDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo)
     {
-        try
-        {
-            var jsonContent = JsonSerializer.Serialize(deviceInfo, _jsonOptions);
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-            
-            var response = await SendAuthenticatedPostAsync("/api/devices/sync", content);
-            return response.IsSuccessStatusCode;
-        }
-        catch
-        {
-            return false;
-        }
+        // Device management removed from server - always return false
+        return false;
     }
 
     public async Task<DeviceManagementInfo?> GetDeviceManagementInfoAsync()
     {
-        try
-        {
-            var response = await SendAuthenticatedGetAsync("/api/devices/management-info");
-            
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonString = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<DeviceManagementInfo>(jsonString, _jsonOptions);
-            }
-            
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
+        // Device management removed from server - always return null
+        return null;
     }
 
     //--------------------------------------------

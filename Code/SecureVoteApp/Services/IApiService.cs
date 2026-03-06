@@ -7,8 +7,31 @@ namespace SecureVoteApp.Services;
 
 public interface IApiService
 {
-    Task<List<ServerResponse>?> GetWeatherDataAsync();
-    Task<bool> SubmitVoteAsync(string candidateName, string party);
-    Task<List<string>?> GetCandidatesAsync();
+    // Authentication & Session Management
+    Task<VoterSessionResponse?> CreateSessionAsync(string voterId, string county, string? stationId = null);
+    Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county);
+    
+    // Vote Casting
+    Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName);
+    
+    // Voter State
+    bool IsAuthenticated { get; }
+    string? CurrentVoterId { get; }
+    string? AssignedStationId { get; }
+    int AssignedVoterId { get; }
+    string SelectedCounty { get; }
+    string PollingStationCode { get; }
+    void Logout();
+    
+    // Connection Testing
     Task<bool> TestConnectionAsync();
+    
+    // Voter Access Management
+    Task<bool> RequestAccessAsync(string? deviceName = null);
+    Task<CodeWaitResponse?> WaitForAccessCodeAsync();
+    
+    // Real-time Communication (Distributed Validation)
+    Task<bool> SubmitCodeForVerificationAsync(string accessCode);
+    Task<VoterCommandResponse?> ListenForCommandsAsync();
+    Task<bool> SendStatusUpdateAsync(string status, string? additionalData = null);
 }

@@ -35,15 +35,25 @@
             </StackPanel>
             
             <!-- Cast Vote Button at top right -->
-            <Button HorizontalAlignment="Right" 
-                    VerticalAlignment="Center" 
-                    Margin="0,0,25,0"
-                    Content="cast vote >"
-                    FontSize="16"
-                    FontWeight="Bold"
-                    Background="#4CAF50"
-                    Foreground="White"
-                    Padding="15,8"/>
+            <StackPanel HorizontalAlignment="Right" 
+                        VerticalAlignment="Center" 
+                        Margin="0,0,25,0"
+                        Spacing="5">
+                        
+                <Button Command="{Binding CastVoteCommand}"
+                        Content="Cast Vote"
+                        FontSize="16"
+                        FontWeight="Bold"
+                        Background="#4CAF50"
+                        Foreground="White"
+                        Padding="15,8"
+                        IsEnabled="{Binding !IsCastingVote}"/>
+                        
+                <TextBlock Text="{Binding VoteStatus}"
+                           FontSize="12"
+                           HorizontalAlignment="Center"
+                           Foreground="DarkGreen"/>
+            </StackPanel>
         </Grid>
         
         <!-- Bottom Grid - 85% of view, split into two halves -->

@@ -22,6 +22,7 @@ public partial class MainWindowViewModel : ViewModelBase
     // ==========================================
     
     // Views
+    private readonly VoterLoginView _voterLoginView;
     private readonly NINEntryView _ninEntryView;
     private readonly PersonalOrProxyView _personalOrProxyView;
     private readonly ProxyVoteDetailsView _proxyVoteDetailsView;
@@ -47,6 +48,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _navigationService.NavigationRequested += OnNavigationRequested;
         
         // Initialize views
+        _voterLoginView = new VoterLoginView { DataContext = new VoterLoginViewModel() };
         _ninEntryView = new NINEntryView { DataContext = new NINEntryViewModel() };
         _personalOrProxyView = new PersonalOrProxyView { DataContext = new PersonalOrProxyViewModel() };
         _proxyVoteDetailsView = new ProxyVoteDetailsView { DataContext = new ProxyVoteDetailsViewModel() };
@@ -56,6 +58,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // TODO: Initialize navigation service with all view factories when ready
         // For now, simplified initialization
         ((NavigationService)_navigationService).Initialize(
+            () => _voterLoginView,
             () => _ninEntryView,
             () => _personalOrProxyView,
             () => _proxyVoteDetailsView,
@@ -66,8 +69,8 @@ public partial class MainWindowViewModel : ViewModelBase
             () => throw new NotImplementedException("SettingsView not implemented yet")
         );
         
-        // Set initial view to Personal or Proxy selection
-        CurrentView = _personalOrProxyView;
+        // Set initial view to Voter Login
+        CurrentView = _voterLoginView;
     }
 
 

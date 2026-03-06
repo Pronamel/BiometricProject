@@ -1,3 +1,6 @@
+//===========================================
+// USING STATEMENTS
+//===========================================
 using System.Collections.Concurrent;
 using System.Text;
 using System.Security.Claims;
@@ -5,18 +8,23 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using Server.Services;
 
+//===========================================
+// BUILDER CONFIGURATION
+//===========================================
 var builder = WebApplication.CreateBuilder(args);
 
-// Force port 80 in all environments
-builder.WebHost.UseUrls("http://0.0.0.0:80");
+// Force port 5000 in all environments
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Add basic services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// JWT Configuration
+//===========================================
+// JWT CONFIGURATION
+//===========================================
 var jwtSecret = "VerySecureSecretKey2026ForVotingSystem!MinimumOf256Bits";
 var jwtKey = Encoding.ASCII.GetBytes(jwtSecret);
 
@@ -38,7 +46,47 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Add CORS for production
+//===========================================
+// IN-MEMORY STORAGE SETUP - COUNTY-BASED CHANNELS
+//===========================================
+// County-based request channels: County -> List of voter requests
+var countyChannels = new ConcurrentDictionary<string, ConcurrentBag<string>>();
+
+// County-based access codes: County -> (VoterId -> Code)
+var countyVoterCodes = new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>();
+
+// County-based active waiting connections: County -> (OfficialId -> TaskCompletionSource)
+var countyActiveConnections = new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>();
+
+// County-based vote notifications: County -> List of vote notifications for officials
+var countyVoteChannels = new ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>();
+
+// Global storage (still shared across all counties)
+var activeVotingSessions = new ConcurrentDictionary<string, DateTime>(); // SessionId -> Expiry
+var tokenCounter = new TokenCounter(); // Global unique token counter
+
+// Official system tracking: (County + SystemCode) -> OfficialInfo
+var activeOfficials = new ConcurrentDictionary<string, (string OfficialId, string StationId, DateTime LoginTime, List<int> ConnectedVoters)>();
+
+// Voter ID assignment counter
+var voterIdCounter = 0;
+
+//===========================================
+// SERVICE REGISTRATION
+//===========================================
+builder.Services.AddSingleton(countyChannels);
+builder.Services.AddSingleton(countyVoterCodes);
+builder.Services.AddSingleton(countyActiveConnections);
+builder.Services.AddSingleton(countyVoteChannels);
+builder.Services.AddSingleton(activeVotingSessions);
+builder.Services.AddSingleton(activeOfficials);
+builder.Services.AddSingleton(tokenCounter);
+builder.Services.AddSingleton<VoterService>();
+builder.Services.AddSingleton<OfficialService>();
+
+//===========================================
+// CORS CONFIGURATION
+//===========================================
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("ProductionCors", policy =>
@@ -47,10 +95,10 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 "http://yourdomain.com", 
                 "http://www.yourdomain.com",
-                "http://localhost",
-                "https://localhost",
-                "http://127.0.0.1",
-                "https://127.0.0.1"
+                "http://localhost:5000",
+                "https://localhost:5000",
+                "http://127.0.0.1:5000",
+                "https://127.0.0.1:5000"
               )
               .AllowAnyMethod() 
               .AllowAnyHeader()
@@ -66,39 +114,30 @@ builder.Services.AddCors(options =>
     });
 });
 
+//===========================================
+// APP BUILD & MIDDLEWARE PIPELINE
+//===========================================
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    
-    // Use permissive CORS in development
     app.UseCors("DevelopmentCors");
 }
 else
 {
-    // Production configuration
     app.UseExceptionHandler("/Error");
     // app.UseHsts(); // Disabled for HTTP-only configuration
-    
-    // Use secure CORS in production
     app.UseCors("ProductionCors");
 }
 
-// Enable HTTPS redirection in production (only if HTTPS is configured)
-// Commented out since we're running HTTP-only
-// if (!app.Environment.IsDevelopment())
-// {
-//     app.UseHttpsRedirection();
-// }
-
-// Add authentication and authorization middleware
+// Authentication and Authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Add request logging middleware
+// Request logging middleware
 app.Use(async (context, next) =>
 {
     var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -111,26 +150,9 @@ app.Use(async (context, next) =>
     await next();
 });
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-// Device Management Storage (simple in-memory storage)
-var deviceManagementInfo = new DeviceManagementInfo(
-    "VOTING_SYS_001",
-    "PollingStation_Central_A1", 
-    3,
-    new List<string> { "BiometricScanner_001", "VotingTablet_002", "BackupTablet_003" }
-);
-
-// Long Polling Storage (thread-safe)
-var pendingVoterCodes = new ConcurrentDictionary<string, string>(); // VoterId -> Code
-var voterRequests = new ConcurrentBag<string>(); // Pending voter requests
-var officialNotifications = new ConcurrentBag<string>(); // Notifications to official
-var activeVotingSessions = new ConcurrentDictionary<string, DateTime>(); // SessionId -> Expiry
-
-// JWT Token Generation Helper
+//===========================================
+// HELPER FUNCTIONS
+//===========================================
 string GenerateJwtToken(string userId, string role, Dictionary<string, object>? additionalClaims = null)
 {
     var tokenHandler = new JwtSecurityTokenHandler();
@@ -156,7 +178,7 @@ string GenerateJwtToken(string userId, string role, Dictionary<string, object>? 
     var tokenDescriptor = new SecurityTokenDescriptor
     {
         Subject = new ClaimsIdentity(claims),
-        Expires = role == "official" ? DateTime.UtcNow.AddHours(24) : DateTime.UtcNow.AddHours(4),
+        Expires = role == "official" ? DateTime.UtcNow.AddHours(24) : DateTime.UtcNow.AddHours(8),
         Issuer = "SecureVoteServer",
         Audience = "VotingClients",
         SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
@@ -166,32 +188,51 @@ string GenerateJwtToken(string userId, string role, Dictionary<string, object>? 
     return tokenHandler.WriteToken(token);
 }
 
-// Authentication Endpoints
-app.MapPost("/auth/official-login", (OfficialLoginRequest request) =>
+
+
+
+
+//===========================================
+// DATA INITIALIZATION
+//===========================================
+var summaries = new[]
+{
+    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+};
+
+
+
+
+
+
+//===========================================
+// API ENDPOINTS - AUTHENTICATION
+//===========================================
+app.MapPost("/auth/official-login", (OfficialLoginRequest request, OfficialService officialService, TokenCounter counter, 
+    ConcurrentDictionary<string, (string OfficialId, string StationId, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials) =>
 {
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received login request:");
-    Console.WriteLine($"  Official ID: '{request.OfficialId ?? "NULL"}'");
-    Console.WriteLine($"  Station ID: '{request.StationId ?? "NULL"}'");
-    Console.WriteLine($"  Password: '{request.Password ?? "NULL"}'");
     
-    // Simple validation - in production, check against database/directory
-    var stationValid = request.StationId?.StartsWith("PollingStation") == true;
-    var officialValid = !string.IsNullOrEmpty(request.OfficialId);
-    
-    Console.WriteLine($"  Station ID valid (starts with 'PollingStation'): {stationValid}");
-    Console.WriteLine($"  Official ID valid (not empty): {officialValid}");
-    
-    if (stationValid && officialValid)
+    if (officialService.ValidateOfficialLogin(request.OfficialId, request.StationId, request.Password))
     {
+        var uniqueTokenId = counter.GetNextId();
+        
+        // Register this official system with their unique code
+        var systemKey = $"{request.County}_{request.SystemCode}";
+        activeOfficials[systemKey] = (request.OfficialId, request.StationId, DateTime.UtcNow, new List<int>());
+        
         var additionalClaims = new Dictionary<string, object>
         {
             ["station"] = request.StationId,
-            ["officialId"] = request.OfficialId
+            ["officialId"] = request.OfficialId,
+            ["county"] = request.County,
+            ["systemCode"] = request.SystemCode,
+            ["tokenId"] = uniqueTokenId
         };
         
-        var token = GenerateJwtToken($"official_{request.OfficialId}", "official", additionalClaims);
+        var token = GenerateJwtToken($"official_{request.OfficialId}_{uniqueTokenId}", "official", additionalClaims);
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official login: {request.OfficialId} at {request.StationId}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official login: {request.OfficialId} at {request.StationId} with system code {request.SystemCode} (Token ID: {uniqueTokenId})");
         
         return Results.Ok(new { 
             success = true, 
@@ -199,6 +240,9 @@ app.MapPost("/auth/official-login", (OfficialLoginRequest request) =>
             role = "official",
             stationId = request.StationId,
             officialId = request.OfficialId,
+            county = request.County,
+            systemCode = request.SystemCode,
+            tokenId = uniqueTokenId,
             expiresAt = DateTime.UtcNow.AddHours(24)
         });
     }
@@ -208,22 +252,24 @@ app.MapPost("/auth/official-login", (OfficialLoginRequest request) =>
 })
 .WithName("OfficialLogin");
 
-app.MapPost("/auth/voter-session", (VoterSessionRequest request) =>
+app.MapPost("/auth/voter-session", (VoterSessionRequest request, VoterService voterService, TokenCounter counter) =>
 {
-    // Simple validation - in production, verify NIN against voter registry
-    if (!string.IsNullOrEmpty(request.VoterId) && request.VoterId.Length >= 5)
+    if (voterService.ValidateVoterId(request.VoterId))
     {
-        var sessionId = Guid.NewGuid().ToString("N")[..16];
+        var uniqueTokenId = counter.GetNextId();
+        var sessionId = voterService.CreateVotingSession(request.VoterId);
         
         var additionalClaims = new Dictionary<string, object>
         {
             ["nin"] = request.VoterId,
-            ["session"] = sessionId
+            ["session"] = sessionId,
+            ["county"] = request.County,
+            ["tokenId"] = uniqueTokenId
         };
         
-        var token = GenerateJwtToken($"voter_{request.VoterId}", "voter", additionalClaims);
+        var token = GenerateJwtToken($"voter_{request.VoterId}_{uniqueTokenId}", "voter", additionalClaims);
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter session: {request.VoterId} with session {sessionId}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter session: {request.VoterId} with session {sessionId} (Token ID: {uniqueTokenId})");
         
         return Results.Ok(new { 
             success = true, 
@@ -231,7 +277,9 @@ app.MapPost("/auth/voter-session", (VoterSessionRequest request) =>
             role = "voter",
             voterId = request.VoterId,
             sessionId = sessionId,
-            expiresAt = DateTime.UtcNow.AddHours(4)
+            county = request.County,
+            tokenId = uniqueTokenId,
+            expiresAt = DateTime.UtcNow.AddHours(8)
         });
     }
     
@@ -239,66 +287,116 @@ app.MapPost("/auth/voter-session", (VoterSessionRequest request) =>
 })
 .WithName("VoterSession");
 
-app.MapGet("/securevote", () =>
+//===========================================
+// API ENDPOINTS - VOTER-OFFICIAL LINKING
+//===========================================
+app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request, 
+    ConcurrentDictionary<string, (string OfficialId, string StationId, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    TokenCounter voterIdCounter) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetSecureVoteData");
-
-// Device Management Endpoints
-app.MapGet("/api/devices/management-info", () =>
-{
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] GET /api/devices/management-info - Returning device info");
-    return deviceManagementInfo;
-})
-.WithName("GetDeviceManagementInfo");
-
-app.MapPost("/api/devices/management-info", (DeviceManagementInfo newDeviceInfo) =>
-{
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] POST /api/devices/management-info - Received device info");
-    Console.WriteLine($"  Identifier: {newDeviceInfo.Identifier}");
-    Console.WriteLine($"  PollingStationID: {newDeviceInfo.PollingStationID}");
-    Console.WriteLine($"  Connected Devices: {newDeviceInfo.No_ConnectedDevices}");
-    Console.WriteLine($"  Device Names: {string.Join(", ", newDeviceInfo.DeviceNames ?? new List<string>())}");
+    var systemKey = $"{request.County}_{request.PollingStationCode}";
     
-    // Update stored device info
-    deviceManagementInfo = newDeviceInfo;
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter link attempt - County: {request.County}, Station Code: {request.PollingStationCode}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking for system key: {systemKey}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Active officials: {string.Join(", ", activeOfficials.Keys)}");
     
-    return Results.Ok(new { success = true, message = "Device management info updated successfully" });
-})
-.WithName("SetDeviceManagementInfo");
-
-// ==========================================
-// LONG POLLING ENDPOINTS
-// ==========================================
-
-// Voter waits for access code (long polling)
-app.MapGet("/api/voter/wait-for-code/{voterId}", async (string voterId) =>
-{
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {voterId} waiting for access code");
-    
-    var timeout = TimeSpan.FromSeconds(20);
-    var startTime = DateTime.Now;
-    
-    while (DateTime.Now - startTime < timeout)
+    if (activeOfficials.TryGetValue(systemKey, out var officialInfo))
     {
-        // Check if voter has a pending code
-        if (pendingVoterCodes.TryGetValue(voterId, out string? code))
-        {
-            pendingVoterCodes.TryRemove(voterId, out _); // One-time use
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending code {code} to voter {voterId}");
-            return Results.Ok(new { success = true, code = code });
-        }
+        var assignedVoterId = (int)voterIdCounter.GetNextId();
         
-        await Task.Delay(500); // Check every 0.5 seconds
+        // Update the official's connected voters list
+        officialInfo.ConnectedVoters.Add(assignedVoterId);
+        activeOfficials[systemKey] = officialInfo with { ConnectedVoters = officialInfo.ConnectedVoters };
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter linked successfully! Assigned ID: {assignedVoterId} to Official: {officialInfo.OfficialId}");
+        
+        return Results.Ok(new VoterLinkResponse(
+            true,
+            assignedVoterId,
+            officialInfo.OfficialId,
+            officialInfo.StationId,
+            "Successfully linked to official"
+        ));
+    }
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No matching official found for county '{request.County}' and polling station code '{request.PollingStationCode}'");
+    return Results.BadRequest(new VoterLinkResponse(
+        false,
+        0,
+        "",
+        "",
+        $"No official found for county '{request.County}' with polling station code '{request.PollingStationCode}'. Please verify the codes with election staff."
+    ));
+})
+.WithName("VoterLinkToOfficial");
+
+app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
+    ConcurrentDictionary<string, (string OfficialId, string StationId, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    ConcurrentDictionary<string, ConcurrentBag<VoteNotification>> countyVoteChannels) =>
+{
+    var systemKey = $"{request.County}_{request.PollingStationCode}";
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast attempt - Voter ID: {request.VoterId}, County: {request.County}, Station: {request.PollingStationCode}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote for: {request.CandidateName} - {request.PartyName}");
+    
+    // Verify voter is linked to the official system
+    if (activeOfficials.TryGetValue(systemKey, out var officialInfo) && 
+        officialInfo.ConnectedVoters.Contains(request.VoterId))
+    {
+        // Create vote notification for the official
+        var voteNotification = new VoteNotification(
+            request.VoterId,
+            request.CandidateName,
+            request.PartyName,
+            DateTime.UtcNow,
+            officialInfo.OfficialId,
+            officialInfo.StationId
+        );
+        
+        // Add vote to the county channel for the official to receive
+        var channel = countyVoteChannels.GetOrAdd(request.County, _ => new ConcurrentBag<VoteNotification>());
+        channel.Add(voteNotification);
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote successfully cast! Voter {request.VoterId} voted for {request.CandidateName}");
+        
+        return Results.Ok(new CastVoteResponse(
+            true,
+            "Vote successfully cast",
+            DateTime.UtcNow
+        ));
+    }
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast failed - Voter {request.VoterId} not linked to official system {systemKey}");
+    return Results.BadRequest(new CastVoteResponse(
+        false,
+        "Vote failed: Voter not properly linked to official system",
+        DateTime.UtcNow
+    ));
+})
+.WithName("CastVote");
+
+
+
+
+
+
+//===========================================
+// API ENDPOINTS - LONG POLLING
+//===========================================
+app.MapGet("/api/voter/wait-for-code/{voterId}", async (string voterId, VoterService voterService, ClaimsPrincipal user) =>
+{
+    var county = user.FindFirst("county")?.Value;
+    if (string.IsNullOrEmpty(county))
+    {
+        return Results.BadRequest(new { success = false, message = "County not found in authentication token" });
+    }
+
+    var timeout = TimeSpan.FromSeconds(20);
+    var (success, code) = await voterService.WaitForAccessCode(voterId, county, timeout);
+    
+    if (success)
+    {
+        return Results.Ok(new { success = true, code = code });
     }
     
     return Results.Ok(new { success = false, message = "Timeout - no code available" });
@@ -306,95 +404,158 @@ app.MapGet("/api/voter/wait-for-code/{voterId}", async (string voterId) =>
 .RequireAuthorization(policy => policy.RequireRole("voter"))
 .WithName("VoterWaitForCode");
 
-// Official waits for voter requests (long polling)
-app.MapGet("/api/official/wait-for-requests", async () =>
+app.MapGet("/api/official/wait-for-votes", async (ClaimsPrincipal user,
+    ConcurrentDictionary<string, ConcurrentBag<VoteNotification>> countyVoteChannels) =>
 {
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official waiting for voter requests");
+    var county = user.FindFirst("county")?.Value;
+    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
     
-    var timeout = TimeSpan.FromSeconds(30);
-    var startTime = DateTime.Now;
-    
-    while (DateTime.Now - startTime < timeout)
+    if (string.IsNullOrEmpty(county))
     {
-        if (!voterRequests.IsEmpty)
-        {
-            var requests = new List<string>();
-            while (voterRequests.TryTake(out string? request))
-            {
-                if (request != null) requests.Add(request);
-            }
-            
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending {requests.Count} voter requests to official");
-            return Results.Ok(new { success = true, requests = requests });
-        }
-        
-        await Task.Delay(1000);
+        return Results.BadRequest(new { success = false, message = "County not found in authentication token" });
     }
     
-    return Results.Ok(new { success = false, requests = new List<string>() });
+    // Get votes for this county
+    var votes = new List<object>();
+    if (countyVoteChannels.TryGetValue(county, out var voteChannel))
+    {
+        var allVotes = new List<VoteNotification>();
+        
+        // Drain all votes from the channel
+        while (voteChannel.TryTake(out var vote))
+        {
+            allVotes.Add(vote);
+        }
+        
+        // Only log if there are actually votes to process
+        if (allVotes.Count > 0)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Delivering {allVotes.Count} votes to official {officialId} in {county}");
+        }
+        
+        foreach (var vote in allVotes)
+        {
+            votes.Add(new {
+                voterId = vote.VoterId,
+                candidateName = vote.CandidateName,
+                partyName = vote.PartyName,
+                timestamp = vote.Timestamp,
+                officialId = vote.OfficialId
+            });
+        }
+    }
+    
+    return Results.Ok(new { success = true, votes = votes, count = votes.Count });
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialWaitForVotes");
+
+app.MapGet("/api/official/wait-for-requests", async (OfficialService officialService, ClaimsPrincipal user) =>
+{
+    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
+    var stationId = user.FindFirst("station")?.Value ?? "Unknown";
+    var county = user.FindFirst("county")?.Value;
+    
+    if (string.IsNullOrEmpty(county))
+    {
+        return Results.BadRequest(new { success = false, message = "County not found in authentication token" });
+    }
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} (Station: {stationId}) waiting for voter requests in {county}");
+    
+    var timeout = TimeSpan.FromSeconds(30);
+    var (success, requests) = await officialService.WaitForVoterRequests(county, officialId, timeout);
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} received {(success ? requests.Count : 0)} voter requests from {county}");
+    
+    return Results.Ok(new { success = success, requests = requests });
 })
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialWaitForRequests");
 
-// Official generates access code for specific voter
-app.MapPost("/api/official/generate-code", (GenerateCodeRequest request) =>
+app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, OfficialService officialService, ClaimsPrincipal user) =>
 {
-    var code = Random.Shared.Next(100000, 999999).ToString();
-    pendingVoterCodes[request.VoterId] = code;
+    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
+    var stationId = user.FindFirst("station")?.Value ?? "Unknown";
+    var county = user.FindFirst("county")?.Value;
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official generated code {code} for voter {request.VoterId}");
+    if (string.IsNullOrEmpty(county))
+    {
+        return Results.BadRequest(new { success = false, message = "County not found in authentication token" });
+    }
     
-    return Results.Ok(new { success = true, code = code, voterId = request.VoterId });
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} (Station: {stationId}) generating code for voter {request.VoterId} in {county}");
+    
+    var (success, code) = officialService.GenerateAccessCode(request.VoterId, county);
+    
+    if (success)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} successfully generated code {code} for voter {request.VoterId} in {county}");
+        return Results.Ok(new { success = true, code = code, voterId = request.VoterId });
+    }
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} failed to generate code for voter {request.VoterId} in {county}");
+    return Results.BadRequest(new { success = false, message = "Failed to generate code" });
 })
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialGenerateCode");
 
-// Voter requests access (notifies official)
-app.MapPost("/api/voter/request-access", (VoterAccessRequest request) =>
+app.MapPost("/api/voter/request-access", async (VoterAccessRequest request, VoterService voterService, ClaimsPrincipal user) =>
 {
-    voterRequests.Add($"Voter {request.VoterId} requesting access from {request.DeviceName}");
+    var county = user.FindFirst("county")?.Value;
+    if (string.IsNullOrEmpty(county))
+    {
+        return Results.BadRequest(new { success = false, message = "County not found in authentication token" });
+    }
+
+    var success = await voterService.RequestAccess(request.VoterId, county, request.DeviceName);
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {request.VoterId} requested access from {request.DeviceName}");
+    if (success)
+    {
+        return Results.Ok(new { success = true, message = "Access request sent to official" });
+    }
     
-    return Results.Ok(new { success = true, message = "Access request sent to official" });
+    return Results.BadRequest(new { success = false, message = "Failed to process access request" });
 })
 .RequireAuthorization(policy => policy.RequireRole("voter"))
 .WithName("VoterRequestAccess");
 
-// Add the endpoints your client is expecting
+//===========================================
+// API ENDPOINTS - HEALTH & TESTING
+//===========================================
+app.MapGet("/securevote", () =>
+{
+    return new { status = "connected", message = "SecureVote Server Ready", timestamp = DateTime.Now };
+})
+.WithName("GetSecureVoteData");
+
 app.MapGet("/securevote/api/health", () =>
 {
     return new { status = "healthy", timestamp = DateTime.Now };
 })
 .WithName("SecureVoteHealthCheck");
 
+//===========================================
+// START APPLICATION
+//===========================================
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
-
-// Device Management Info record to match your client model
-record DeviceManagementInfo(
-    string Identifier,
-    string PollingStationID,
-    int No_ConnectedDevices,
-    List<string>? DeviceNames
-);
-
-// Authentication Request Models
+//===========================================
+// DATA MODELS & RECORDS
+//===========================================
 record OfficialLoginRequest(
     string OfficialId,  
     string StationId,
+    string County,
+    string SystemCode,
     string? Password = null  // Optional for now
 );
 
 record VoterSessionRequest(
-    string VoterId  // NIN or voter identifier
+    string VoterId,  // NIN or voter identifier
+    string County
 );
 
-// Long Polling Request Models  
 record VoterAccessRequest(
     string VoterId,
     string DeviceName = "Unknown"
@@ -403,3 +564,54 @@ record VoterAccessRequest(
 record GenerateCodeRequest(
     string VoterId
 );
+
+// Voter-Official Linking Request
+record VoterLinkRequest(
+    string PollingStationCode,  // Should match official's SystemCode
+    string County
+);
+
+record VoterLinkResponse(
+    bool Success,
+    int AssignedVoterId,
+    string ConnectedOfficialId,
+    string ConnectedStationId,
+    string Message
+);
+
+// Vote casting models
+record CastVoteRequest(
+    int VoterId,
+    string County,
+    string PollingStationCode,
+    string CandidateName,
+    string PartyName
+);
+
+record CastVoteResponse(
+    bool Success,
+    string Message,
+    DateTime Timestamp
+);
+
+record VoteNotification(
+    int VoterId,
+    string CandidateName,
+    string PartyName,
+    DateTime Timestamp,
+    string OfficialId,
+    string StationId
+);
+
+// Thread-safe token counter for unique identities
+public class TokenCounter
+{
+    private long _counter = 0;
+    
+    public long GetNextId()
+    {
+        return Interlocked.Increment(ref _counter);
+    }
+    
+    public long CurrentCount => _counter;
+}

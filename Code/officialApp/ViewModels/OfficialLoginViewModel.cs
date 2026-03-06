@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using officialApp.Services;
+using officialApp.Models;
 
 namespace officialApp.ViewModels;
 
@@ -22,6 +24,9 @@ public partial class OfficialLoginViewModel : ViewModelBase
     private string password = "";
 
     [ObservableProperty]
+    private string selectedCounty = "";
+
+    [ObservableProperty]
     private string serverStatus = "Server status: Not tested";
 
     [ObservableProperty]
@@ -37,6 +42,20 @@ public partial class OfficialLoginViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IServerHandler _serverHandler;
     private readonly IApiService _apiService;
+
+    // County options for selection
+    public List<string> CountyOptions => UKCounties.Counties;
+    
+    // ==========================================
+    // SYSTEM IDENTIFICATION
+    // ==========================================
+    
+    // Hardcoded unique system code for this official terminal
+    // This identifies the specific official system within the county
+    public const string SYSTEM_CODE = "OFF-SYS-2024-7891";  // Unique per official terminal
+    
+    [ObservableProperty]
+    private List<int> connectedVoterIds = new();
 
     // ==========================================
     // CONSTRUCTOR
@@ -76,8 +95,14 @@ public partial class OfficialLoginViewModel : ViewModelBase
                 return;
             }
 
+            if (string.IsNullOrWhiteSpace(SelectedCounty))
+            {
+                LoginStatus = "❌ County selection is required";
+                return;
+            }
+
             // Attempt JWT authentication
-            var loginResponse = await _apiService.LoginAsync(OfficialId, StationId, Password);
+            var loginResponse = await _apiService.LoginAsync(OfficialId, StationId, SelectedCounty, SYSTEM_CODE, Password);
             
             if (loginResponse != null && loginResponse.Success)
             {
@@ -129,20 +154,8 @@ public partial class OfficialLoginViewModel : ViewModelBase
                 return;
             }
             
-            // Get device management info
-            var deviceInfo = await _serverHandler.GetDeviceManagementInfoAsync();
-            if (deviceInfo != null)
-            {
-                var deviceNames = deviceInfo.DeviceNames?.Count > 0 ? 
-                    string.Join(", ", deviceInfo.DeviceNames) : "No devices";
-                
-                ServerStatus = $"✅ Connected | Station: {deviceInfo.PollingStationID} | " +
-                             $"Devices: {deviceInfo.No_ConnectedDevices} ({deviceNames})";
-            }
-            else
-            {
-                ServerStatus = "✅ Connected, but no device info available";
-            }
+            // Device management has been removed from server - show simple connected status
+            ServerStatus = "✅ Connected to local server (localhost:5000)";
         }
         catch (Exception ex)
         {

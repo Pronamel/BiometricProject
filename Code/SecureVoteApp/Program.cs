@@ -28,8 +28,9 @@ sealed class Program
         // Register HttpClient
         services.AddHttpClient<IApiService, ApiService>();
         
-        // Register API services
-        services.AddTransient<IApiTestService, ApiTestService>();
+        // Register API and Server Handler services
+        services.AddSingleton<IApiService, ApiService>();
+        services.AddSingleton<IServerHandler, ServerHandler>();
         
         // Register other services
         services.AddSingleton<INavigationService, NavigationService>();

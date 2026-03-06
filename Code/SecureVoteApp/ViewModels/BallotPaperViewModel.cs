@@ -1,6 +1,9 @@
 using System;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SecureVoteApp.Services;
+using SecureVoteApp.Models;
 
 namespace SecureVoteApp.ViewModels;
 
@@ -11,6 +14,13 @@ public partial class BallotPaperViewModel : ViewModelBase
     // ==========================================
     
     private readonly INavigationService _navigationService;
+    private readonly IApiService _apiService;
+    
+    [ObservableProperty]
+    private bool isCastingVote = false;
+    
+    [ObservableProperty]
+    private string voteStatus = "";
 
 
     // ==========================================
@@ -81,6 +91,7 @@ public partial class BallotPaperViewModel : ViewModelBase
     public BallotPaperViewModel(INavigationService navigationService)
     {
         _navigationService = navigationService;
+        _apiService = ApiService.Instance;
         
         // Subscribe to selection changes to update the readable text
         SelectionChanged += UpdateReadingCandidateName;
@@ -103,8 +114,56 @@ public partial class BallotPaperViewModel : ViewModelBase
 
 
     // ==========================================
-    // NAVIGATION COMMANDS
+    // COMMANDS
     // ==========================================
+
+    [RelayCommand]
+    private async Task CastVote()
+    {
+        if (IsCastingVote) return;
+        
+        try
+        {
+            // Check if a candidate is selected
+            if (!HasVoted)
+            {
+                VoteStatus = "❌ Please select a candidate first";
+                return;
+            }
+            
+            IsCastingVote = true;
+            VoteStatus = "🗳️ Casting vote...";
+            
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Attempting to cast vote for: {SelectedCandidateName} - {SelectedParty}");
+            
+            // Cast the vote through the API
+            var response = await _apiService.CastVoteAsync(SelectedCandidateName!, SelectedParty!);
+            
+            if (response.Success)
+            {
+                VoteStatus = "✅ Vote successfully cast!";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast successfully: {response.Message}");
+                
+                // Keep showing success message instead of navigating
+                await Task.Delay(3000); // Show success message for longer
+                VoteStatus = "Vote completed - thank you for voting!";
+            }
+            else
+            {
+                VoteStatus = $"❌ Vote failed: {response.Message}";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote casting failed: {response.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            VoteStatus = $"❌ Error: {ex.Message}";
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote casting exception: {ex.Message}");
+        }
+        finally
+        {
+            IsCastingVote = false;
+        }
+    }
 
     [RelayCommand]
     private void Back()

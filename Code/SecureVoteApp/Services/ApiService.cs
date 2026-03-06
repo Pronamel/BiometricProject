@@ -1,3 +1,6 @@
+// This service handles communication with the server for voter authentication and real-time communication.
+// It provides methods for voter session creation, access code verification, and long polling for official commands.
+
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -15,6 +18,28 @@ public class ApiService : IApiService
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
     private readonly JsonSerializerOptions _jsonOptions;
+    
+    // JWT Authentication fields
+    private string? _jwtToken;
+    private DateTime _tokenExpiry;
+    private string? _currentVoterId;
+    private string? _currentSessionId;
+    private string? _assignedStationId;
+    
+    // Voter linking fields
+    private int _assignedVoterId = 0;
+    private string _selectedCounty = string.Empty;
+    private string _pollingStationCode = string.Empty;
+    
+    // Authentication properties
+    public bool IsAuthenticated => 
+        !string.IsNullOrEmpty(_jwtToken) && DateTime.UtcNow < _tokenExpiry;
+    
+    public string? CurrentVoterId => _currentVoterId;
+    public string? AssignedStationId => _assignedStationId;
+    public int AssignedVoterId => _assignedVoterId;
+    public string SelectedCounty => _selectedCounty;
+    public string PollingStationCode => _pollingStationCode;
 
     static ApiService()
     {
@@ -26,9 +51,9 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://3.88.160.93"; // Server IP here
+        _baseUrl = "http://localhost:5000"; // Local server
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(3);
+        _httpClient.Timeout = TimeSpan.FromSeconds(25); // Longer timeout for long polling
         
         // Configure JSON serialization options
         _jsonOptions = new JsonSerializerOptions
@@ -38,162 +63,406 @@ public class ApiService : IApiService
         };
     }
 
+    //--------------------------------------------
+    // JWT Authentication Methods
+    //--------------------------------------------
+
+    public async Task<VoterSessionResponse?> CreateSessionAsync(string voterId, string county, string? stationId = null)
+    {
+        try
+        {
+            var sessionRequest = new VoterSessionRequest
+            {
+                VoterId = voterId,
+                County = county,
+                StationId = stationId
+            };
+
+            var jsonContent = JsonSerializer.Serialize(sessionRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Creating voter session:");
+            Console.WriteLine($"  Voter ID: '{voterId}'");
+            Console.WriteLine($"  County: '{county}'");
+            Console.WriteLine($"  Station ID: '{stationId ?? "Not assigned"}'");
+
+            var response = await _httpClient.PostAsync($"{_baseUrl}/auth/voter-session", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Response Status: {response.StatusCode}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Response Body: {responseContent}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var sessionResponse = JsonSerializer.Deserialize<VoterSessionResponse>(responseContent, _jsonOptions);
+
+                if (sessionResponse?.Success == true && !string.IsNullOrEmpty(sessionResponse.Token))
+                {
+                    // Store authentication state
+                    _jwtToken = sessionResponse.Token;
+                    _tokenExpiry = sessionResponse.ExpiresAt;
+                    _currentVoterId = sessionResponse.VoterId;
+                    _currentSessionId = sessionResponse.SessionId;
+                    _assignedStationId = stationId;
+
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {voterId} session created successfully");
+                    return sessionResponse;
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Session creation error: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county)
+    {
+        try
+        {
+            var linkRequest = new VoterLinkRequest
+            {
+                PollingStationCode = pollingStationCode,
+                County = county
+            };
+
+            var jsonContent = JsonSerializer.Serialize(linkRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Linking voter to official:");
+            Console.WriteLine($"  Polling Station Code: '{pollingStationCode}'");
+            Console.WriteLine($"  County: '{county}'");
+
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/voter/link-to-official", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Link Response Status: {response.StatusCode}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Link Response Body: {responseContent}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var linkResponse = JsonSerializer.Deserialize<VoterLinkResponse>(responseContent, _jsonOptions);
+                if (linkResponse != null)
+                {                    // Store linking information for vote casting
+                    _assignedVoterId = linkResponse.AssignedVoterId;
+                    _selectedCounty = county;
+                    _pollingStationCode = pollingStationCode;
+                                        return linkResponse;
+                }
+            }
+
+            // Parse error response if available
+            try
+            {
+                var errorResponse = JsonSerializer.Deserialize<VoterLinkResponse>(responseContent, _jsonOptions);
+                if (errorResponse != null)
+                {
+                    return errorResponse;
+                }
+            }
+            catch
+            {
+                // Ignore JSON parsing errors
+            }
+
+            // Return generic failure response
+            return new VoterLinkResponse
+            {
+                Success = false,
+                Message = "Failed to connect to polling station. Please check your codes and try again.",
+                AssignedVoterId = 0,
+                ConnectedOfficialId = "",
+                ConnectedStationId = ""
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Voter linking error: {ex.Message}");
+            return new VoterLinkResponse
+            {
+                Success = false,
+                Message = $"Connection error: {ex.Message}",
+                AssignedVoterId = 0,
+                ConnectedOfficialId = "",
+                ConnectedStationId = ""
+            };
+        }
+    }
+
+    public async Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName)
+    {
+        try
+        {
+            if (_assignedVoterId == 0)
+            {
+                return new CastVoteResponse
+                {
+                    Success = false,
+                    Message = "Not linked to any official system. Please restart and link to an official first.",
+                    Timestamp = DateTime.UtcNow
+                };
+            }
+
+            var castVoteRequest = new CastVoteRequest
+            {
+                VoterId = _assignedVoterId,
+                County = _selectedCounty,
+                PollingStationCode = _pollingStationCode,
+                CandidateName = candidateName,
+                PartyName = partyName
+            };
+
+            var jsonContent = JsonSerializer.Serialize(castVoteRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Casting vote:");
+            Console.WriteLine($"  Voter ID: {_assignedVoterId}");
+            Console.WriteLine($"  County: {_selectedCounty}");
+            Console.WriteLine($"  Polling Station: {_pollingStationCode}");
+            Console.WriteLine($"  Candidate: {candidateName} - {partyName}");
+
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/voter/cast-vote", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Cast Vote Response Status: {response.StatusCode}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Cast Vote Response: {responseContent}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var voteResponse = JsonSerializer.Deserialize<CastVoteResponse>(responseContent, _jsonOptions);
+                if (voteResponse != null)
+                {
+                    return voteResponse;
+                }
+            }
+
+            // Parse error response
+            try
+            {
+                var errorResponse = JsonSerializer.Deserialize<CastVoteResponse>(responseContent, _jsonOptions);
+                if (errorResponse != null)
+                {
+                    return errorResponse;
+                }
+            }
+            catch
+            {
+                // Ignore JSON parsing errors
+            }
+
+            return new CastVoteResponse
+            {
+                Success = false,
+                Message = "Failed to cast vote. Please try again.",
+                Timestamp = DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Vote casting error: {ex.Message}");
+            return new CastVoteResponse
+            {
+                Success = false,
+                Message = $"Error casting vote: {ex.Message}",
+                Timestamp = DateTime.UtcNow
+            };
+        }
+    }
+
+    public void Logout()
+    {
+        _jwtToken = null;
+        _tokenExpiry = DateTime.MinValue;
+        _currentVoterId = null;
+        _currentSessionId = null;
+        _assignedStationId = null;
+        _assignedVoterId = 0;
+        _selectedCounty = string.Empty;
+        _pollingStationCode = string.Empty;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter logged out");
+    }
+
+    private void AddAuthorizationHeader(HttpRequestMessage request)
+    {
+        if (!string.IsNullOrEmpty(_jwtToken) && DateTime.UtcNow < _tokenExpiry)
+        {
+            request.Headers.Add("Authorization", $"Bearer {_jwtToken}");
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendAuthenticatedGetAsync(string endpoint)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}{endpoint}");
+        AddAuthorizationHeader(request);
+        return await _httpClient.SendAsync(request);
+    }
+
+    private async Task<HttpResponseMessage> SendAuthenticatedPostAsync(string endpoint, HttpContent content)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}{endpoint}");
+        request.Content = content;
+        AddAuthorizationHeader(request);
+        return await _httpClient.SendAsync(request);
+    }
+
     public async Task<bool> TestConnectionAsync()
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine($"Testing connection to: {_baseUrl}");
-            
-            // Try multiple endpoints to test connection
-            var endpoints = new[] { "/api/health", "/api/weather", "/" };
-            
-            foreach (var endpoint in endpoints)
-            {
-                try
-                {
-                    var response = await _httpClient.GetAsync($"{_baseUrl}{endpoint}");
-                    if (response.IsSuccessStatusCode)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Connection successful via endpoint: {endpoint}");
-                        return true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed endpoint {endpoint}: {ex.Message}");
-                }
-            }
-            
-            return false;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Connection test failed: {ex.Message}");
-            return false;
-        }
-    }
-
-    public async Task<List<ServerResponse>?> GetWeatherDataAsync()
-    {
-        try
-        {
-            System.Diagnostics.Debug.WriteLine($"Requesting weather data from: {_baseUrl}/api/weather");
-            
-            var response = await _httpClient.GetAsync($"{_baseUrl}/api/weather");
-            
+            var response = await _httpClient.GetAsync($"{_baseUrl}/securevote");
             if (response.IsSuccessStatusCode)
             {
-                var jsonString = await response.Content.ReadAsStringAsync();
-                System.Diagnostics.Debug.WriteLine($"Received response: {jsonString}");
-                
-                var data = JsonSerializer.Deserialize<List<ServerResponse>>(jsonString, _jsonOptions);
-                System.Diagnostics.Debug.WriteLine($"Deserialized {data?.Count ?? 0} weather records");
-                
-                return data;
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"Weather API request failed: {response.StatusCode} - {response.ReasonPhrase}");
-                return null;
-            }
-        }
-        catch (JsonException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"JSON Deserialization error: {ex.Message}");
-            return null;
-        }
-        catch (HttpRequestException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"HTTP request error: {ex.Message}");
-            return null;
-        }
-        catch (TaskCanceledException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Request timeout: {ex.Message}");
-            return null;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Unexpected API error: {ex.Message}");
-            return null;
-        }
-    }
-
-    public async Task<bool> SubmitVoteAsync(string candidateName, string party)
-    {
-        try
-        {
-            var voteData = new { candidateName, party, timestamp = DateTime.UtcNow };
-            var json = JsonSerializer.Serialize(voteData, _jsonOptions);
-            
-            System.Diagnostics.Debug.WriteLine($"Submitting vote: {json}");
-            
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/vote", content);
-            
-            if (response.IsSuccessStatusCode)
-            {
-                System.Diagnostics.Debug.WriteLine("Vote submitted successfully");
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter app connected successfully: {responseContent}");
                 return true;
             }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                System.Diagnostics.Debug.WriteLine($"Vote submission failed: {response.StatusCode} - {errorContent}");
-                return false;
-            }
+            return false;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Vote submission error: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter app connection failed: {ex.Message}");
             return false;
         }
     }
 
-    public async Task<List<string>?> GetCandidatesAsync()
+    //--------------------------------------------
+    // Voter Access Management
+    //--------------------------------------------
+
+    public async Task<bool> RequestAccessAsync(string? deviceName = null)
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine($"Requesting candidates from: {_baseUrl}/api/candidates");
-            
-            var response = await _httpClient.GetAsync($"{_baseUrl}/api/candidates");
+            if (string.IsNullOrEmpty(_currentVoterId))
+        {
+                Console.WriteLine("No voter ID available for access request");
+                return false;
+            }
+
+            var request = new VoterAccessRequest 
+            { 
+                VoterId = _currentVoterId,
+                DeviceName = deviceName ?? "SecureVoteApp"
+            };
+
+            var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            var response = await SendAuthenticatedPostAsync("/api/voter/request-access", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Access request error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<CodeWaitResponse?> WaitForAccessCodeAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_currentVoterId))
+            {
+                return null;
+            }
+
+            var response = await SendAuthenticatedGetAsync($"/api/voter/wait-for-code/{_currentVoterId}");
             
             if (response.IsSuccessStatusCode)
             {
                 var jsonString = await response.Content.ReadAsStringAsync();
-                System.Diagnostics.Debug.WriteLine($"Received candidates response: {jsonString}");
-                
-                var data = JsonSerializer.Deserialize<List<string>>(jsonString, _jsonOptions);
-                System.Diagnostics.Debug.WriteLine($"Deserialized {data?.Count ?? 0} candidates");
-                
-                return data;
+                return JsonSerializer.Deserialize<CodeWaitResponse>(jsonString, _jsonOptions);
             }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"Candidates API request failed: {response.StatusCode} - {response.ReasonPhrase}");
-                return null;
-            }
-        }
-        catch (JsonException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"JSON Deserialization error: {ex.Message}");
-            return null;
-        }
-        catch (HttpRequestException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"HTTP request error: {ex.Message}");
-            return null;
-        }
-        catch (TaskCanceledException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Request timeout: {ex.Message}");
+            
             return null;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Unexpected API error: {ex.Message}");
+            Console.WriteLine($"Code wait error: {ex.Message}");
             return null;
+        }
+    }
+
+    //--------------------------------------------
+    // Real-time Communication (Distributed Validation)
+    //--------------------------------------------
+
+    public async Task<bool> SubmitCodeForVerificationAsync(string accessCode)
+    {
+        try
+        {
+            var request = new CodeVerificationRequest
+            {
+                VoterId = _currentVoterId ?? "",
+                AccessCode = accessCode,
+                StationId = _assignedStationId
+            };
+
+            var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            var response = await SendAuthenticatedPostAsync("/api/voter/verify-code", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Code verification submission error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<VoterCommandResponse?> ListenForCommandsAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_currentVoterId))
+            {
+                return null;
+            }
+
+            var response = await SendAuthenticatedGetAsync($"/api/voter/listen/{_currentVoterId}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<VoterCommandResponse>(jsonString, _jsonOptions);
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Command listening error: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<bool> SendStatusUpdateAsync(string status, string? additionalData = null)
+    {
+        try
+        {
+            var request = new VoterStatusUpdate
+            {
+                VoterId = _currentVoterId ?? "",
+                Status = status,
+                AdditionalData = additionalData,
+                Timestamp = DateTime.UtcNow
+            };
+
+            var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            var response = await SendAuthenticatedPostAsync("/api/voter/status-update", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Status update error: {ex.Message}");
+            return false;
         }
     }
 }
