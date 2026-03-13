@@ -79,3 +79,6 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\obj\Debug\net8.
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\obj\Debug\net8.0\Server.csproj.Up2Date
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\obj\Debug\net8.0\Server.genruntimeconfig.cache
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\obj\Debug\net8.0\ref\Server.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\AWSSDK.Core.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\AWSSDK.Extensions.NETCore.Setup.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\AWSSDK.SecretsManager.dll

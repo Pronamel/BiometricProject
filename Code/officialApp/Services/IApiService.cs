@@ -7,7 +7,7 @@ namespace officialApp.Services;
 public interface IApiService
 {
     // Authentication
-    Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string county, string systemCode, string? password = null);
+    Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string county, string constituency, string systemCode, string? password = null);
     bool IsAuthenticated { get; }
     string? CurrentOfficialId { get; }
     void Logout();

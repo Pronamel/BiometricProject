@@ -40,16 +40,19 @@ public class OfficialLoginRequest
 {
     [JsonPropertyName("officialId")]
     public string OfficialId { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("stationId")]
     public string StationId { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("county")]
     public string County { get; set; } = string.Empty;
-    
+
+    [JsonPropertyName("constituency")]
+    public string Constituency { get; set; } = string.Empty;
+
     [JsonPropertyName("systemCode")]
     public string SystemCode { get; set; } = string.Empty;
-    
+
     [JsonPropertyName("password")]
     public string? Password { get; set; } = null;
 }

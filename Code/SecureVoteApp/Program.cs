@@ -2,8 +2,11 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SecureVoteApp.Services;
 using SecureVoteApp.ViewModels;
+using SecureVoteApp.Data;
 
 namespace SecureVoteApp;
 
@@ -42,5 +45,13 @@ sealed class Program
         services.AddTransient<NINEntryViewModel>();
         services.AddTransient<PersonalOrProxyViewModel>();
         services.AddTransient<ProxyVoteDetailsViewModel>();
+
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: false)
+            .Build();
+
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
     }
 }

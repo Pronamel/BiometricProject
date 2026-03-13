@@ -212,3 +212,15 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\obj\Debu
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\obj\Debug\net8.0\SecureVoteApp.pdb
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\obj\Debug\net8.0\SecureVoteApp.genruntimeconfig.cache
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\obj\Debug\net8.0\ref\SecureVoteApp.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Humanizer.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Microsoft.EntityFrameworkCore.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Microsoft.EntityFrameworkCore.Abstractions.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Microsoft.EntityFrameworkCore.Design.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Microsoft.EntityFrameworkCore.Relational.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Microsoft.Extensions.Caching.Abstractions.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Microsoft.Extensions.Caching.Memory.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Microsoft.Extensions.DependencyModel.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Mono.TextTemplating.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Npgsql.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\Npgsql.EntityFrameworkCore.PostgreSQL.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\SecureVoteApp\bin\Debug\net8.0\System.CodeDom.dll

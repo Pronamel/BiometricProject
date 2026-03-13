@@ -129,19 +129,19 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     // ==========================================
 
     [RelayCommand]
-    private void ScanFingerPrintValid()
+    private async Task ScanFingerPrintValid()
     {
         scannAttempts++;
         validFingerPrintScan = true;
-        attemptHandler(scannAttempts, validFingerPrintScan);
+        await attemptHandler(scannAttempts, validFingerPrintScan);
     }
 
     [RelayCommand]
-    private void ScanFingerPrintInvalid()
+    private async Task ScanFingerPrintInvalid()
     {
         scannAttempts++;
         validFingerPrintScan = false;
-        attemptHandler(scannAttempts, validFingerPrintScan);
+        await attemptHandler(scannAttempts, validFingerPrintScan);
     }
 
     [RelayCommand]

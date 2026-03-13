@@ -7,9 +7,10 @@ using officialApp.Services;
 using officialApp.Models;
 
 namespace officialApp.ViewModels;
-
 public partial class OfficialLoginViewModel : ViewModelBase
 {
+    [ObservableProperty]
+    private string selectedConstituency = "";
     // ==========================================
     // OBSERVABLE PROPERTIES
     // ==========================================
@@ -35,6 +36,13 @@ public partial class OfficialLoginViewModel : ViewModelBase
     [ObservableProperty]
     private bool isLoggingIn = false;
 
+    [ObservableProperty]
+    private List<Models.Entities.Voter> voters = new();
+
+    
+
+    
+
     // ==========================================
     // PRIVATE READONLY FIELDS
     // ==========================================
@@ -42,9 +50,13 @@ public partial class OfficialLoginViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IServerHandler _serverHandler;
     private readonly IApiService _apiService;
-
+    private readonly VoterService _voterService;
+    
     // County options for selection
     public List<string> CountyOptions => UKCounties.Counties;
+
+    // Constituency options for selection
+    public List<string> ConstituencyOptions => UKConstituencies.Constituencies;
     
     // ==========================================
     // SYSTEM IDENTIFICATION
@@ -66,11 +78,37 @@ public partial class OfficialLoginViewModel : ViewModelBase
         _navigationService = Navigation.Instance;
         _serverHandler = ServerHandler.Instance;
         _apiService = ApiService.Instance;
+        _voterService = new VoterService(DbContextFactory.Create());
     }
 
     // ==========================================
     // COMMANDS
     // ==========================================
+
+    [RelayCommand]
+    private async Task FetchVoters()
+    {
+        try
+        {
+            Voters = await _voterService.GetAllVotersAsync();
+                // Print voter data to terminal
+                if (Voters != null && Voters.Count > 0)
+                {
+                    foreach (var voter in Voters)
+                    {
+                        Console.WriteLine($"VoterId: {voter.VoterId}, Name: {voter.FirstName} {voter.LastName}, HasVoted: {voter.HasVoted}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No voters found.");
+                }
+        }
+        catch (Exception ex)
+        {
+            LoginStatus = $"❌ Error fetching voters: {ex.Message}";
+        }
+    }
 
     [RelayCommand]
     private async Task Authenticate()
@@ -102,7 +140,7 @@ public partial class OfficialLoginViewModel : ViewModelBase
             }
 
             // Attempt JWT authentication
-            var loginResponse = await _apiService.LoginAsync(OfficialId, StationId, SelectedCounty, SYSTEM_CODE, Password);
+            var loginResponse = await _apiService.LoginAsync(OfficialId, StationId, SelectedCounty, SelectedConstituency, SYSTEM_CODE, Password);
             
             if (loginResponse != null && loginResponse.Success)
             {
@@ -162,4 +200,6 @@ public partial class OfficialLoginViewModel : ViewModelBase
             ServerStatus = $"❌ Error: {ex.Message}";
         }
     }
+
+    
 }

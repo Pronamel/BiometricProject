@@ -30,6 +30,7 @@ public class ApiService : IApiService
     private int _assignedVoterId = 0;
     private string _selectedCounty = string.Empty;
     private string _pollingStationCode = string.Empty;
+    private string _selectedConstituency = string.Empty;
     
     // Authentication properties
     public bool IsAuthenticated => 
@@ -40,6 +41,7 @@ public class ApiService : IApiService
     public int AssignedVoterId => _assignedVoterId;
     public string SelectedCounty => _selectedCounty;
     public string PollingStationCode => _pollingStationCode;
+    public string SelectedConstituency => _selectedConstituency;
 
     static ApiService()
     {
@@ -51,9 +53,9 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://localhost:5000"; // Local server
+        _baseUrl = "http://localhost:5000"; // HTTP for local testing (will use HTTPS in production)
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(25); // Longer timeout for long polling
+        _httpClient.Timeout = TimeSpan.FromSeconds(3); // Timeout for local server
         
         // Configure JSON serialization options
         _jsonOptions = new JsonSerializerOptions
@@ -67,7 +69,7 @@ public class ApiService : IApiService
     // JWT Authentication Methods
     //--------------------------------------------
 
-    public async Task<VoterSessionResponse?> CreateSessionAsync(string voterId, string county, string? stationId = null)
+    public async Task<VoterSessionResponse?> CreateSessionAsync(string voterId, string county, string constituency, string? stationId = null)
     {
         try
         {
@@ -75,6 +77,7 @@ public class ApiService : IApiService
             {
                 VoterId = voterId,
                 County = county,
+                Constituency = constituency,
                 StationId = stationId
             };
 
@@ -119,14 +122,15 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county)
+    public async Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency)
     {
         try
         {
             var linkRequest = new VoterLinkRequest
             {
                 PollingStationCode = pollingStationCode,
-                County = county
+                County = county,
+                Constituency = constituency
             };
 
             var jsonContent = JsonSerializer.Serialize(linkRequest, _jsonOptions);
@@ -150,7 +154,8 @@ public class ApiService : IApiService
                     _assignedVoterId = linkResponse.AssignedVoterId;
                     _selectedCounty = county;
                     _pollingStationCode = pollingStationCode;
-                                        return linkResponse;
+                    _selectedConstituency = constituency;
+                    return linkResponse;
                 }
             }
 
@@ -212,7 +217,8 @@ public class ApiService : IApiService
                 County = _selectedCounty,
                 PollingStationCode = _pollingStationCode,
                 CandidateName = candidateName,
-                PartyName = partyName
+                PartyName = partyName,
+                Constituency = _selectedConstituency
             };
 
             var jsonContent = JsonSerializer.Serialize(castVoteRequest, _jsonOptions);

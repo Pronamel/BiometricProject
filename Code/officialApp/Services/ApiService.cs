@@ -43,7 +43,7 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://localhost:5000"; // Local server
+        _baseUrl = "http://localhost:5000"; // HTTP for local testing (will use HTTPS in production)
         
         _httpClient.Timeout = TimeSpan.FromSeconds(3); // Timeout for local server
         
@@ -59,7 +59,7 @@ public class ApiService : IApiService
     // JWT Authentication Methods
     //--------------------------------------------
 
-    public async Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string county, string systemCode, string? password = null)
+    public async Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string county, string constituency, string systemCode, string? password = null)
     {
         try
         {
@@ -68,6 +68,7 @@ public class ApiService : IApiService
                 OfficialId = officialId,
                 StationId = stationId,
                 County = county,
+                Constituency = constituency,
                 SystemCode = systemCode,
                 Password = password
             };

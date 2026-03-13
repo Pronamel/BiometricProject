@@ -77,7 +77,9 @@ public class ServerHandler : IServerHandler
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Creating voter session for {voterId} in {county} at station {stationId ?? "unassigned"}");
             
-            var result = await _apiService.CreateSessionAsync(voterId, county, stationId);
+            // Provide a default value for constituency if null
+            var defaultConstituency = "DefaultConstituency";
+            var result = await _apiService.CreateSessionAsync(voterId, county, defaultConstituency, stationId);
             
             if (result?.Success == true)
             {

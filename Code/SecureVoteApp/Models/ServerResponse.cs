@@ -15,6 +15,9 @@ public class VoterSessionRequest
     
     [JsonPropertyName("county")]
     public string County { get; set; } = string.Empty;
+    
+    [JsonPropertyName("constituency")]
+    public string Constituency { get; set; } = string.Empty;
 }
 
 public class VoterSessionResponse
@@ -120,6 +123,9 @@ public class VoterLinkRequest
     
     [JsonPropertyName("county")]
     public string County { get; set; } = string.Empty;
+    
+    [JsonPropertyName("constituency")]
+    public string Constituency { get; set; } = string.Empty;
 }
 
 public class VoterLinkResponse
@@ -157,6 +163,9 @@ public class CastVoteRequest
     
     [JsonPropertyName("partyName")]
     public string PartyName { get; set; } = string.Empty;
+
+    [JsonPropertyName("constituency")]
+    public string Constituency { get; set; } = string.Empty;
 }
 
 public class CastVoteResponse

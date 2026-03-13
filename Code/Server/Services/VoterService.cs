@@ -4,15 +4,15 @@ namespace Server.Services;
 
 public class VoterService
 {
-    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _countyChannels;
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, string>> _countyVoterCodes;
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>> _countyActiveConnections;
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> _countyChannels;
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _countyVoterCodes;
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> _countyActiveConnections;
     private readonly ConcurrentDictionary<string, DateTime> _activeVotingSessions;
 
     public VoterService(
-        ConcurrentDictionary<string, ConcurrentBag<string>> countyChannels,
-        ConcurrentDictionary<string, ConcurrentDictionary<string, string>> countyVoterCodes,
-        ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>> countyActiveConnections,
+        ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> countyChannels,
+        ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> countyVoterCodes,
+        ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> countyActiveConnections,
         ConcurrentDictionary<string, DateTime> activeVotingSessions)
     {
         _countyChannels = countyChannels;
@@ -21,11 +21,10 @@ public class VoterService
         _activeVotingSessions = activeVotingSessions;
     }
 
-    public async Task<bool> RequestAccess(string voterId, string county, string deviceName = "Unknown")
+    public async Task<bool> RequestAccess(string voterId, string county, string constituency, string deviceName = "Unknown")
     {
         try
         {
-            // Add validation logic here
             if (string.IsNullOrEmpty(voterId))
                 return false;
 
@@ -35,36 +34,35 @@ public class VoterService
                 return false;
             }
 
-            // Check if voter already has an active session
             if (_activeVotingSessions.ContainsKey(voterId))
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {voterId} already has active session");
                 return false;
             }
 
-            // Add request to county-specific channel
             var requestMessage = $"Voter {voterId} requesting access from {deviceName}";
-            
-            // Get or create county channel
-            var countyRequests = _countyChannels.GetOrAdd(county, _ => new ConcurrentBag<string>());
-            countyRequests.Add(requestMessage);
 
-            // Notify any waiting officials in this county
-            var countyConnections = _countyActiveConnections.GetOrAdd(county, _ => new ConcurrentDictionary<string, TaskCompletionSource<List<string>>>());
-            
-            if (countyConnections.Any())
+            var countyDict = _countyChannels.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentBag<string>>());
+            var constituencyRequests = countyDict.GetOrAdd(constituency, _ => new ConcurrentBag<string>());
+            constituencyRequests.Add(requestMessage);
+
+            var countyConnDict = _countyActiveConnections.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>?>());
+            var constituencyConnDict = countyConnDict.GetOrAdd(constituency, _ => new ConcurrentDictionary<string, TaskCompletionSource<List<string>>>());
+
+            // Send to all officials currently registered in the channel
+            foreach (var kvp in constituencyConnDict.ToList())
             {
-                // Get first available official connection
-                var firstConnection = countyConnections.First();
-                if (countyConnections.TryRemove(firstConnection.Key, out var tcs))
+                if (kvp.Value != null && !kvp.Value.Task.IsCompleted)
                 {
-                    // Send this request to waiting official
-                    tcs.SetResult(new List<string> { requestMessage });
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Routed voter request to waiting official {firstConnection.Key} in {county}");
+                    kvp.Value.SetResult(new List<string> { requestMessage });
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Routed voter request to connected official {kvp.Key} in {county}/{constituency}");
+                    
+                    // ❌ REMOVE THIS LINE - Don't create a new TCS here!
+                    // constituencyConnDict[kvp.Key] = new TaskCompletionSource<List<string>>();
                 }
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {requestMessage} in {county}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {requestMessage} in {county}/{constituency}");
             return true;
         }
         catch (Exception ex)
@@ -73,14 +71,14 @@ public class VoterService
             return false;
         }
     }
-
-    public async Task<(bool Success, string? Code)> WaitForAccessCode(string voterId, string county, TimeSpan timeout)
+    public async Task<(bool Success, string? Code)> WaitForAccessCode(string voterId, string county, string constituency, TimeSpan timeout)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {voterId} waiting for access code in {county}");
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {voterId} waiting for access code in {county}/{constituency}");
 
-        if (string.IsNullOrEmpty(county))
+        if (string.IsNullOrEmpty(county) || string.IsNullOrEmpty(constituency))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Cannot wait for code: Invalid county for voter {voterId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Cannot wait for code: Invalid county or constituency for voter {voterId}");
             return (false, null);
         }
 
@@ -88,21 +86,22 @@ public class VoterService
 
         while (DateTime.Now - startTime < timeout)
         {
-            // Get county-specific voter codes
-            var countyVoterCodes = _countyVoterCodes.GetOrAdd(county, _ => new ConcurrentDictionary<string, string>());
-            
+            // Get or create county+constituency voter codes
+            var countyVoterCodes = _countyVoterCodes.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
+            var constituencyVoterCodes = countyVoterCodes.GetOrAdd(constituency, _ => new ConcurrentDictionary<string, string>());
+
             // Check if voter has a pending code
-            if (countyVoterCodes.TryGetValue(voterId, out string? code))
+            if (constituencyVoterCodes.TryGetValue(voterId, out string? code))
             {
-                countyVoterCodes.TryRemove(voterId, out _); // One-time use
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending code {code} to voter {voterId} from {county}");
+                constituencyVoterCodes.TryRemove(voterId, out _); // One-time use
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending code {code} to voter {voterId} from {county}/{constituency}");
                 return (true, code);
             }
 
             await Task.Delay(500); // Check every 0.5 seconds
         }
 
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Timeout waiting for code for voter {voterId} in {county}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Timeout waiting for code for voter {voterId} in {county}/{constituency}");
         return (false, null);
     }
 

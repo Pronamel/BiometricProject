@@ -8,12 +8,44 @@
     ".NETCoreApp,Version=v8.0": {
       "Server/1.0.0": {
         "dependencies": {
+          "AWSSDK.Extensions.NETCore.Setup": "3.7.7",
+          "AWSSDK.SecretsManager": "3.7.300",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "8.0.0",
           "Swashbuckle.AspNetCore": "6.5.0",
           "System.IdentityModel.Tokens.Jwt": "7.1.2"
         },
         "runtime": {
           "Server.dll": {}
+        }
+      },
+      "AWSSDK.Core/3.7.300": {
+        "runtime": {
+          "lib/net8.0/AWSSDK.Core.dll": {
+            "assemblyVersion": "3.3.0.0",
+            "fileVersion": "3.7.300.0"
+          }
+        }
+      },
+      "AWSSDK.Extensions.NETCore.Setup/3.7.7": {
+        "dependencies": {
+          "AWSSDK.Core": "3.7.300"
+        },
+        "runtime": {
+          "lib/netstandard2.0/AWSSDK.Extensions.NETCore.Setup.dll": {
+            "assemblyVersion": "3.3.0.0",
+            "fileVersion": "3.7.7.0"
+          }
+        }
+      },
+      "AWSSDK.SecretsManager/3.7.300": {
+        "dependencies": {
+          "AWSSDK.Core": "3.7.300"
+        },
+        "runtime": {
+          "lib/net8.0/AWSSDK.SecretsManager.dll": {
+            "assemblyVersion": "3.3.0.0",
+            "fileVersion": "3.7.300.0"
+          }
         }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer/8.0.0": {
@@ -156,6 +188,27 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
+    },
+    "AWSSDK.Core/3.7.300": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Sf6Y3Ip44LUnTsFK2lz5heMThQQ4eYqN2u1xF/jA5K6uiXUeIHV4ISGb/reQ4MEOejiD15e+dtYy3Zebn4yXLw==",
+      "path": "awssdk.core/3.7.300",
+      "hashPath": "awssdk.core.3.7.300.nupkg.sha512"
+    },
+    "AWSSDK.Extensions.NETCore.Setup/3.7.7": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-jz7BRX6pUVJqvULIfdMdG2apcI1loh4kodyM/9ypHdlTers0OlPVshPBpUVA8WsSygIVa5evU8tZk4SdbSRCDg==",
+      "path": "awssdk.extensions.netcore.setup/3.7.7",
+      "hashPath": "awssdk.extensions.netcore.setup.3.7.7.nupkg.sha512"
+    },
+    "AWSSDK.SecretsManager/3.7.300": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-VIDxmA9sSA/kUhBwxX9NurAgqkrHiR2z2wOpewTeTxDy3EvtA/E4BWD/3LK7ZeoYliognm1p8yV76mhIveN1eg==",
+      "path": "awssdk.secretsmanager/3.7.300",
+      "hashPath": "awssdk.secretsmanager.3.7.300.nupkg.sha512"
     },
     "Microsoft.AspNetCore.Authentication.JwtBearer/8.0.0": {
       "type": "package",

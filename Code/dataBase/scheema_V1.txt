@@ -1,0 +1,176 @@
+-- =====================================================
+-- UK VOTING SYSTEM DATABASE SCHEMA
+-- General Elections with Biometric Authentication
+-- ANONYMOUS VOTING - No linkage between voters and votes
+-- =====================================================
+
+-- 1. CONSTITUENCIES TABLE
+CREATE TABLE constituencies (
+    constituency_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL UNIQUE,
+    total_voters INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. VOTERS TABLE
+-- Note Most fields encryptedhashed - database cannot query on them
+CREATE TABLE voters (
+    voter_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    national_id VARCHAR(20),  -- Encrypted
+    electoral_roll_number UUID,
+    constituency_id UUID NOT NULL,
+    ward_id UUID,  -- For future local elections
+    
+    -- Personal details (encrypted)
+    first_name VARCHAR(50),  -- Encrypted
+    last_name VARCHAR(50),  -- Encrypted
+    date_of_birth DATE,  -- Encrypted
+    
+    -- Address (encrypted)
+    address_line1 VARCHAR(100),  -- Encrypted
+    previous_address VARCHAR(100),  -- Encrypted
+    postcode VARCHAR(10),  -- Encrypted
+    
+    -- Biometric (encrypted)
+    fingerprint_scan BLOB,  -- Encrypted fingerprint template
+    
+    -- Voting status
+    has_voted BOOLEAN DEFAULT FALSE,
+    registered_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    
+    -- Foreign keys
+    FOREIGN KEY (constituency_id) REFERENCES constituencies(constituency_id) ON DELETE RESTRICT
+);
+
+-- 3. ELECTIONS TABLE
+CREATE TABLE elections (
+    election_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(150) NOT NULL,
+    election_date DATE NOT NULL,
+    election_type VARCHAR(20) NOT NULL CHECK (election_type IN ('general', 'local', 'referendum')),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'closed')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. CANDIDATES TABLE
+CREATE TABLE candidates (
+    candidate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    party VARCHAR(50),
+    bio TEXT,
+    constituency_id UUID NOT NULL,
+    election_id UUID NOT NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (constituency_id) REFERENCES constituencies(constituency_id) ON DELETE RESTRICT,
+    FOREIGN KEY (election_id) REFERENCES elections(election_id) ON DELETE CASCADE,
+    
+    -- Ensure unique candidate per constituency per election
+    UNIQUE (constituency_id, election_id, first_name, last_name)
+);
+
+-- 5. POLLING STATIONS TABLE
+CREATE TABLE polling_stations (
+    polling_station_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    polling_station_code UUID NOT NULL UNIQUE,
+    constituency_id UUID NOT NULL,
+    county VARCHAR(50),  -- Kept for server channelsorganization
+    
+    -- Capacity tracking
+    invalid_votes INT DEFAULT 0,
+    total_votes INT DEFAULT 0,
+    expected_votes INT DEFAULT 0,
+    
+    -- Foreign keys
+    FOREIGN KEY (constituency_id) REFERENCES constituencies(constituency_id) ON DELETE RESTRICT
+);
+
+-- 6. OFFICIALS TABLE
+CREATE TABLE officials (
+    official_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,  -- Hashed password
+    last_login TIMESTAMP,
+    assigned_county_id UUID,
+    assigned_polling_station_id UUID,
+    
+    -- Foreign keys
+    FOREIGN KEY (assigned_polling_station_id) REFERENCES polling_stations(polling_station_id) ON DELETE SET NULL
+);
+
+-- 7. VOTE RECORD TABLE
+-- ANONYMOUS Records THAT a vote happened, NOT who voted or what was voted
+-- No voter_id - maintains ballot secrecy
+CREATE TABLE vote_record (
+    record_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    election_id UUID NOT NULL,
+    voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign keys
+    FOREIGN KEY (election_id) REFERENCES elections(election_id) ON DELETE CASCADE
+);
+
+-- 8. CONSTITUENCY RESULTS TABLE
+-- Aggregated vote counts - no individual voter linkage
+CREATE TABLE constituency_results (
+    result_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    constituency_id UUID NOT NULL,
+    candidate_id UUID NOT NULL,
+    election_id UUID NOT NULL,
+    total_votes INT DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign keys
+    FOREIGN KEY (constituency_id) REFERENCES constituencies(constituency_id) ON DELETE CASCADE,
+    FOREIGN KEY (candidate_id) REFERENCES candidates(candidate_id) ON DELETE CASCADE,
+    FOREIGN KEY (election_id) REFERENCES elections(election_id) ON DELETE CASCADE,
+    
+    -- Ensure one result per candidate per constituency per election
+    UNIQUE (constituency_id, candidate_id, election_id),
+    
+    -- Constraints
+    CONSTRAINT check_votes_positive CHECK (total_votes = 0)
+);
+
+-- =====================================================
+-- INDEXES FOR PERFORMANCE
+-- =====================================================
+
+-- Voters indexes
+CREATE INDEX idx_voters_constituency ON voters(constituency_id);
+CREATE INDEX idx_voters_has_voted ON voters(has_voted);
+
+-- Candidates indexes
+CREATE INDEX idx_candidates_constituency ON candidates(constituency_id);
+CREATE INDEX idx_candidates_election ON candidates(election_id);
+
+-- Vote record indexes
+CREATE INDEX idx_vote_record_election ON vote_record(election_id);
+CREATE INDEX idx_vote_record_timestamp ON vote_record(voted_at);
+
+-- Results indexes
+CREATE INDEX idx_results_constituency ON constituency_results(constituency_id);
+CREATE INDEX idx_results_election ON constituency_results(election_id);
+
+-- =====================================================
+-- SAMPLE DATA (Optional - for testing)
+-- =====================================================
+
+-- Insert sample constituencies
+INSERT INTO constituencies (name, total_voters) VALUES 
+('Canterbury', 80000),
+('Ashford', 75000);
+
+-- Insert sample election
+INSERT INTO elections (name, election_date, election_type, status) VALUES
+('2029 General Election', '2029-05-03', 'general', 'pending');
+
+-- Insert sample polling station
+INSERT INTO polling_stations (polling_station_code, constituency_id, county, expected_votes) VALUES
+(
+    gen_random_uuid(),
+    (SELECT constituency_id FROM constituencies WHERE name = 'Canterbury'),
+    'Kent',
+    5000
+);

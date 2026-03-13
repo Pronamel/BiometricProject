@@ -16,6 +16,9 @@ public partial class VoterLoginViewModel : ViewModelBase
     // ==========================================
 
     [ObservableProperty]
+    private string selectedConstituency = "";
+
+    [ObservableProperty]
     private string selectedCounty = "";
 
     [ObservableProperty]
@@ -41,6 +44,9 @@ public partial class VoterLoginViewModel : ViewModelBase
 
     // County options for selection
     public List<string> CountyOptions => UKCounties.Counties;
+
+    // Constituency options for selection
+    public List<string> ConstituencyOptions => UKConstituencies.Constituencies;
 
     // ==========================================
     // PRIVATE READONLY FIELDS
@@ -136,7 +142,7 @@ public partial class VoterLoginViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Attempting voter link: County={SelectedCounty}, Station={PollingStationCode}");
             
             // Call the voter linking API
-            var linkResponse = await _apiService.LinkToOfficialAsync(PollingStationCode, SelectedCounty);
+            var linkResponse = await _apiService.LinkToOfficialAsync(PollingStationCode, SelectedCounty, SelectedConstituency);
             
             if (linkResponse.Success)
             {
