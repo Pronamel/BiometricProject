@@ -1,0 +1,113 @@
+========================================
+PostgreSQL DATABASE BACKUP & RESTORE GUIDE
+========================================
+
+DATABASE CONNECTION DETAILS:
+- Username: postgres
+- Password: SummerIsComing617!
+- Database: biometric_db
+- Host: localhost
+- Port: 5432
+- PostgreSQL Path: A:\PostgreSQL\bin
+- Data Directory: A:\PostgreSQL\data
+
+========================================
+1. START POSTGRESQL SERVER
+========================================
+
+Option A - Using Service (requires Admin):
+---
+Start-Service -Name "postgresql-x64-18"
+
+Option B - Using pg_ctl (no admin needed):
+---
+& 'A:\PostgreSQL\bin\pg_ctl.exe' -D 'A:\PostgreSQL\data' start
+
+Option C - Using batch file:
+---
+& ".\startPostgres.bat"
+
+
+========================================
+2. CREATE DATABASE DUMP (BACKUP)
+========================================
+
+Run this command to create db_backup.dump:
+---
+$env:PGPASSWORD='SummerIsComing617!'; & 'A:\PostgreSQL\bin\pg_dump.exe' -U postgres -h localhost -p 5432 -f "db_backup.dump" biometric_db
+
+Make sure PostgreSQL is running before executing this command!
+The dump file will be created in your current directory.
+
+
+========================================
+3. RESTORE DATABASE FROM DUMP
+========================================
+
+On the NEW COMPUTER (after transferring db_backup.dump):
+
+Step 1 - Start PostgreSQL:
+---
+& 'A:\PostgreSQL\bin\pg_ctl.exe' -D 'A:\PostgreSQL\data' start
+
+Step 2 - Restore the database:
+---
+$env:PGPASSWORD='SummerIsComing617!'; & 'A:\PostgreSQL\bin\pg_restore.exe' -U postgres -h localhost -p 5432 -d biometric_db db_backup.dump
+
+OR if the dump is in plain text format:
+---
+$env:PGPASSWORD='SummerIsComing617!'; & 'A:\PostgreSQL\bin\psql.exe' -U postgres -h localhost -p 5432 -d biometric_db -f db_backup.dump
+
+
+========================================
+4. VERIFY THE DUMP
+========================================
+
+Check the dump file size:
+---
+(Get-Item "db_backup.dump").Length
+
+View first few lines of dump:
+---
+Get-Content db_backup.dump -Head 20
+
+Get file info:
+---
+Get-Item db_backup.dump | Select-Object Name, Length, LastWriteTime
+
+
+========================================
+5. TROUBLESHOOTING
+========================================
+
+Connection Refused Error:
+- PostgreSQL is not running
+- Start it using one of the commands in section 1
+
+Access Denied Error:
+- You may need to run PowerShell as Administrator
+- Right-click PowerShell and select "Run as Administrator"
+
+Wrong Password:
+- Make sure the password is correct: SummerIsComing617!
+- Use $env:PGPASSWORD environment variable to set it
+
+Database doesn't exist:
+- Verify the database name is "biometric_db"
+- Check list of databases with:
+  $env:PGPASSWORD='SummerIsComing617!'; & 'A:\PostgreSQL\bin\psql.exe' -U postgres -h localhost -c "\l"
+
+
+========================================
+6. STOP POSTGRESQL SERVER
+========================================
+
+Option A - Using Service:
+---
+Stop-Service -Name "postgresql-x64-18"
+
+Option B - Using pg_ctl:
+---
+& 'A:\PostgreSQL\bin\pg_ctl.exe' -D 'A:\PostgreSQL\data' stop
+
+========================================
