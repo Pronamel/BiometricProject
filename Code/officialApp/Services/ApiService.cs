@@ -43,9 +43,9 @@ public class ApiService : IApiService
         _httpClient = httpClient;
         
         // TODO: Move this to configuration or environment variable
-        _baseUrl = "http://localhost:5000"; // HTTP for local testing (will use HTTPS in production)
+        _baseUrl = "https://34-238-14-248.nip.io";
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(3); // Timeout for local server
+        _httpClient.Timeout = TimeSpan.FromSeconds(10); // Increased from 3 to 10 seconds for HTTPS handshake
         
         // Configure JSON serialization options
         _jsonOptions = new JsonSerializerOptions

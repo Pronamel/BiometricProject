@@ -1,9 +1,4 @@
 ﻿using Avalonia;
-using System;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using officialApp.Data;
 
 namespace officialApp;
 

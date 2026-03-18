@@ -96,13 +96,27 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         IsListeningForVotes = true;
         _voteListeningCancellation = new CancellationTokenSource();
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official starting to listen for votes...");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official starting to listen for voter requests and votes...");
         
         try
         {
             while (IsListeningForVotes && !_voteListeningCancellation.Token.IsCancellationRequested)
             {
-                // Check for new votes through API
+                // First, check for voter link requests
+                var voterRequests = await _apiService.WaitForVoterRequestsAsync();
+                
+                if (voterRequests?.Requests.Count > 0)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received {voterRequests.Requests.Count} voter link requests");
+                    
+                    // Process each voter request
+                    foreach (var request in voterRequests.Requests)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] New voter link request: {request}");
+                    }
+                }
+                
+                // Then check for new votes through API
                 var voteResponse = await _apiService.CheckForVotesAsync();
                 
                 if (voteResponse?.Success == true && voteResponse.Count > 0)

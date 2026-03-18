@@ -1,0 +1,74 @@
+#!/bin/bash
+dnf update -y
+dnf install -y nginx
+systemctl enable nginx
+systemctl start nginx
+dnf install -y certbot python3-certbot-nginx
+dnf install -y dotnet-sdk-8.0
+mkdir -p /var/www/app
+chown ec2-user:ec2-user /var/www/app
+
+cat > /usr/local/bin/renew-https.sh << 'SCRIPT'
+#!/bin/bash
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/public-ipv4)
+DOMAIN="${PUBLIC_IP//./-}.nip.io"
+echo "Public IP: $PUBLIC_IP"
+echo "Domain: $DOMAIN"
+systemctl stop nginx
+certbot certonly --standalone \
+  --non-interactive \
+  --agree-tos \
+  --email your@email.com \
+  -d "$DOMAIN" \
+  --keep-until-expiring
+cat > /etc/nginx/conf.d/https.conf << EOF
+server {
+    listen 80;
+    server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name $DOMAIN;
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    location / {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection keep-alive;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+systemctl start nginx
+echo "HTTPS configured for https://$DOMAIN"
+SCRIPT
+
+chmod +x /usr/local/bin/renew-https.sh
+
+cat > /etc/systemd/system/renew-https.service << 'SERVICE'
+[Unit]
+Description=Renew HTTPS cert on boot with new IP
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/renew-https.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+systemctl daemon-reload
+systemctl enable renew-https.service
+systemctl start renew-https.service

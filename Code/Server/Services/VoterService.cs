@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Server.Data;
 
 namespace Server.Services;
 
@@ -8,17 +9,20 @@ public class VoterService
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _countyVoterCodes;
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> _countyActiveConnections;
     private readonly ConcurrentDictionary<string, DateTime> _activeVotingSessions;
+    private readonly ApplicationDbContext _dbContext;
 
     public VoterService(
         ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> countyChannels,
         ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> countyVoterCodes,
         ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> countyActiveConnections,
-        ConcurrentDictionary<string, DateTime> activeVotingSessions)
+        ConcurrentDictionary<string, DateTime> activeVotingSessions,
+        ApplicationDbContext dbContext)
     {
         _countyChannels = countyChannels;
         _countyVoterCodes = countyVoterCodes;
         _countyActiveConnections = countyActiveConnections;
         _activeVotingSessions = activeVotingSessions;
+        _dbContext = dbContext;
     }
 
     public async Task<bool> RequestAccess(string voterId, string county, string constituency, string deviceName = "Unknown")

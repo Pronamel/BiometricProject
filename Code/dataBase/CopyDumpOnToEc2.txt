@@ -1,0 +1,1 @@
+ scp -i Server-Key.pem C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/dataBase/db_backup.dump ec2-user@52.0.63.9:/home/ec2-user/

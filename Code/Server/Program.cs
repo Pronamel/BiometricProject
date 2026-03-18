@@ -4,111 +4,35 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using System.Security.Claims;
-using System.Security.Cryptography.X509Certificates;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
-using Amazon.SecretsManager;
-using Amazon.SecretsManager.Model;
 using Server.Services;
+using Server.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 //===========================================
 // BUILDER CONFIGURATION
 //===========================================
 var builder = WebApplication.CreateBuilder(args);
 
-// Add AWS services
-builder.Services.AddAWSService<IAmazonSecretsManager>();
-
-// Try to load SSL certificate from AWS (with fallback for local development)
-X509Certificate2? certificate = null;
-
-// Local function to load certificate
-async Task<X509Certificate2?> LoadCertificateFromAwsLocal()
+// Configure Kestrel for Nginx reverse proxy
+// App listens ONLY on localhost:5000 (HTTP)
+// Nginx handles HTTPS externally
+builder.WebHost.ConfigureKestrel(options =>
 {
-    try
+    options.ListenLocalhost(5000, listenOptions =>
     {
-        // Check if we're in a local development environment
-        var isLocal = Environment.GetEnvironmentVariable("AWS_REGION") == null && 
-                     Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID") == null;
-        
-        if (isLocal)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No AWS credentials detected - skipping AWS certificate loading");
-            return null;
-        }
-
-        var client = new AmazonSecretsManagerClient();
-        
-        var request = new GetSecretValueRequest
-        {
-            SecretId = "voting-system/ssl-certificate"
-        };
-
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Loading SSL certificate from AWS Secrets Manager...");
-        
-        var response = await client.GetSecretValueAsync(request);
-        var certData = JsonSerializer.Deserialize<CertificateSecret>(response.SecretString);
-
-        if (certData?.Certificate == null || certData?.PrivateKey == null)
-        {
-            throw new InvalidOperationException("Invalid certificate data retrieved from AWS");
-        }
-
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] SSL certificate loaded successfully from AWS");
-        
-        return X509Certificate2.CreateFromPem(certData.Certificate, certData.PrivateKey);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Failed to load certificate from AWS: {ex.Message}");
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] This is expected for local development without AWS credentials");
-        return null;
-    }
-}
-
-try 
-{
-    certificate = await LoadCertificateFromAwsLocal();
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Using AWS certificate for HTTPS");
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] AWS certificate failed: {ex.Message}");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Falling back to HTTP-only mode for local development");
-}
-
-// Configure Kestrel - HTTPS only if we have a certificate
-if (certificate != null)
-{
-    builder.WebHost.ConfigureKestrel(options =>
-    {
-        options.ListenAnyIP(5001, listenOptions =>
-        {
-            listenOptions.UseHttps(certificate);
-        });
-        options.ListenAnyIP(5000, listenOptions =>
-        {
-            listenOptions.Protocols = HttpProtocols.Http1;
-        });
+        listenOptions.Protocols = HttpProtocols.Http1;
     });
-    
-    // Add HTTPS redirection
-    builder.Services.AddHttpsRedirection(options =>
-    {
-        options.HttpsPort = 5001;
-    });
-}
-else
-{
-    // Fallback to HTTP-only for local development
-    builder.WebHost.UseUrls("http://0.0.0.0:5000");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Running in HTTP-only mode on port 5000");
-}
+});
+
+Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Configured to listen on http://localhost:5000 (Nginx reverse proxy handles HTTPS)");
 
 // Add basic services
 builder.Services.AddEndpointsApiExplorer();
@@ -137,6 +61,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+//===========================================
+// DATABASE CONFIGURATION
+//===========================================
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 //===========================================
 // IN-MEMORY STORAGE SETUP - COUNTY-BASED CHANNELS
@@ -184,14 +115,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("ProductionCors", policy =>
     {
-        // Allow local development and production domains
+        // Allow production domain via Nginx
         policy.WithOrigins(
-                "https://yourdomain.com", 
-                "https://www.yourdomain.com",
-                "https://localhost:5001",
-                "http://localhost:5000", // Allow HTTP for redirect
-                "https://127.0.0.1:5001",
-                "http://127.0.0.1:5000"  // Allow HTTP for redirect
+                "https://34-238-14-248.nip.io",
+                "http://localhost:5000",
+                "https://localhost:5001"
               )
               .AllowAnyMethod() 
               .AllowAnyHeader()
@@ -212,6 +140,31 @@ builder.Services.AddCors(options =>
 //===========================================
 var app = builder.Build();
 
+// Test database connection on startup
+try
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Testing database connection...");
+    Console.Out.Flush();
+    
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        if (await dbContext.Database.CanConnectAsync())
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Database connection successful!");
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Database connection failed!");
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Database connection error: {ex.Message}");
+}
+Console.Out.Flush();
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -226,16 +179,12 @@ else
     app.UseCors("ProductionCors");
 }
 
-// HTTPS redirection - only if we have a certificate
-if (certificate != null)
+// Trust forwarded headers from Nginx reverse proxy
+// This ensures the app knows requests are HTTPS and gets the real client IP
+app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    app.UseHttpsRedirection();
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] HTTPS redirection enabled");
-}
-else
-{
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Running in HTTP-only mode - no HTTPS redirection");
-}
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 // Authentication and Authorization middleware
 app.UseAuthentication();
@@ -244,12 +193,17 @@ app.UseAuthorization();
 // Request logging middleware
 app.Use(async (context, next) =>
 {
-    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
     var method = context.Request.Method;
     var path = context.Request.Path;
-    var clientIP = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
     
-    Console.WriteLine($"[{timestamp}] {method} {path} from {clientIP}");
+    // Skip logging for long-polling GET requests to reduce console clutter
+    if (!(method == "GET" && path.StartsWithSegments("/api/official/wait-for-requests")))
+    {
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var clientIP = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+        
+        Console.WriteLine($"[{timestamp}] {method} {path} from {clientIP}");
+    }
     
     await next();
 });
@@ -403,13 +357,16 @@ app.MapPost("/auth/voter-session", (VoterSessionRequest request, VoterService vo
 //===========================================
 app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request, 
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> countyChannels,
+    ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> countyActiveConnections,
     TokenCounter voterIdCounter) =>
 {
     var stationPrefix = $"{request.County}_{request.PollingStationCode}_";
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter link attempt - County: {request.County}, Station Code: {request.PollingStationCode}");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking for officials with prefix: {stationPrefix}");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Active officials: {string.Join(", ", activeOfficials.Keys)}");
+    Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ===== VOTER LINK ATTEMPT =====");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter request - County: {request.County}, PollingStationCode: {request.PollingStationCode}, Constituency: {request.Constituency}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking for officials with key prefix: {stationPrefix}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Active officials registered: {string.Join(" | ", activeOfficials.Keys)}");
     
     // Find the first official at this polling station
     var officialsAtStation = activeOfficials
@@ -422,11 +379,64 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
         var systemKey = officialsAtStation.Key;
         var assignedVoterId = (int)voterIdCounter.GetNextId();
         
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found official: {officialInfo.OfficialId} at station {officialInfo.StationId}");
+        
         // Update the official's connected voters list
         officialInfo.ConnectedVoters.Add(assignedVoterId);
         activeOfficials[systemKey] = officialInfo with { ConnectedVoters = officialInfo.ConnectedVoters };
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter linked successfully! Assigned ID: {assignedVoterId} to Official: {officialInfo.OfficialId}");
+        // NOTIFY THE WAITING OFFICIAL
+        var voterRequestMessage = $"New voter link: VoterId={assignedVoterId}, Constituency={request.Constituency}";
+        
+        // Add to county channels for the official to receive
+        var countyDict = countyChannels.GetOrAdd(request.County, _ => new ConcurrentDictionary<string, ConcurrentBag<string>>());
+        var countyRequests = countyDict.GetOrAdd(request.Constituency, _ => new ConcurrentBag<string>());
+        countyRequests.Add(voterRequestMessage);
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Added to countyChannels[{request.County}][{request.Constituency}]");
+        
+        // Signal any waiting official task completion source
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Checking countyActiveConnections for waiting officials...");
+        var countyConnDict = countyActiveConnections.GetOrAdd(request.County, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>?>());
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Counties in activeConnections: {string.Join(" | ", countyActiveConnections.Keys)}");
+        
+        if (countyConnDict.TryGetValue(request.Constituency, out var constituencyConnDict) && constituencyConnDict != null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Found constituencies: {string.Join(" | ", constituencyConnDict.Keys)}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Waiting officials in {request.County}/{request.Constituency}: {string.Join(" | ", constituencyConnDict.Keys)}");
+            
+            int notifiedCount = 0;
+            foreach (var kvp in constituencyConnDict)
+            {
+                var officialId = kvp.Key;
+                var tcs = kvp.Value;
+                
+                // Collect all pending requests for this official
+                var requests = new List<string>();
+                while (countyRequests.TryTake(out string? req))
+                {
+                    if (req != null) requests.Add(req);
+                }
+                
+                if (requests.Count > 0 && tcs.TrySetResult(requests))
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Notified official {officialId} about {requests.Count} voter request(s)");
+                    notifiedCount++;
+                }
+            }
+            
+            if (notifiedCount == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ No waiting officials were notified!");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ No constituencies found in activeConnections for {request.County}");
+        }
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {assignedVoterId} linked successfully!\n");
         
         return Results.Ok(new VoterLinkResponse(
             true,
@@ -437,7 +447,8 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
         ));
     }
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No matching official found for county '{request.County}' and polling station code '{request.PollingStationCode}'");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No matching official found");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER LINK ATTEMPT =====\n");
     return Results.BadRequest(new VoterLinkResponse(
         false,
         0,

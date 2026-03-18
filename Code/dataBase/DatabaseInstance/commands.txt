@@ -1,0 +1,13 @@
+
+opens the postgreSQL prompt
+	sudo -u postgres psql
+
+
+lists the database
+	\l
+
+opens the database
+	/c (database name)
+
+lists tables in the database
+	/dt
