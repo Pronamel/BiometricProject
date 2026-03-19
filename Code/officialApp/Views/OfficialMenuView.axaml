@@ -34,9 +34,9 @@
                 BorderBrush="Black"
                 FontSize="20">
                 <StackPanel>
-                    <TextBlock Text="Start" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                    <TextBlock Text="Voting" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                    <TextBlock Text="Program" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Generate" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Access" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Code" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
                 </StackPanel>
             </Button>
 
@@ -70,5 +70,20 @@
             </Button>
             
         </StackPanel>
+
+        <!-- Test Voters Button (Bottom) -->
+        <Button 
+            Command="{Binding FetchVotersTestCommand}"
+            Background="#6b4423"  
+            Width="150"
+            Height="50" 
+            BorderThickness="2"
+            BorderBrush="Black"
+            FontSize="14"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,10"
+            HorizontalAlignment="Center">
+            <TextBlock Text="Test: Fetch Voters" Foreground="white"/>
+        </Button>
     </Grid>
 </UserControl>

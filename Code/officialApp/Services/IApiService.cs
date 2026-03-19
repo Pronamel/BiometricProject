@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using officialApp.Models;
@@ -7,7 +8,7 @@ namespace officialApp.Services;
 public interface IApiService
 {
     // Authentication
-    Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string county, string constituency, string systemCode, string? password = null);
+    Task<OfficialLoginResponse?> LoginAsync(string username, string password);
     bool IsAuthenticated { get; }
     string? CurrentOfficialId { get; }
     void Logout();
@@ -20,7 +21,11 @@ public interface IApiService
     // Long Polling Methods
     Task<OfficialRequestsResponse?> WaitForVoterRequestsAsync();
     Task<bool> GenerateAccessCodeAsync(string voterId);
+    Task<bool> SetAccessCodeAsync(string accessCode);
     
     // Vote Management
     Task<VoteNotificationResponse?> CheckForVotesAsync();
+    
+    // Database Queries
+    Task<List<dynamic>?> GetAllVotersAsync();
 }

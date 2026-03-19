@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Net.Http;
 using System.Reflection;
 using Avalonia.Controls;
+using officialApp.Services;
 
 namespace officialApp.ViewModels;
 
@@ -16,6 +17,7 @@ public partial class OfficialMenuViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
+    private readonly IApiService _apiService;
 
     // ==========================================
     // CONSTRUCTOR
@@ -24,6 +26,7 @@ public partial class OfficialMenuViewModel : ViewModelBase
     public OfficialMenuViewModel()
     {
         _navigationService = Navigation.Instance;
+        _apiService = ApiService.Instance;
     }
 
     // ==========================================
@@ -33,9 +36,7 @@ public partial class OfficialMenuViewModel : ViewModelBase
     [RelayCommand]
     private void VotingStart()
     {
-        // TODO: Navigate to manage screen or connect to voter app
-        // For now, stay on current view
-        // _navigationService.NavigateToPersonalOrProxy();
+        _navigationService.NavigateToOfficialGenerateAccessCode();
     }
     
     [RelayCommand]
@@ -49,5 +50,29 @@ public partial class OfficialMenuViewModel : ViewModelBase
     {
         // TODO: Implement reports functionality
         // _navigationService.NavigateToReports();
+    }
+
+    [RelayCommand]
+    private async Task FetchVotersTest()
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== FETCHING VOTERS FROM DATABASE =====");
+        
+        var voters = await _apiService.GetAllVotersAsync();
+        
+        if (voters != null && voters.Count > 0)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Successfully retrieved {voters.Count} voters:");
+            
+            foreach (var voter in voters)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter: {JsonSerializer.Serialize(voter)}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No voters found or API call failed");
+        }
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER FETCH =====\n");
     }
 }

@@ -5,7 +5,7 @@ namespace Server.Models.Entities
     public class PollingStation
     {
         public Guid PollingStationId { get; set; }
-        public Guid PollingStationCode { get; set; }
+        public string? PollingStationCode { get; set; }
         public Guid ConstituencyId { get; set; }
         public string? County { get; set; }
         public int InvalidVotes { get; set; }

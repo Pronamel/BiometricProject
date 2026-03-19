@@ -17,26 +17,29 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = officialApp
-build_property.ProjectDir = C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\
+build_property.ProjectDir = c:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.EffectiveAnalysisLevelStyle = 8.0
 build_property.EnableCodeStyleSeverity = 
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/App.axaml]
+[c:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/App.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/MainWindow.axaml]
+[c:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/MainWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialAuthenticateView.axaml]
+[c:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialAuthenticateView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialLoginView.axaml]
+[c:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialGenerateAccessCodeView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialMenuView.axaml]
+[c:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialLoginView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
-[C:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialVotingPollingManagerView.axaml]
+[c:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialMenuView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[c:/Users/alexa/OneDrive/Desktop/dis/BiometricProject/Code/officialApp/Views/OfficialVotingPollingManagerView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

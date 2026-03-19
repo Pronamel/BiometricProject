@@ -1,4 +1,7 @@
 using System.Collections.Concurrent;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Server.Data;
 
 namespace Server.Services;
@@ -38,6 +41,46 @@ public class OfficialService
         Console.WriteLine($"  Official valid: {officialValid}");
 
         return stationValid && officialValid;
+    }
+
+    public async Task<bool> ValidateOfficialCredentialsAsync(string username, string password)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Validating official credentials:");
+            Console.WriteLine($"  Username: '{username}'");
+            Console.WriteLine($"  Password: '{password}'");
+
+            // Query the database for the official
+            var official = await _dbContext.Officials
+                .FirstOrDefaultAsync(o => o.Username == username);
+
+            if (official == null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official '{username}' not found in database");
+                return false;
+            }
+
+            // Check password (currently plain text, compare directly)
+            // TODO: In production, use proper password hashing (BCrypt, Argon2, etc.)
+            bool passwordMatch = official.PasswordHash == password;
+
+            if (passwordMatch)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official '{username}' credentials verified");
+                return true;
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Incorrect password for official '{username}'");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error validating credentials: {ex.Message}");
+            return false;
+        }
     }
 
     public async Task<(bool Success, List<string> Requests)> WaitForVoterRequests(string county, string constituency, string officialId, TimeSpan timeout)

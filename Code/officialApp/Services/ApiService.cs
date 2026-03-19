@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -26,12 +27,21 @@ public class ApiService : IApiService
     private DateTime _tokenExpiry;
     private string? _currentOfficialId;
     private string? _currentStationId;
+    private string? _currentCounty;
+    private string? _currentConstituency;
+    private string? _currentSystemCode;
+    private long _currentTokenId;
     
     // Authentication properties
     public bool IsAuthenticated => 
         !string.IsNullOrEmpty(_jwtToken) && DateTime.UtcNow < _tokenExpiry;
     
     public string? CurrentOfficialId => _currentOfficialId;
+    public string? CurrentStationId => _currentStationId;
+    public string? CurrentCounty => _currentCounty;
+    public string? CurrentConstituency => _currentConstituency;
+    public string? CurrentSystemCode => _currentSystemCode;
+    public long CurrentTokenId => _currentTokenId;
 
     static ApiService()
     {
@@ -59,26 +69,18 @@ public class ApiService : IApiService
     // JWT Authentication Methods
     //--------------------------------------------
 
-    public async Task<OfficialLoginResponse?> LoginAsync(string officialId, string stationId, string county, string constituency, string systemCode, string? password = null)
+    public async Task<OfficialLoginResponse?> LoginAsync(string username, string password)
     {
         try
         {
-            var loginRequest = new OfficialLoginRequest
-            {
-                OfficialId = officialId,
-                StationId = stationId,
-                County = county,
-                Constituency = constituency,
-                SystemCode = systemCode,
-                Password = password
-            };
+            var loginRequest = new { Username = username, Password = password };
 
             var jsonContent = JsonSerializer.Serialize(loginRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending login request:");
-            Console.WriteLine($"  Official ID: '{officialId}'");
-            Console.WriteLine($"  Station ID: '{stationId}'");
+            Console.WriteLine($"  Username: '{username}'");
+            Console.WriteLine($"  Password: '{password}'");
             Console.WriteLine($"  JSON: {jsonContent}");
 
             var response = await _httpClient.PostAsync($"{_baseUrl}/auth/official-login", content);
@@ -99,8 +101,12 @@ public class ApiService : IApiService
                     _tokenExpiry = loginResponse.ExpiresAt;
                     _currentOfficialId = loginResponse.OfficialId;
                     _currentStationId = loginResponse.StationId;
+                    _currentCounty = loginResponse.County;
+                    _currentConstituency = loginResponse.Constituency;
+                    _currentSystemCode = loginResponse.SystemCode;
+                    _currentTokenId = loginResponse.TokenId;
 
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} logged in successfully");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {username} logged in successfully");
                     return loginResponse;
                 }
             }
@@ -140,6 +146,64 @@ public class ApiService : IApiService
             return null;
         }
     }
+
+    //--------------------------------------------
+    // Access Code Management Methods
+    //--------------------------------------------
+
+    private string HashAccessCode(string plaintext)
+    {
+        using (var sha256 = SHA256.Create())
+        {
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(plaintext));
+            return Convert.ToBase64String(hashedBytes);
+        }
+    }
+
+    public async Task<bool> SetAccessCodeAsync(string accessCode)
+    {
+        try
+        {
+            if (!IsAuthenticated)
+            {
+                Console.WriteLine("Not authenticated for setting access code");
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(accessCode))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Access code is empty");
+                return false;
+            }
+
+            // Hash the plaintext code before sending
+            var hashedCode = HashAccessCode(accessCode);
+
+            var setCodeRequest = new { accessCode = hashedCode };
+            var jsonContent = JsonSerializer.Serialize(setCodeRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Setting access code for station {_currentStationId}");
+
+            var response = await SendAuthenticatedPostAsync("/api/official/set-access-code", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Access code set successfully");
+                return true;
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to set access code: {errorContent}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error setting access code: {ex.Message}");
+            return false;
+        }
+    }
+
     public void Logout()
     {
         _jwtToken = null;
@@ -243,4 +307,30 @@ public class ApiService : IApiService
             return false;
         }
     }
-}
+    //--------------------------------------------
+    // Database Query Methods
+    //--------------------------------------------
+
+    public async Task<List<dynamic>?> GetAllVotersAsync()
+    {
+        try
+        {
+            var response = await SendAuthenticatedGetAsync("/api/official/database");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+                
+                // Parse as list of objects
+                var jsonDoc = JsonSerializer.Deserialize<System.Collections.Generic.List<dynamic>>(jsonString, _jsonOptions);
+                return jsonDoc;
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching data: {ex.Message}");
+            return null;
+        }
+    }}

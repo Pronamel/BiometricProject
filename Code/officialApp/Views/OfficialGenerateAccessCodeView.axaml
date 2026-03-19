@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:officialApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="400"
+            x:Class="officialApp.Views.OfficialGenerateAccessCodeView"
+            x:DataType="vm:OfficialGenerateAccessCodeViewModel">
+
+    <Design.DataContext>
+        <vm:OfficialGenerateAccessCodeViewModel/>
+    </Design.DataContext>
+
+    <Grid Background="#f6f2e6">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="20" Width="400" Margin="20">
+            
+            <!-- Title -->
+            <TextBlock Text="Generate Access Code" 
+                      FontSize="24" 
+                      FontWeight="Bold" 
+                      Foreground="black"
+                      HorizontalAlignment="Center"/>
+            
+            <!-- Description -->
+            <TextBlock Text="Enter an access code that voters will use to join your polling station." 
+                      TextWrapping="Wrap"
+                      Foreground="#555555"
+                      FontSize="14"
+                      HorizontalAlignment="Center"/>
+            
+            <!-- Input Field -->
+            <StackPanel Spacing="5">
+                <TextBlock Text="Access Code:" Foreground="black" FontSize="14"/>
+                <TextBox x:Name="AccessCodeInput"
+                        Text="{Binding AccessCode}"
+                        Watermark="Enter access code (e.g., BRAINTREE-2026)"
+                        Height="40"
+                        FontSize="14"
+                        Padding="10"/>
+            </StackPanel>
+            
+            <!-- Status Message -->
+            <TextBlock x:Name="StatusMessage"
+                      Text="{Binding StatusMessage}"
+                      TextWrapping="Wrap"
+                      Foreground="{Binding StatusColor}"
+                      FontSize="12"
+                      HorizontalAlignment="Center"/>
+            
+            <!-- Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Center" Margin="0,20,0,0">
+                
+                <Button 
+                    Command="{Binding GenerateCommand}"
+                    Background="#27ae60"  
+                    Width="120"
+                    Height="50" 
+                    BorderThickness="2"
+                    BorderBrush="Black"
+                    FontSize="16">
+                    <TextBlock Text="Generate" Foreground="white"/>
+                </Button>
+                
+                <Button 
+                    Command="{Binding CancelCommand}"
+                    Background="#e74c3c"  
+                    Width="120"
+                    Height="50" 
+                    BorderThickness="2"
+                    BorderBrush="Black"
+                    FontSize="16">
+                    <TextBlock Text="Cancel" Foreground="white"/>
+                </Button>
+                
+            </StackPanel>
+            
+        </StackPanel>
+    </Grid>
+</UserControl>

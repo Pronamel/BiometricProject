@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -275,6 +276,64 @@ public class ApiService : IApiService
                 Message = $"Error casting vote: {ex.Message}",
                 Timestamp = DateTime.UtcNow
             };
+        }
+    }
+
+    //--------------------------------------------
+    // Access Code Management Methods
+    //--------------------------------------------
+
+    private string HashAccessCode(string plaintext)
+    {
+        using (var sha256 = SHA256.Create())
+        {
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(plaintext));
+            return Convert.ToBase64String(hashedBytes);
+        }
+    }
+
+    public async Task<bool> VerifyAccessCodeAsync(string accessCode, string county, string constituency)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(accessCode))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Access code is empty");
+                return false;
+            }
+
+            // Hash the plaintext code before sending
+            var hashedCode = HashAccessCode(accessCode);
+
+            var verifyRequest = new
+            {
+                accessCode = hashedCode,
+                county = county,
+                constituency = constituency
+            };
+
+            var jsonContent = JsonSerializer.Serialize(verifyRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Verifying access code for {county}/{constituency}");
+
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/voter/verify-access-code", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var verifyResponse = JsonSerializer.Deserialize<dynamic>(responseContent, _jsonOptions);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Access code verified successfully");
+                return true;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Access code verification failed: {responseContent}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error verifying access code: {ex.Message}");
+            return false;
         }
     }
 

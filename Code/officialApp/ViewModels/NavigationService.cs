@@ -13,6 +13,7 @@ public interface INavigationService
     void NavigateToOfficialLogin();
     void NavigateToOfficialAuthenticate();
     void NavigateToOfficialMenu();
+    void NavigateToOfficialGenerateAccessCode();
     void NavigateToOfficialVotingPollingManager();
     void NavigateToView(UserControl view);
     
@@ -42,6 +43,7 @@ public class NavigationService : INavigationService
     private UserControl? _officialLoginView;
     private UserControl? _officialAuthenticateView;
     private UserControl? _officialMenuView;
+    private UserControl? _officialGenerateAccessCodeView;
     private UserControl? _officialVotingPollingManagerView;
 
     // ==========================================
@@ -52,6 +54,7 @@ public class NavigationService : INavigationService
     private Func<UserControl>? _getOfficialLoginView;
     private Func<UserControl>? _getOfficialAuthenticateView;
     private Func<UserControl>? _getOfficialMenuView;
+    private Func<UserControl>? _getOfficialGenerateAccessCodeView;
     private Func<UserControl>? _getOfficialVotingPollingManagerView;
 
     // ==========================================
@@ -63,11 +66,13 @@ public class NavigationService : INavigationService
         Func<UserControl> getOfficialLoginView,
         Func<UserControl> getOfficialAuthenticateView,
         Func<UserControl> getOfficialMenuView,
+        Func<UserControl> getOfficialGenerateAccessCodeView,
         Func<UserControl> getOfficialVotingPollingManagerView)
     {
         _getOfficialLoginView = getOfficialLoginView;
         _getOfficialAuthenticateView = getOfficialAuthenticateView;
         _getOfficialMenuView = getOfficialMenuView;
+        _getOfficialGenerateAccessCodeView = getOfficialGenerateAccessCodeView;
         _getOfficialVotingPollingManagerView = getOfficialVotingPollingManagerView;
     }
 
@@ -100,6 +105,15 @@ public class NavigationService : INavigationService
 
         if (_officialMenuView != null)
             NavigationRequested?.Invoke(_officialMenuView);
+    }
+    
+    public void NavigateToOfficialGenerateAccessCode()
+    {
+        if (_officialGenerateAccessCodeView == null && _getOfficialGenerateAccessCodeView != null)
+            _officialGenerateAccessCodeView = _getOfficialGenerateAccessCodeView();
+
+        if (_officialGenerateAccessCodeView != null)
+            NavigationRequested?.Invoke(_officialGenerateAccessCodeView);
     }
     
     public void NavigateToOfficialVotingPollingManager()

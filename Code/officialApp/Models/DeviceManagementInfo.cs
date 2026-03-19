@@ -76,8 +76,16 @@ public class OfficialLoginResponse
     
     [JsonPropertyName("county")]
     public string County { get; set; } = string.Empty;
-        [JsonPropertyName("systemCode")]
+    
+    [JsonPropertyName("systemCode")]
     public string SystemCode { get; set; } = string.Empty;
-        [JsonPropertyName("expiresAt")]
+    
+    [JsonPropertyName("constituency")]
+    public string Constituency { get; set; } = string.Empty;
+    
+    [JsonPropertyName("tokenId")]
+    public long TokenId { get; set; }
+    
+    [JsonPropertyName("expiresAt")]
     public DateTime ExpiresAt { get; set; }
 }

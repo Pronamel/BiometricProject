@@ -2,6 +2,7 @@
 // USING STATEMENTS
 //===========================================
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -107,6 +108,7 @@ builder.Services.AddSingleton(activeOfficials);
 builder.Services.AddSingleton(tokenCounter);
 builder.Services.AddSingleton<VoterService>();
 builder.Services.AddSingleton<OfficialService>();
+builder.Services.AddScoped<DatabaseService>();
 
 //===========================================
 // CORS CONFIGURATION
@@ -271,48 +273,64 @@ var summaries = new[]
 //===========================================
 // API ENDPOINTS - AUTHENTICATION
 //===========================================
-app.MapPost("/auth/official-login", (OfficialLoginRequest request, OfficialService officialService, TokenCounter counter, 
+app.MapPost("/auth/official-login", async (OfficialLoginRequest request, DatabaseService dbService, TokenCounter counter, 
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials) =>
 {
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received login request:");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received login request for user: {request.Username}");
     
-    if (officialService.ValidateOfficialLogin(request.OfficialId, request.StationId, request.Password))
+    // Check if official with username and password exists
+    var official = await dbService.GetOfficialByCredentialsAsync(request.Username, request.Password);
+    
+    if (official == null)
     {
-        var uniqueTokenId = counter.GetNextId();
-        
-        // Register this official system with their unique code (now includes constituency and official ID to make key unique)
-        var systemKey = $"{request.County}_{request.SystemCode}_{request.OfficialId}";
-        activeOfficials[systemKey] = (request.OfficialId, request.StationId, request.Constituency, DateTime.UtcNow, new List<int>());
-        
-        var additionalClaims = new Dictionary<string, object>
-        {
-            ["station"] = request.StationId,
-            ["officialId"] = request.OfficialId,
-            ["county"] = request.County,
-            ["systemCode"] = request.SystemCode,
-            ["constituency"] = request.Constituency,
-            ["tokenId"] = uniqueTokenId
-        };
-        
-        var token = GenerateJwtToken($"official_{request.OfficialId}_{uniqueTokenId}", "official", additionalClaims);
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official login: {request.OfficialId} at {request.StationId} with system code {request.SystemCode} (Token ID: {uniqueTokenId})");
-        
-        return Results.Ok(new { 
-            success = true, 
-            token = token,
-            role = "official",
-            stationId = request.StationId,
-            officialId = request.OfficialId,
-            county = request.County,
-            systemCode = request.SystemCode,
-            tokenId = uniqueTokenId,
-            expiresAt = DateTime.UtcNow.AddHours(24)
-        });
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Authentication REJECTED - no matching official found for {request.Username}");
+        return Results.Unauthorized();
     }
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Authentication REJECTED for {request.OfficialId}");
-    return Results.Unauthorized();
+    if (official.AssignedPollingStation == null)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No polling station assigned for {request.Username}");
+        return Results.BadRequest(new { success = false, message = "No polling station assigned" });
+    }
+
+    var pollingStation = official.AssignedPollingStation;
+    var county = pollingStation.County ?? "Unknown";
+    var constituency = pollingStation.Constituency?.Name ?? "Unknown";
+    var stationId = pollingStation.PollingStationId.ToString();
+    var systemCode = $"OFF-{pollingStation.PollingStationCode}";
+    var uniqueTokenId = counter.GetNextId();
+    var officialId = official.OfficialId.ToString();
+    
+    // Register this official system with their unique code
+    var systemKey = $"{county}_{systemCode}_{officialId}";
+    activeOfficials[systemKey] = (officialId, stationId, constituency, DateTime.UtcNow, new List<int>());
+    
+    var additionalClaims = new Dictionary<string, object>
+    {
+        ["station"] = stationId,
+        ["officialId"] = officialId,
+        ["county"] = county,
+        ["systemCode"] = systemCode,
+        ["constituency"] = constituency,
+        ["tokenId"] = uniqueTokenId
+    };
+    
+    var token = GenerateJwtToken($"official_{officialId}_{uniqueTokenId}", "official", additionalClaims);
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official login successful: {officialId} at {stationId} in {county}/{constituency} (Token ID: {uniqueTokenId})");
+    
+    return Results.Ok(new { 
+        success = true, 
+        token = token,
+        role = "official",
+        stationId = stationId,
+        officialId = officialId,
+        county = county,
+        systemCode = systemCode,
+        constituency = constituency,
+        tokenId = uniqueTokenId,
+        expiresAt = DateTime.UtcNow.AddHours(24)
+    });
 })
 .WithName("OfficialLogin");
 
@@ -351,6 +369,98 @@ app.MapPost("/auth/voter-session", (VoterSessionRequest request, VoterService vo
     return Results.BadRequest(new { success = false, message = "Invalid voter ID" });
 })
 .WithName("VoterSession");
+
+//===========================================
+// API ENDPOINTS - ACCESS CODE MANAGEMENT
+//===========================================
+app.MapPost("/api/official/set-access-code", async (SetAccessCodeRequest request, ClaimsPrincipal user, 
+    [FromServices] ApplicationDbContext dbContext) =>
+{
+    var stationId = user.FindFirst("station")?.Value;
+    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
+    
+    if (string.IsNullOrEmpty(stationId))
+    {
+        return Results.BadRequest(new { success = false, message = "Station ID not found in authentication token" });
+    }
+    
+    if (string.IsNullOrEmpty(request.AccessCode))
+    {
+        return Results.BadRequest(new { success = false, message = "Access code hash is required" });
+    }
+    
+    try
+    {
+        // Find polling station by ID
+        var station = await dbContext.PollingStations.FirstOrDefaultAsync(s => s.PollingStationId == Guid.Parse(stationId));
+        
+        if (station == null)
+        {
+            return Results.NotFound(new { success = false, message = "Polling station not found" });
+        }
+        
+        // Store the pre-hashed code directly from the app
+        station.PollingStationCode = request.AccessCode;
+        
+        await dbContext.SaveChangesAsync();
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official {officialId} set access code for station {stationId}");
+        
+        return Results.Ok(new { success = true, message = "Access code set successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error setting access code: {ex.Message}");
+        return Results.BadRequest(new { success = false, message = "Failed to set access code" });
+    }
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialSetAccessCode");
+
+app.MapPost("/api/voter/verify-access-code", async (VerifyAccessCodeRequest request, 
+    [FromServices] ApplicationDbContext dbContext) =>
+{
+    if (string.IsNullOrEmpty(request.AccessCode))
+    {
+        return Results.BadRequest(new VerifyAccessCodeResponse(false, "Access code hash is required"));
+    }
+    
+    try
+    {
+        // Find the polling station for this county and constituency
+        var constituency = await dbContext.Constituencies
+            .FirstOrDefaultAsync(c => c.Name == request.Constituency);
+        
+        if (constituency == null)
+        {
+            return Results.BadRequest(new VerifyAccessCodeResponse(false, "Constituency not found"));
+        }
+        
+        var station = await dbContext.PollingStations
+            .FirstOrDefaultAsync(s => s.ConstituencyId == constituency.ConstituencyId && s.County == request.County);
+        
+        if (station == null)
+        {
+            return Results.BadRequest(new VerifyAccessCodeResponse(false, "Polling station not found for this county/constituency"));
+        }
+        
+        // Compare the pre-hashed codes directly (both are already hashed from their respective apps)
+        if (station.PollingStationCode == request.AccessCode)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter verified access code for {request.County}/{request.Constituency}");
+            return Results.Ok(new VerifyAccessCodeResponse(true, "Access code verified successfully"));
+        }
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Voter entered incorrect access code for {request.County}/{request.Constituency}");
+        return Results.BadRequest(new VerifyAccessCodeResponse(false, "Invalid access code"));
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error verifying access code: {ex.Message}");
+        return Results.BadRequest(new VerifyAccessCodeResponse(false, "Error verifying access code"));
+    }
+})
+.WithName("VoterVerifyAccessCode");
 
 //===========================================
 // API ENDPOINTS - VOTER-OFFICIAL LINKING
@@ -705,6 +815,17 @@ app.MapGet("/securevote/api/health", () =>
 .WithName("SecureVoteHealthCheck");
 
 //===========================================
+// API ENDPOINTS - DATA RETRIEVAL
+//===========================================
+app.MapGet("/api/official/database", async (DatabaseService db) =>
+{
+    var voters = await db.GetAllVotersAsync();
+    return Results.Ok(voters);
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialDatabaseAccess");
+
+//===========================================
 // START APPLICATION
 //===========================================
 app.Run();
@@ -713,12 +834,8 @@ app.Run();
 // DATA MODELS & RECORDS
 //===========================================
 record OfficialLoginRequest(
-    string OfficialId,  
-    string StationId,
-    string County,
-    string Constituency,
-    string SystemCode,
-    string? Password = null  // Optional for now
+    string Username,
+    string Password
 );
 
 record VoterSessionRequest(
@@ -734,6 +851,21 @@ record VoterAccessRequest(
 
 record GenerateCodeRequest(
     string VoterId
+);
+
+record SetAccessCodeRequest(
+    string AccessCode
+);
+
+record VerifyAccessCodeRequest(
+    string AccessCode,
+    string County,
+    string Constituency
+);
+
+record VerifyAccessCodeResponse(
+    bool Success,
+    string Message
 );
 
 // Voter-Official Linking Request

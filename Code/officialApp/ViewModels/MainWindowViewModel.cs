@@ -22,6 +22,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly OfficialLoginView _officialLoginView;
     private readonly OfficialAuthenticateView _officialAuthenticateView;
     private readonly OfficialMenuView _officialMenuView;
+    private readonly OfficialGenerateAccessCodeView _officialGenerateAccessCodeView;
     private readonly OfficialVotingPollingManagerView _officialVotingPollingManagerView;
     
     // Navigation service
@@ -43,6 +44,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _officialLoginView = new OfficialLoginView { DataContext = new OfficialLoginViewModel() };
         _officialAuthenticateView = new OfficialAuthenticateView { DataContext = new OfficialAuthenticateViewModel() };
         _officialMenuView = new OfficialMenuView { DataContext = new OfficialMenuViewModel() };
+        _officialGenerateAccessCodeView = new OfficialGenerateAccessCodeView { DataContext = new OfficialGenerateAccessCodeViewModel() };
         _officialVotingPollingManagerView = new OfficialVotingPollingManagerView { DataContext = new OfficialVotingPollingManagerViewModel() };
         
         // Initialize navigation service with all view factories
@@ -50,6 +52,7 @@ public partial class MainWindowViewModel : ViewModelBase
             () => _officialLoginView,
             () => _officialAuthenticateView,
             () => _officialMenuView,
+            () => _officialGenerateAccessCodeView,
             () => _officialVotingPollingManagerView
         );
         
