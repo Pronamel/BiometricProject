@@ -1,4 +1,8 @@
 ﻿using Avalonia;
+using System;
+using Microsoft.Extensions.DependencyInjection;
+using SecureVoteApp.Services;
+using SecureVoteApp.ViewModels;
 
 namespace SecureVoteApp;
 
@@ -17,4 +21,19 @@ sealed class Program
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();
+
+    public static void ConfigureServices(IServiceCollection services)
+    {
+        // Register services
+        services.AddSingleton<IApiService>(ApiService.Instance);
+        services.AddSingleton<CountyService>();
+        
+        // Register view models
+        services.AddSingleton<MainWindowViewModel>();
+        services.AddSingleton<VoterLoginViewModel>();
+        services.AddSingleton<NINEntryViewModel>();
+        services.AddSingleton<AuthenticateUserViewModel>();
+        services.AddSingleton<PersonalOrProxyViewModel>();
+        services.AddSingleton<BallotPaperViewModel>();
+    }
 }

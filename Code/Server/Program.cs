@@ -93,6 +93,9 @@ var tokenCounter = new TokenCounter(); // Global unique token counter
 // Official system tracking: (County + SystemCode) -> OfficialInfo (now includes Constituency)
 var activeOfficials = new ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)>();
 
+// Official polling station hashes: OfficialId -> (County, Constituency, HashedCode)
+var officialPollingStationHashes = new ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)>();
+
 // Voter ID assignment counter
 var voterIdCounter = 0;
 
@@ -105,6 +108,7 @@ builder.Services.AddSingleton(countyActiveConnections);
 builder.Services.AddSingleton(countyVoteChannels);
 builder.Services.AddSingleton(activeVotingSessions);
 builder.Services.AddSingleton(activeOfficials);
+builder.Services.AddSingleton(officialPollingStationHashes);
 builder.Services.AddSingleton(tokenCounter);
 builder.Services.AddSingleton<VoterService>();
 builder.Services.AddSingleton<OfficialService>();
@@ -274,7 +278,8 @@ var summaries = new[]
 // API ENDPOINTS - AUTHENTICATION
 //===========================================
 app.MapPost("/auth/official-login", async (OfficialLoginRequest request, DatabaseService dbService, TokenCounter counter, 
-    ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials) =>
+    ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes) =>
 {
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received login request for user: {request.Username}");
     
@@ -301,7 +306,14 @@ app.MapPost("/auth/official-login", async (OfficialLoginRequest request, Databas
     var uniqueTokenId = counter.GetNextId();
     var officialId = official.OfficialId.ToString();
     
-    // Register this official system with their unique code
+    // Store the hashed polling station code with county/constituency (direct from DB - NO re-hashing)
+    officialPollingStationHashes[officialId] = (county, constituency, pollingStation.PollingStationCode);
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Stored polling station hash for official {officialId}:");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {county}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {constituency}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Hash (length {pollingStation.PollingStationCode.Length}): {pollingStation.PollingStationCode}");
+    
+    // Register this official system with their code (already hashed from DB)
     var systemKey = $"{county}_{systemCode}_{officialId}";
     activeOfficials[systemKey] = (officialId, stationId, constituency, DateTime.UtcNow, new List<int>());
     
@@ -467,104 +479,106 @@ app.MapPost("/api/voter/verify-access-code", async (VerifyAccessCodeRequest requ
 //===========================================
 app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request, 
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
-    ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> countyChannels,
-    ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> countyActiveConnections,
+    ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes,
     TokenCounter voterIdCounter) =>
 {
-    var stationPrefix = $"{request.County}_{request.PollingStationCode}_";
-    
     Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ===== VOTER LINK ATTEMPT =====");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter request - County: {request.County}, PollingStationCode: {request.PollingStationCode}, Constituency: {request.Constituency}");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking for officials with key prefix: {stationPrefix}");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Active officials registered: {string.Join(" | ", activeOfficials.Keys)}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter requesting access to: County={request.County}, Constituency={request.Constituency}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter sent hashed code (length {request.PollingStationCode.Length}): {request.PollingStationCode}");
     
-    // Find the first official at this polling station
-    var officialsAtStation = activeOfficials
-        .Where(o => o.Key.StartsWith(stationPrefix))
-        .FirstOrDefault();
+    Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] Searching through {officialPollingStationHashes.Count} officials for county/constituency match:");
     
-    if (officialsAtStation.Value != default)
+    // Find matching official by iterating through all officials
+    var matchingOfficialId = "";
+    foreach (var kvp in officialPollingStationHashes)
     {
-        var officialInfo = officialsAtStation.Value;
-        var systemKey = officialsAtStation.Key;
-        var assignedVoterId = (int)voterIdCounter.GetNextId();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Checking Official {kvp.Key}:");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {kvp.Value.County} (requested: {request.County}, match: {kvp.Value.County == request.County})");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {kvp.Value.Constituency} (requested: {request.Constituency}, match: {kvp.Value.Constituency == request.Constituency})");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Code in DB: {kvp.Value.HashedCode}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Code from voter: {request.PollingStationCode}");
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found official: {officialInfo.OfficialId} at station {officialInfo.StationId}");
+        var countyMatch = kvp.Value.County == request.County;
+        var constituencyMatch = kvp.Value.Constituency == request.Constituency;
+        var codeMatch = kvp.Value.HashedCode == request.PollingStationCode;
         
-        // Update the official's connected voters list
-        officialInfo.ConnectedVoters.Add(assignedVoterId);
-        activeOfficials[systemKey] = officialInfo with { ConnectedVoters = officialInfo.ConnectedVoters };
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Code match: {codeMatch}");
         
-        // NOTIFY THE WAITING OFFICIAL
-        var voterRequestMessage = $"New voter link: VoterId={assignedVoterId}, Constituency={request.Constituency}";
-        
-        // Add to county channels for the official to receive
-        var countyDict = countyChannels.GetOrAdd(request.County, _ => new ConcurrentDictionary<string, ConcurrentBag<string>>());
-        var countyRequests = countyDict.GetOrAdd(request.Constituency, _ => new ConcurrentBag<string>());
-        countyRequests.Add(voterRequestMessage);
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Added to countyChannels[{request.County}][{request.Constituency}]");
-        
-        // Signal any waiting official task completion source
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Checking countyActiveConnections for waiting officials...");
-        var countyConnDict = countyActiveConnections.GetOrAdd(request.County, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>?>());
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Counties in activeConnections: {string.Join(" | ", countyActiveConnections.Keys)}");
-        
-        if (countyConnDict.TryGetValue(request.Constituency, out var constituencyConnDict) && constituencyConnDict != null)
+        if (countyMatch && constituencyMatch && codeMatch)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Found constituencies: {string.Join(" | ", constituencyConnDict.Keys)}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Waiting officials in {request.County}/{request.Constituency}: {string.Join(" | ", constituencyConnDict.Keys)}");
-            
-            int notifiedCount = 0;
-            foreach (var kvp in constituencyConnDict)
-            {
-                var officialId = kvp.Key;
-                var tcs = kvp.Value;
-                
-                // Collect all pending requests for this official
-                var requests = new List<string>();
-                while (countyRequests.TryTake(out string? req))
-                {
-                    if (req != null) requests.Add(req);
-                }
-                
-                if (requests.Count > 0 && tcs.TrySetResult(requests))
-                {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Notified official {officialId} about {requests.Count} voter request(s)");
-                    notifiedCount++;
-                }
-            }
-            
-            if (notifiedCount == 0)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ No waiting officials were notified!");
-            }
+            matchingOfficialId = kvp.Key;
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ MATCH FOUND with official {kvp.Key}!");
+            break;  // Found a match, stop searching
         }
-        else
+    }
+    
+    if (string.IsNullOrEmpty(matchingOfficialId))
+    {
+        Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ❌ No official found with matching county/constituency/code");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Available polling stations:");
+        foreach (var kvp in officialPollingStationHashes)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ No constituencies found in activeConnections for {request.County}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - Official {kvp.Key}: {kvp.Value.County}/{kvp.Value.Constituency} Code={kvp.Value.HashedCode.Substring(0, Math.Min(10, kvp.Value.HashedCode.Length))}...");
         }
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {assignedVoterId} linked successfully!\n");
-        
-        return Results.Ok(new VoterLinkResponse(
-            true,
-            assignedVoterId,
-            officialInfo.OfficialId,
-            officialInfo.StationId,
-            "Successfully linked to official"
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER LINK ATTEMPT =====\n");
+        return Results.BadRequest(new VoterLinkResponse(
+            false,
+            0,
+            "",
+            "",
+            $"Polling station code does not match. Please verify the code with election staff.",
+            null
         ));
     }
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No matching official found");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER LINK ATTEMPT =====\n");
-    return Results.BadRequest(new VoterLinkResponse(
-        false,
-        0,
-        "",
-        "",
-        $"No official found for county '{request.County}' with polling station code '{request.PollingStationCode}'. Please verify the codes with election staff."
+    // Find the official's info to get station ID
+    var officialKey = activeOfficials.Keys
+        .FirstOrDefault(k => k.EndsWith($"_{matchingOfficialId}"));
+    
+    if (officialKey == null || !activeOfficials.TryGetValue(officialKey, out var officialInfo))
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official {matchingOfficialId} not currently online");
+        return Results.BadRequest(new VoterLinkResponse(
+            false,
+            0,
+            "",
+            "",
+            $"Official is not currently available. Please try again later.",
+            null
+        ));
+    }
+    
+    var assignedVoterId = (int)voterIdCounter.GetNextId();
+    
+    Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ✅ Assigned voter ID: {assignedVoterId}");
+    
+    // Add voter to official's connected voters list
+    var updatedOfficialInfo = officialInfo with { ConnectedVoters = new List<int>(officialInfo.ConnectedVoters) { assignedVoterId } };
+    activeOfficials[officialKey] = updatedOfficialInfo;
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Added voter {assignedVoterId} to official's connected voters");
+    
+    // Create JWT token for voter
+    var voterTokenId = voterIdCounter.GetNextId();
+    var voterClaims = new Dictionary<string, object>
+    {
+        ["voterId"] = assignedVoterId.ToString(),
+        ["county"] = request.County,
+        ["constituency"] = request.Constituency,
+        ["stationId"] = officialInfo.StationId,
+        ["tokenId"] = voterTokenId
+    };
+    var voterToken = GenerateJwtToken($"voter_{assignedVoterId}_{voterTokenId}", "voter", voterClaims);
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Generated JWT token for voter {assignedVoterId}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== VOTER LINK SUCCESSFUL =====\n");
+    
+    return Results.Ok(new VoterLinkResponse(
+        true,
+        assignedVoterId,
+        matchingOfficialId,
+        officialInfo.StationId,
+        "Successfully linked to official",
+        voterToken
     ));
 })
 .WithName("VoterLinkToOfficial");
@@ -573,22 +587,32 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
     [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>> countyVoteChannels) =>
 {
-    var stationPrefix = $"{request.County}_{request.PollingStationCode}_";
-    
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast attempt - Voter ID: {request.VoterId}, County: {request.County}, Constituency: {request.Constituency}, Station: {request.PollingStationCode}");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote for: {request.CandidateName} - {request.PartyName}");
     
-    // Find all officials at this polling station
-    var officialsAtStation = activeOfficials
-        .Where(o => o.Key.StartsWith(stationPrefix))
+    // Find ALL active officials
+    var allOfficials = activeOfficials.ToList();
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Total active officials: {allOfficials.Count}");
+    
+    // Find officials that have THIS VOTER in their ConnectedVoters list (hash-based linking)
+    var officialsWithVoter = allOfficials
+        .Where(o => o.Value.ConnectedVoters.Contains(request.VoterId))
         .ToList();
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Found {officialsAtStation.Count} officials at station {request.PollingStationCode}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Officials with this voter connected: {officialsWithVoter.Count}");
+    foreach (var kvp in officialsWithVoter)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - Official: {kvp.Value.OfficialId}, County: {request.County}, Constituency: {kvp.Value.Constituency}");
+    }
     
-    // Verify voter is linked to at least one official at this station
-    var voterLinked = officialsAtStation.Any(o => o.Value.ConnectedVoters.Contains(request.VoterId));
+    // Filter to officials in the same constituency
+    var officialsInConstituency = officialsWithVoter
+        .Where(o => o.Value.Constituency == request.Constituency)
+        .ToList();
     
-    if (voterLinked && officialsAtStation.Count > 0)
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Officials in same constituency: {officialsInConstituency.Count}");
+    
+    if (officialsInConstituency.Count > 0)
     {
         // Create vote notification with county and constituency
         var voteNotification = new VoteNotification(
@@ -602,17 +626,11 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
             request.Constituency
         );
         
-        // Add vote to ONLY OFFICIALS IN THE SAME CONSTITUENCY - with safe iteration
+        // Add vote to all linked officials in the same constituency
         var officialQueues = countyVoteChannels.GetOrAdd(request.County, _ => new ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>());
-        
-        // Find all officials at this station in the same constituency
-        var officialsInConstituency = officialsAtStation
-            .Where(o => o.Value.Constituency == request.Constituency)
-            .ToList();
         
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Broadcasting vote to {officialsInConstituency.Count} officials in constituency {request.Constituency}");
         
-        // Add vote to ALL officials in this constituency at this station
         foreach (var kvp in officialsInConstituency)
         {
             var thisOfficialId = kvp.Value.OfficialId;
@@ -639,13 +657,14 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
         ));
     }
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast failed - Voter {request.VoterId} not linked to any official at station {request.PollingStationCode}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast failed - Voter {request.VoterId} not linked to any official in constituency {request.Constituency}");
     return Results.BadRequest(new CastVoteResponse(
         false,
         "Vote failed: Voter not properly linked to official system",
         DateTime.UtcNow
     ));
 })
+.RequireAuthorization(policy => policy.RequireRole("voter"))
 .WithName("CastVote");
 
 
@@ -880,7 +899,8 @@ record VoterLinkResponse(
     int AssignedVoterId,
     string ConnectedOfficialId,
     string ConnectedStationId,
-    string Message
+    string Message,
+    string? Token = null
 );
 
 // Vote casting models

@@ -144,6 +144,9 @@ public class VoterLinkResponse
     
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
+    
+    [JsonPropertyName("token")]
+    public string? Token { get; set; }
 }
 
 // Vote casting models

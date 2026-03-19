@@ -123,13 +123,25 @@ public class ApiService : IApiService
         }
     }
 
+    private string HashPollingStationCode(string code)
+    {
+        using (var sha256 = SHA256.Create())
+        {
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(code));
+            return Convert.ToBase64String(hashedBytes);
+        }
+    }
+
     public async Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency)
     {
         try
         {
+            // Hash the polling station code before sending for security
+            var hashedCode = HashPollingStationCode(pollingStationCode);
+            
             var linkRequest = new VoterLinkRequest
             {
-                PollingStationCode = pollingStationCode,
+                PollingStationCode = hashedCode,
                 County = county,
                 Constituency = constituency
             };
@@ -151,11 +163,21 @@ public class ApiService : IApiService
             {
                 var linkResponse = JsonSerializer.Deserialize<VoterLinkResponse>(responseContent, _jsonOptions);
                 if (linkResponse != null)
-                {                    // Store linking information for vote casting
+                {                    
+                    // Store linking information for vote casting
                     _assignedVoterId = linkResponse.AssignedVoterId;
                     _selectedCounty = county;
                     _pollingStationCode = pollingStationCode;
                     _selectedConstituency = constituency;
+                    
+                    // Store JWT token from link response
+                    if (!string.IsNullOrEmpty(linkResponse.Token))
+                    {
+                        _jwtToken = linkResponse.Token;
+                        _tokenExpiry = DateTime.UtcNow.AddHours(8);
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter JWT token stored, expires in 8 hours");
+                    }
+                    
                     return linkResponse;
                 }
             }
@@ -230,8 +252,9 @@ public class ApiService : IApiService
             Console.WriteLine($"  County: {_selectedCounty}");
             Console.WriteLine($"  Polling Station: {_pollingStationCode}");
             Console.WriteLine($"  Candidate: {candidateName} - {partyName}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Using JWT Token: {(!string.IsNullOrEmpty(_jwtToken) ? "Yes" : "No")}");
 
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/voter/cast-vote", content);
+            var response = await SendAuthenticatedPostAsync("/api/voter/cast-vote", content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Cast Vote Response Status: {response.StatusCode}");
