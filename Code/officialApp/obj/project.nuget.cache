@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "x2F5DeURyPc=",
+  "dgSpecHash": "2E4dA3o7wPA=",
   "success": true,
   "projectFilePath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
   "expectedPackageFiles": [
@@ -39,8 +39,8 @@
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\10.0.4\\microsoft.extensions.configuration.abstractions.10.0.4.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.configuration.fileextensions\\10.0.4\\microsoft.extensions.configuration.fileextensions.10.0.4.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.configuration.json\\10.0.4\\microsoft.extensions.configuration.json.10.0.4.nupkg.sha512",
-    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\7.0.0\\microsoft.extensions.dependencyinjection.7.0.0.nupkg.sha512",
-    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\7.0.0\\microsoft.extensions.dependencyinjection.abstractions.7.0.0.nupkg.sha512",
+    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\8.0.0\\microsoft.extensions.dependencyinjection.8.0.0.nupkg.sha512",
+    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\8.0.0\\microsoft.extensions.dependencyinjection.abstractions.8.0.0.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.dependencymodel\\7.0.0\\microsoft.extensions.dependencymodel.7.0.0.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.fileproviders.abstractions\\10.0.4\\microsoft.extensions.fileproviders.abstractions.10.0.4.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.extensions.fileproviders.physical\\10.0.4\\microsoft.extensions.fileproviders.physical.10.0.4.nupkg.sha512",

@@ -99,9 +99,9 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public OfficialAuthenticateViewModel()
+    public OfficialAuthenticateViewModel(INavigationService navigationService)
     {
-        _navigationService = Navigation.Instance;
+        _navigationService = navigationService;
         // Initialize with default fingerprint image
         ImageSource = LoadImage("fingerPrint.png");
     }

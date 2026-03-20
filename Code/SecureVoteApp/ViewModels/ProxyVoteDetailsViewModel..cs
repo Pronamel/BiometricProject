@@ -44,9 +44,9 @@ public partial class ProxyVoteDetailsViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public ProxyVoteDetailsViewModel()
+    public ProxyVoteDetailsViewModel(INavigationService navigationService)
     {
-        _navigationService = Navigation.Instance;
+        _navigationService = navigationService;
     }
 
 

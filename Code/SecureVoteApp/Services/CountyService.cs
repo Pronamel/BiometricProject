@@ -39,5 +39,5 @@ public class CountyService
     /// </summary>
     public bool HasValidCounty => !string.IsNullOrWhiteSpace(_selectedCounty);
     
-    private CountyService() { }
+    public CountyService() { }
 }

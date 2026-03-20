@@ -39,24 +39,29 @@ public partial class MainWindowViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public MainWindowViewModel()
+    public MainWindowViewModel(
+        VoterLoginViewModel voterLoginViewModel,
+        NINEntryViewModel ninEntryViewModel,
+        PersonalOrProxyViewModel personalOrProxyViewModel,
+        ProxyVoteDetailsViewModel proxyVoteDetailsViewModel,
+        AuthenticateUserViewModel authenticateUserViewModel,
+        BallotPaperViewModel ballotPaperViewModel,
+        INavigationService navigationService)
     {
-        // Get navigation service instance
-        _navigationService = Navigation.Instance;
+        _navigationService = navigationService;
         
         // Subscribe to navigation events
         _navigationService.NavigationRequested += OnNavigationRequested;
         
-        // Initialize views
-        _voterLoginView = new VoterLoginView { DataContext = new VoterLoginViewModel() };
-        _ninEntryView = new NINEntryView { DataContext = new NINEntryViewModel() };
-        _personalOrProxyView = new PersonalOrProxyView { DataContext = new PersonalOrProxyViewModel() };
-        _proxyVoteDetailsView = new ProxyVoteDetailsView { DataContext = new ProxyVoteDetailsViewModel() };
-        _authenticateUserView = new AuthenticateUserView { DataContext = new AuthenticateUserViewModel() };
-        _ballotPaperView = new BallotPaperView { DataContext = new BallotPaperViewModel(_navigationService) };
+        // Initialize views with injected ViewModels
+        _voterLoginView = new VoterLoginView { DataContext = voterLoginViewModel };
+        _ninEntryView = new NINEntryView { DataContext = ninEntryViewModel };
+        _personalOrProxyView = new PersonalOrProxyView { DataContext = personalOrProxyViewModel };
+        _proxyVoteDetailsView = new ProxyVoteDetailsView { DataContext = proxyVoteDetailsViewModel };
+        _authenticateUserView = new AuthenticateUserView { DataContext = authenticateUserViewModel };
+        _ballotPaperView = new BallotPaperView { DataContext = ballotPaperViewModel };
         
-        // TODO: Initialize navigation service with all view factories when ready
-        // For now, simplified initialization
+        // Initialize navigation service with all view factories
         ((NavigationService)_navigationService).Initialize(
             () => _voterLoginView,
             () => _ninEntryView,

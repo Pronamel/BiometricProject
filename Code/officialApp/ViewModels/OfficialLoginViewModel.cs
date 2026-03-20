@@ -66,10 +66,10 @@ public partial class OfficialLoginViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public OfficialLoginViewModel()
+    public OfficialLoginViewModel(IApiService apiService, INavigationService navigationService)
     {
-        _navigationService = Navigation.Instance;
-        _apiService = ApiService.Instance;
+        _navigationService = navigationService;
+        _apiService = apiService;
     }
 
     // ==========================================

@@ -16,9 +16,9 @@ public partial class PersonalOrProxyViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public PersonalOrProxyViewModel()
+    public PersonalOrProxyViewModel(INavigationService navigationService)
     {
-        _navigationService = Navigation.Instance;
+        _navigationService = navigationService;
     }
 
     // ==========================================

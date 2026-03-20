@@ -14,8 +14,6 @@ namespace SecureVoteApp.Services;
 
 public class ApiService : IApiService
 {
-    public static ApiService Instance { get; private set; }
-    
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
     private readonly JsonSerializerOptions _jsonOptions;
@@ -43,11 +41,6 @@ public class ApiService : IApiService
     public string SelectedCounty => _selectedCounty;
     public string PollingStationCode => _pollingStationCode;
     public string SelectedConstituency => _selectedConstituency;
-
-    static ApiService()
-    {
-        Instance = new ApiService(new HttpClient());
-    }
 
     public ApiService(HttpClient httpClient)
     {

@@ -88,10 +88,10 @@ public partial class BallotPaperViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public BallotPaperViewModel(INavigationService navigationService)
+    public BallotPaperViewModel(INavigationService navigationService, IApiService apiService)
     {
         _navigationService = navigationService;
-        _apiService = ApiService.Instance;
+        _apiService = apiService;
         
         // Subscribe to selection changes to update the readable text
         SelectionChanged += UpdateReadingCandidateName;

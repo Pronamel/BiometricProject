@@ -10,8 +10,6 @@ namespace officialApp.Services;
 
 public class ServerHandler : IServerHandler
 {
-    public static ServerHandler Instance { get; private set; }
-    
     private readonly IApiService _apiService;
     
     // Events for real-time updates
@@ -21,14 +19,9 @@ public class ServerHandler : IServerHandler
     public event Action<List<string>>? VoterRequestsReceived;
     public event Action<string>? AccessCodeGenerated;
     
-    static ServerHandler()
+    public ServerHandler(IApiService apiService)
     {
-        Instance = new ServerHandler();
-    }
-    
-    public ServerHandler()
-    {
-        _apiService = ApiService.Instance;
+        _apiService = apiService;
     }
 
     // ==========================================

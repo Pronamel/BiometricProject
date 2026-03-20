@@ -35,8 +35,8 @@ C:\Users\alexa\.nuget\packages\microsoft.extensions.configuration.abstractions\1
 C:\Users\alexa\.nuget\packages\microsoft.extensions.configuration\10.0.4\lib\net8.0\Microsoft.Extensions.Configuration.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.configuration.fileextensions\10.0.4\lib\net8.0\Microsoft.Extensions.Configuration.FileExtensions.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.configuration.json\10.0.4\lib\net8.0\Microsoft.Extensions.Configuration.Json.dll
-C:\Users\alexa\.nuget\packages\microsoft.extensions.dependencyinjection.abstractions\7.0.0\lib\net7.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll
-C:\Users\alexa\.nuget\packages\microsoft.extensions.dependencyinjection\7.0.0\lib\net7.0\Microsoft.Extensions.DependencyInjection.dll
+C:\Users\alexa\.nuget\packages\microsoft.extensions.dependencyinjection.abstractions\8.0.0\lib\net8.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\alexa\.nuget\packages\microsoft.extensions.dependencyinjection\8.0.0\lib\net8.0\Microsoft.Extensions.DependencyInjection.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.fileproviders.abstractions\10.0.4\lib\net8.0\Microsoft.Extensions.FileProviders.Abstractions.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.fileproviders.physical\10.0.4\lib\net8.0\Microsoft.Extensions.FileProviders.Physical.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.filesystemglobbing\10.0.4\lib\net8.0\Microsoft.Extensions.FileSystemGlobbing.dll

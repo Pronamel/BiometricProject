@@ -5,11 +5,19 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <!-- IBScanUltimate SDK DLL references -->
+  <ItemGroup>
+    <None Update="IBScanUltimate_SDK\bin\IBScanUltimate.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +38,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.4" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.4" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="7.0.5" />
   </ItemGroup>
 </Project>

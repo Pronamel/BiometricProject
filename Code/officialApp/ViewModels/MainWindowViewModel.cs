@@ -32,20 +32,26 @@ public partial class MainWindowViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public MainWindowViewModel()
+    public MainWindowViewModel(
+        OfficialLoginViewModel officialLoginViewModel,
+        OfficialAuthenticateViewModel officialAuthenticateViewModel,
+        OfficialMenuViewModel officialMenuViewModel,
+        OfficialGenerateAccessCodeViewModel officialGenerateAccessCodeViewModel,
+        OfficialVotingPollingManagerViewModel officialVotingPollingManagerViewModel,
+        INavigationService navigationService)
     {
         // Get navigation service instance
-        _navigationService = Navigation.Instance;
+        _navigationService = navigationService;
         
         // Subscribe to navigation events
         _navigationService.NavigationRequested += OnNavigationRequested;
         
         // Initialize views with their DataContexts
-        _officialLoginView = new OfficialLoginView { DataContext = new OfficialLoginViewModel() };
-        _officialAuthenticateView = new OfficialAuthenticateView { DataContext = new OfficialAuthenticateViewModel() };
-        _officialMenuView = new OfficialMenuView { DataContext = new OfficialMenuViewModel() };
-        _officialGenerateAccessCodeView = new OfficialGenerateAccessCodeView { DataContext = new OfficialGenerateAccessCodeViewModel() };
-        _officialVotingPollingManagerView = new OfficialVotingPollingManagerView { DataContext = new OfficialVotingPollingManagerViewModel() };
+        _officialLoginView = new OfficialLoginView { DataContext = officialLoginViewModel };
+        _officialAuthenticateView = new OfficialAuthenticateView { DataContext = officialAuthenticateViewModel };
+        _officialMenuView = new OfficialMenuView { DataContext = officialMenuViewModel };
+        _officialGenerateAccessCodeView = new OfficialGenerateAccessCodeView { DataContext = officialGenerateAccessCodeViewModel };
+        _officialVotingPollingManagerView = new OfficialVotingPollingManagerView { DataContext = officialVotingPollingManagerViewModel };
         
         // Initialize navigation service with all view factories
         ((NavigationService)_navigationService).Initialize(

@@ -44,9 +44,9 @@ public partial class NINEntryViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public NINEntryViewModel()
+    public NINEntryViewModel(INavigationService navigationService)
     {
-        _navigationService = Navigation.Instance;
+        _navigationService = navigationService;
     }
 
 

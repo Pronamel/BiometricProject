@@ -20,10 +20,10 @@ public partial class OfficialGenerateAccessCodeViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IApiService _apiService;
 
-    public OfficialGenerateAccessCodeViewModel()
+    public OfficialGenerateAccessCodeViewModel(IApiService apiService, INavigationService navigationService)
     {
-        _navigationService = Navigation.Instance;
-        _apiService = ApiService.Instance;
+        _navigationService = navigationService;
+        _apiService = apiService;
     }
 
     [RelayCommand]

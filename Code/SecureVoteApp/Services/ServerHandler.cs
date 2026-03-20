@@ -8,8 +8,6 @@ namespace SecureVoteApp.Services;
 
 public class ServerHandler : IServerHandler
 {
-    public static ServerHandler Instance { get; private set; }
-    
     private readonly IApiService _apiService;
     private CancellationTokenSource? _listeningCancellation;
     private bool _isListening;
@@ -26,14 +24,9 @@ public class ServerHandler : IServerHandler
     public string? CurrentVoterId => _apiService.CurrentVoterId;
     public string? AssignedStationId => _apiService.AssignedStationId;
     
-    static ServerHandler()
+    public ServerHandler(IApiService apiService)
     {
-        Instance = new ServerHandler();
-    }
-    
-    public ServerHandler()
-    {
-        _apiService = ApiService.Instance;
+        _apiService = apiService;
     }
 
     // ==========================================

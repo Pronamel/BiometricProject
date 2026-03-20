@@ -74,10 +74,10 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public OfficialVotingPollingManagerViewModel()
+    public OfficialVotingPollingManagerViewModel(IApiService apiService, INavigationService navigationService)
     {
-        _navigationService = Navigation.Instance;
-        _apiService = ApiService.Instance;
+        _navigationService = navigationService;
+        _apiService = apiService;
         InitializeSystemStatus();
         
         // Start listening for votes when this view model is created

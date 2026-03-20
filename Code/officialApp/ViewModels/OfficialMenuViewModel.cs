@@ -23,10 +23,10 @@ public partial class OfficialMenuViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public OfficialMenuViewModel()
+    public OfficialMenuViewModel(IApiService apiService, INavigationService navigationService)
     {
-        _navigationService = Navigation.Instance;
-        _apiService = ApiService.Instance;
+        _navigationService = navigationService;
+        _apiService = apiService;
     }
 
     // ==========================================

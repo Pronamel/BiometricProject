@@ -16,8 +16,6 @@ namespace officialApp.Services;
 
 public class ApiService : IApiService
 {
-    public static ApiService Instance { get; private set; }
-    
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
     private readonly JsonSerializerOptions _jsonOptions;
@@ -42,11 +40,6 @@ public class ApiService : IApiService
     public string? CurrentConstituency => _currentConstituency;
     public string? CurrentSystemCode => _currentSystemCode;
     public long CurrentTokenId => _currentTokenId;
-
-    static ApiService()
-    {
-        Instance = new ApiService(new HttpClient());
-    }
 
     public ApiService(HttpClient httpClient)
     {

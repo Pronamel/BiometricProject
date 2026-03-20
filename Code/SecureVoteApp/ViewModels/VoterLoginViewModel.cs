@@ -60,11 +60,11 @@ public partial class VoterLoginViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public VoterLoginViewModel()
+    public VoterLoginViewModel(IApiService apiService, INavigationService navigationService, CountyService countyService)
     {
-        _navigationService = Navigation.Instance;
-        _countyService = CountyService.Instance;
-        _apiService = ApiService.Instance;
+        _navigationService = navigationService;
+        _countyService = countyService;
+        _apiService = apiService;
     }
 
     // ==========================================
