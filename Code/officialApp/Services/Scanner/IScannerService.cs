@@ -55,9 +55,9 @@ namespace officialApp.Services.Scanner
         /// <summary>
         /// Begins fingerprint capture with the specified options
         /// </summary>
-        /// <param name="imageType">Type of capture (0 = flat, 1 = rolled)</param>
+        /// <param name="imageType">Type of capture (2 = flat single finger, 1 = rolled finger)</param>
         /// <returns>True if capture started successfully, false otherwise</returns>
-        bool StartCapture(int imageType = 0);
+        bool StartCapture(int imageType = 2);
 
         /// <summary>
         /// Cancels the ongoing fingerprint capture

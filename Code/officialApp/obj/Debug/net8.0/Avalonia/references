@@ -26,11 +26,6 @@ C:\Users\alexa\.nuget\packages\communitytoolkit.mvvm\8.2.1\lib\net6.0\CommunityT
 C:\Users\alexa\.nuget\packages\harfbuzzsharp\8.3.1.1\lib\net8.0\HarfBuzzSharp.dll
 C:\Users\alexa\.nuget\packages\microcom.runtime\0.11.0\lib\net5.0\MicroCom.Runtime.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Microsoft.CSharp.dll
-C:\Users\alexa\.nuget\packages\microsoft.entityframeworkcore.abstractions\7.0.18\lib\net6.0\Microsoft.EntityFrameworkCore.Abstractions.dll
-C:\Users\alexa\.nuget\packages\microsoft.entityframeworkcore\7.0.18\lib\net6.0\Microsoft.EntityFrameworkCore.dll
-C:\Users\alexa\.nuget\packages\microsoft.entityframeworkcore.relational\7.0.18\lib\net6.0\Microsoft.EntityFrameworkCore.Relational.dll
-C:\Users\alexa\.nuget\packages\microsoft.extensions.caching.abstractions\7.0.0\lib\net7.0\Microsoft.Extensions.Caching.Abstractions.dll
-C:\Users\alexa\.nuget\packages\microsoft.extensions.caching.memory\7.0.0\lib\net7.0\Microsoft.Extensions.Caching.Memory.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.configuration.abstractions\10.0.4\lib\net8.0\Microsoft.Extensions.Configuration.Abstractions.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.configuration\10.0.4\lib\net8.0\Microsoft.Extensions.Configuration.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.configuration.fileextensions\10.0.4\lib\net8.0\Microsoft.Extensions.Configuration.FileExtensions.dll
@@ -40,9 +35,6 @@ C:\Users\alexa\.nuget\packages\microsoft.extensions.dependencyinjection\8.0.0\li
 C:\Users\alexa\.nuget\packages\microsoft.extensions.fileproviders.abstractions\10.0.4\lib\net8.0\Microsoft.Extensions.FileProviders.Abstractions.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.fileproviders.physical\10.0.4\lib\net8.0\Microsoft.Extensions.FileProviders.Physical.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.filesystemglobbing\10.0.4\lib\net8.0\Microsoft.Extensions.FileSystemGlobbing.dll
-C:\Users\alexa\.nuget\packages\microsoft.extensions.logging.abstractions\7.0.0\lib\net7.0\Microsoft.Extensions.Logging.Abstractions.dll
-C:\Users\alexa\.nuget\packages\microsoft.extensions.logging\7.0.0\lib\net7.0\Microsoft.Extensions.Logging.dll
-C:\Users\alexa\.nuget\packages\microsoft.extensions.options\7.0.0\lib\net7.0\Microsoft.Extensions.Options.dll
 C:\Users\alexa\.nuget\packages\microsoft.extensions.primitives\10.0.4\lib\net8.0\Microsoft.Extensions.Primitives.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Microsoft.VisualBasic.Core.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Microsoft.VisualBasic.dll
@@ -50,8 +42,6 @@ C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Micro
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Microsoft.Win32.Registry.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\mscorlib.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\netstandard.dll
-C:\Users\alexa\.nuget\packages\npgsql\7.0.6\lib\net7.0\Npgsql.dll
-C:\Users\alexa\.nuget\packages\npgsql.entityframeworkcore.postgresql\7.0.11\lib\net7.0\Npgsql.EntityFrameworkCore.PostgreSQL.dll
 C:\Users\alexa\.nuget\packages\skiasharp\2.88.9\lib\net6.0\SkiaSharp.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\System.AppContext.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\System.Buffers.dll

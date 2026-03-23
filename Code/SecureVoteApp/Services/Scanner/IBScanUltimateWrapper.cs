@@ -11,13 +11,13 @@ namespace SecureVoteApp.Services.Scanner
 
         #region Constants
 
-        // Image types
-        public const int FLAT_FINGERPRINT = 0;
-        public const int ROLLED_FINGERPRINT = 1;
+        // Image types (from SDK enums)
+        public const int FLAT_FINGERPRINT = 2;      // ENUM_IBSU_FLAT_SINGLE_FINGER
+        public const int ROLLED_FINGERPRINT = 1;    // ENUM_IBSU_ROLL_SINGLE_FINGER
 
-        // Image resolution
-        public const int IMAGE_RESOLUTION_500 = 0;
-        public const int IMAGE_RESOLUTION_1000 = 1;
+        // Image resolution (from SDK enums)
+        public const int IMAGE_RESOLUTION_500 = 500;    // ENUM_IBSU_IMAGE_RESOLUTION_500
+        public const int IMAGE_RESOLUTION_1000 = 1000;  // ENUM_IBSU_IMAGE_RESOLUTION_1000
 
         // Capture options
         public const uint AUTO_CAPTURE_ENABLED = 0x00000001;
@@ -39,30 +39,32 @@ namespace SecureVoteApp.Services.Scanner
 
         #region Structures
 
-        // Image data structure from scanner
+        // Image data structure from scanner - MUST match SDK struct IBSU_ImageData exactly
         [StructLayout(LayoutKind.Sequential)]
         public struct IBSU_ImageData
         {
-            public IntPtr Buffer; // Pointer to image buffer (grayscale pixel data)
+            public IntPtr Buffer; // Pointer to image buffer (void *Buffer)
 
-            public uint Width; // Image width in pixels
+            public uint Width; // Image width in pixels (DWORD)
 
-            public uint Height; // Image height in pixels
+            public uint Height; // Image height in pixels (DWORD)
 
-            public double ResolutionX; // Horizontal resolution (DPI)
+            public double ResolutionX; // Horizontal resolution DPI (double)
 
-            public double ResolutionY; // Vertical resolution (DPI)
+            public double ResolutionY; // Vertical resolution DPI (double)
 
-            public uint BitsPerPixel; // Bits per pixel (usually 8)
+            public double FrameTime; // Acquisition time in seconds (double)
 
-            public uint Format; // Image format
+            public int Pitch; // Line pitch in bytes (int)
+
+            public byte BitsPerPixel; // Bits per pixel (BYTE)
+
+            public uint Format; // Image color format / IBSU_ImageFormat (enum/DWORD)
 
             [MarshalAs(UnmanagedType.I1)]
-            public bool IsFinal; // Whether this is final image or preview
+            public bool IsFinal; // BOOL - final image or preview
 
-            public ulong FrameTime; // Frame capture time
-
-            public uint FrameIndex; // Sequence of frame in current capture
+            public uint ProcessThres; // Image processing threshold (DWORD)
         }
 
         // Device description structure

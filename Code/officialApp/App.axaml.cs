@@ -25,6 +25,15 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Add global exception handler
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                var ex = (Exception)e.ExceptionObject;
+                Console.WriteLine($"[FATAL] AppDomain.UnhandledException: {ex.GetType().Name}");
+                Console.WriteLine($"[FATAL] Message: {ex.Message}");
+                Console.WriteLine($"[FATAL] Stack trace: {ex.StackTrace}");
+            };
+            
             // Get MainWindow and set DataContext to MainWindowViewModel
             var mainWindow = new MainWindow();
             var mainViewModel = ServiceProvider.GetRequiredService<MainWindowViewModel>();

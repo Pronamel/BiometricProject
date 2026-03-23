@@ -11,17 +11,21 @@ namespace officialApp.Services.Scanner
 
         #region Constants
 
-        // Image types
-        public const int FLAT_FINGERPRINT = 0;
-        public const int ROLLED_FINGERPRINT = 1;
+        // Image types (from SDK enums)
+        public const int FLAT_FINGERPRINT = 2;      // ENUM_IBSU_FLAT_SINGLE_FINGER
+        public const int ROLLED_FINGERPRINT = 1;    // ENUM_IBSU_ROLL_SINGLE_FINGER
 
-        // Image resolution
-        public const int IMAGE_RESOLUTION_500 = 0;
-        public const int IMAGE_RESOLUTION_1000 = 1;
+        // Image resolution (from SDK enums)
+        public const int IMAGE_RESOLUTION_500 = 500;    // ENUM_IBSU_IMAGE_RESOLUTION_500
+        public const int IMAGE_RESOLUTION_1000 = 1000;  // ENUM_IBSU_IMAGE_RESOLUTION_1000
 
         // Capture options
         public const uint AUTO_CAPTURE_ENABLED = 0x00000001;
         public const uint QUALITY_CHECK_ENABLED = 0x00000002;
+
+        // Property IDs for scanner configuration
+        public const int PROPERTY_SPOOF_DETECTION = 0x0024;
+        public const int PROPERTY_MOTION_SENSITIVITY = 0x005C;  // Controls motion-based frame filtering
 
         // Event types
         public const int PREVIEW_IMAGE_EVENT = 0;
@@ -39,66 +43,84 @@ namespace officialApp.Services.Scanner
 
         #region Structures
 
-        // Image data structure from scanner
+        // Image data structure from scanner - MUST match SDK struct IBSU_ImageData exactly
+        // Critical: BOOL is 4 bytes in C, not 1! Use natural alignment, NOT Pack=1
         [StructLayout(LayoutKind.Sequential)]
         public struct IBSU_ImageData
         {
-            public IntPtr Buffer; // Pointer to image buffer (grayscale pixel data)
+            public IntPtr Buffer;           // void* = 8 bytes (64-bit)
 
-            public uint Width; // Image width in pixels
+            public uint Width;              // DWORD = 4 bytes
 
-            public uint Height; // Image height in pixels
+            public uint Height;             // DWORD = 4 bytes
 
-            public double ResolutionX; // Horizontal resolution (DPI)
+            public double ResolutionX;      // double = 8 bytes
 
-            public double ResolutionY; // Vertical resolution (DPI)
+            public double ResolutionY;      // double = 8 bytes
 
-            public uint BitsPerPixel; // Bits per pixel (usually 8)
+            public double FrameTime;        // double = 8 bytes
 
-            public uint Format; // Image format
+            public int Pitch;               // int = 4 bytes
 
-            [MarshalAs(UnmanagedType.I1)]
-            public bool IsFinal; // Whether this is final image or preview
+            public byte BitsPerPixel;       // BYTE = 1 byte
 
-            public ulong FrameTime; // Frame capture time
+            public uint Format;             // DWORD (IBSU_ImageFormat) = 4 bytes
 
-            public uint FrameIndex; // Sequence of frame in current capture
+            [MarshalAs(UnmanagedType.Bool)] // BOOL is 4 bytes in C SDK, not 1!
+            public bool IsFinal;            // BOOL = 4 bytes
+
+            public uint ProcessThres;       // DWORD = 4 bytes
         }
 
         // Device description structure
+        // Note: IBSU_MAX_STR_LEN = 128 (from SDK headers)
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         public struct IBSU_DeviceDescription
         {
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
-            public string ProductName;
-
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
             public string SerialNumber;
 
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            public string ProductName;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            public string InterfaceType;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
             public string FirmwareVersion;
 
-            public uint ProductId;
-            public uint VendorId;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            public string DeviceRevision;
+
+            public int Handle;
+
+            [MarshalAs(UnmanagedType.I1)]
+            public bool IsHandleOpened;
+
+            [MarshalAs(UnmanagedType.I1)]
+            public bool IsDeviceLocked;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            public string CustomerString;
         }
 
         #endregion
 
         #region Delegates (Callbacks)
 
-        // Preview image callback delegate
+        // Preview image callback delegate - NOTE: Parameter order is deviceHandle, pContext, imageData
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         public delegate void PreviewImageCallback(
             int deviceHandle,
-            IBSU_ImageData imageData,
-            IntPtr pContext);
+            IntPtr pContext,
+            IBSU_ImageData imageData);
 
-        // Result image callback delegate
+        // Result image callback delegate - NOTE: Parameter order is deviceHandle, pContext, imageData
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         public delegate void ResultImageCallback(
             int deviceHandle,
-            IBSU_ImageData imageData,
-            IntPtr pContext);
+            IntPtr pContext,
+            IBSU_ImageData imageData);
 
         // Device count changed callback delegate
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -106,20 +128,22 @@ namespace officialApp.Services.Scanner
             int deviceCount,
             IntPtr pContext);
 
-        // Finger quality callback delegate
+        // Finger quality callback delegate - NOTE: pQualityArray is an array pointer, qualityArrayCount is the count
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         public delegate void FingerQualityCallback(
             int deviceHandle,
-            int fingerQuality,
-            IntPtr pContext);
+            IntPtr pContext,
+            IntPtr pQualityArray,
+            int qualityArrayCount);
 
         #endregion
 
         #region Native Functions
 
         // Gets the number of currently connected scanner devices
+        // Returns IBSU_STATUS_OK if successful
         [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
-        public static extern int IBSU_GetDeviceCount();
+        public static extern int IBSU_GetDeviceCount(out int pDeviceCount);
 
         // Gets description of a specific device
         [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
@@ -158,19 +182,19 @@ namespace officialApp.Services.Scanner
         [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
         public static extern int IBSU_CancelCaptureImage(int deviceHandle);
 
-        // Checks if image capture is currently active
+        // Checks if image capture is currently active - Returns status code, sets pIsActive out parameter
         [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
-        [return: MarshalAs(UnmanagedType.I1)]
-        public static extern bool IBSU_IsCaptureActive(int deviceHandle);
+        public static extern int IBSU_IsCaptureActive(
+            int deviceHandle,
+            [MarshalAs(UnmanagedType.I1)] out bool pIsActive);
 
         // Registers callback functions for scanner events
+        // Signature: IBSU_RegisterCallbacks(deviceHandle, event, pCallbackFunction, pContext)
         [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
         public static extern int IBSU_RegisterCallbacks(
+            int deviceHandle,
             int eventType,
-            PreviewImageCallback previewCallback,
-            ResultImageCallback resultCallback,
-            DeviceCountCallback deviceCountCallback,
-            FingerQualityCallback fingerQualityCallback,
+            IntPtr pCallbackFunction,
             IntPtr pContext);
 
         // Checks if touched finger is detected on scanner

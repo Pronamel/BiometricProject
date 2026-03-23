@@ -13,9 +13,12 @@
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
-  <!-- IBScanUltimate SDK DLL references -->
+  <!-- IBScanUltimate SDK DLL references - Copy to output directory -->
   <ItemGroup>
-    <None Update="IBScanUltimate_SDK\bin\IBScanUltimate.dll">
+    <None Include="IBScanUltimate_SDK\bin\x64-windows\IBScanUltimate.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="IBScanUltimate_SDK\bin\x64-windows\ACamSDK.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
@@ -31,14 +34,8 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.18" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="7.0.18">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.4" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="7.0.5" />
   </ItemGroup>
 </Project>
