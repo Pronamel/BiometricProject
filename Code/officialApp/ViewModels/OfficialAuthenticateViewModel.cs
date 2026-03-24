@@ -57,7 +57,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     
     // Quality threshold for feedback and acceptance (must match ScannerService MIN_QUALITY_THRESHOLD)
     private const int QUALITY_THRESHOLD = 10;
-    private byte[]? _capturedFingerprintData = null;
+    private byte[]? _capturedFingerprintData = null;        // Raw image data (200,000 bytes) - for display
 
     // ==========================================
     // IMAGE MANAGEMENT METHODS
@@ -290,10 +290,10 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
         {
             Console.WriteLine($"[OfficialAuthenticateViewModel] Fingerprint captured: Success={args.IsSuccess}, Quality={args.QualityScore}");
 
-            // Store fingerprint data immediately (thread-safe operation)
+            // Store fingerprint data immediately (thread-safe operation) - stored in memory only for security/privacy
             if (args.IsSuccess)
             {
-                _capturedFingerprintData = args.ImageData;
+                _capturedFingerprintData = args.ImageData;      // Raw image for display
             }
 
             // Update UI on the main thread
@@ -308,11 +308,19 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
                     validFingerPrintScan = true;
                     scannAttempts++;
                     
-                    // Schedule UI update and navigation
+                    // Schedule UI update and navigation with null-check
                     Task.Run(async () =>
                     {
                         await Task.Delay(1000);
-                        await attemptHandler(scannAttempts, validFingerPrintScan);
+                        if (_navigationService != null)
+                        {
+                            await attemptHandler(scannAttempts, validFingerPrintScan);
+                        }
+                        else
+                        {
+                            Console.WriteLine("[OfficialAuthenticateViewModel] ❌ ERROR: NavigationService is null");
+                            CleanupCapture();
+                        }
                     });
                 }
                 else
@@ -327,6 +335,8 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
         catch (Exception ex)
         {
             Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ Error in capture handler: {ex.Message}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Stack: {ex.StackTrace}");
+            CleanupCapture();
         }
     }
 
