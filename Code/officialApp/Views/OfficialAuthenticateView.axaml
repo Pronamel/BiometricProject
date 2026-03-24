@@ -108,6 +108,16 @@
                         FontWeight="Bold"
                         Command="{Binding ScanFingerPrintValidCommand}"
                         IsEnabled="{Binding !IsCapturing}"/>
+
+                <Button Content="Test Image" 
+                        Background="Orange" 
+                        Foreground="White"
+                        Width="100" 
+                        Height="40"
+                        FontSize="14"
+                        FontWeight="Bold"
+                        Command="{Binding TestPreviewImageCommand}"
+                        ToolTip.Tip="Display test fingerprint image"/>
             </StackPanel>
             
             <Image Source="{Binding ImageSource}"

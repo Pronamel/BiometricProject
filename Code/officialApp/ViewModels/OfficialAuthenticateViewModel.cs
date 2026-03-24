@@ -238,7 +238,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     {
         try
         {
-            Console.WriteLine($"[OfficialAuthenticateViewModel] Preview image received: {args.Width}x{args.Height}, Quality: {args.QualityScore}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Preview image received: {args.Width}x{args.Height}, Quality: {args.QualityScore}%, ImageData: {(args.ImageData != null ? args.ImageData.Length : 0)} bytes");
             
             // Dispatch all UI updates to the main thread to ensure proper Avalonia binding notifications
             Dispatcher.UIThread.InvokeAsync(() =>
@@ -264,15 +264,23 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
                 CaptureStatusMessage = statusMessage;
 
                 // Convert and display preview
-                if (args.ImageData != null)
+                if (args.ImageData != null && args.ImageData.Length > 0)
                 {
-                    PreviewImage = ConvertBytesToBitmap(args.ImageData, args.Width, args.Height);
+                    Console.WriteLine($"[OfficialAuthenticateViewModel] Converting image data to bitmap...");
+                    Bitmap? convertedBitmap = ConvertBytesToBitmap(args.ImageData, args.Width, args.Height);
+                    PreviewImage = convertedBitmap;
+                    Console.WriteLine($"[OfficialAuthenticateViewModel] ✓ PreviewImage updated (Bitmap: {(PreviewImage != null ? "valid" : "null")})");
+                }
+                else
+                {
+                    Console.WriteLine($"[OfficialAuthenticateViewModel] ⚠️ No image data to display");
                 }
             }, DispatcherPriority.Input);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ Error in preview handler: {ex.Message}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Stack trace: {ex.StackTrace}");
         }
     }
 
@@ -382,37 +390,57 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     {
         try
         {
+            var pixelSize = new PixelSize((int)width, (int)height);
+            
             // Create WriteableBitmap with ARGB32 format (Avalonia doesn't support direct grayscale)
             var bitmap = new WriteableBitmap(
-                new PixelSize((int)width, (int)height),
+                pixelSize,
                 new Vector(96, 96),
                 PixelFormat.Rgba8888
             );
 
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Converting {width}x{height} grayscale image to bitmap ({imageData.Length} bytes)");
+
             // Convert grayscale to ARGB and copy into bitmap buffer
             using (var buffer = bitmap.Lock())
             {
-                // Create ARGB buffer from grayscale data
-                byte[] argbData = new byte[imageData.Length * 4];
+                Console.WriteLine($"[OfficialAuthenticateViewModel] Bitmap locked, stride: {buffer.RowBytes}");
                 
-                for (int i = 0; i < imageData.Length; i++)
+                // IMPORTANT: Use stride to properly handle padding between rows
+                // The bitmap buffer may have padding, so we can't just copy all data at once
+                int bytesPerPixel = 4; // RGBA
+                IntPtr bufferPtr = buffer.Address;
+
+                // Copy row by row, handling stride properly and INVERTING the image
+                // Fingerprint scanners typically return mostly white with dark fingerprint lines,
+                // so we invert to show dark lines on light background
+                for (int y = 0; y < height; y++)
                 {
-                    byte grayValue = imageData[i];
-                    argbData[i * 4 + 0] = grayValue;  // R
-                    argbData[i * 4 + 1] = grayValue;  // G
-                    argbData[i * 4 + 2] = grayValue;  // B
-                    argbData[i * 4 + 3] = 255;        // A
+                    for (int x = 0; x < width; x++)
+                    {
+                        byte grayValue = imageData[y * (int)width + x];
+                        // INVERT the image so white becomes black and vice versa
+                        byte invertedValue = (byte)(255 - grayValue);
+                        int pixelOffset = y * buffer.RowBytes + x * bytesPerPixel;
+                        
+                        // Write ARGB values directly to buffer - using inverted value
+                        Marshal.WriteByte(bufferPtr, pixelOffset + 0, invertedValue); // R
+                        Marshal.WriteByte(bufferPtr, pixelOffset + 1, invertedValue); // G
+                        Marshal.WriteByte(bufferPtr, pixelOffset + 2, invertedValue); // B
+                        Marshal.WriteByte(bufferPtr, pixelOffset + 3, 255);           // A
+                    }
                 }
                 
-                // Copy to bitmap
-                Marshal.Copy(argbData, 0, buffer.Address, argbData.Length);
+                Console.WriteLine($"[OfficialAuthenticateViewModel] ✓ Bitmap data copied and inverted ({(int)width}x{(int)height})");
             }
 
+            Console.WriteLine($"[OfficialAuthenticateViewModel] ✓ Bitmap conversion complete");
             return bitmap;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ Error converting bytes to bitmap: {ex.Message}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Stack trace: {ex.StackTrace}");
             return new WriteableBitmap(
                 new PixelSize((int)width, (int)height),
                 new Vector(96, 96),
@@ -441,5 +469,38 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     private void Back()
     {
         _navigationService.NavigateToOfficialLogin();
+    }
+
+    [RelayCommand]
+    private void TestPreviewImage()
+    {
+        // Generate a test fingerprint pattern (grayscale)
+        int testWidth = 256;
+        int testHeight = 256;
+        byte[] testImageData = new byte[testWidth * testHeight];
+        
+        // Create a simple gradient pattern for testing
+        for (int y = 0; y < testHeight; y++)
+        {
+            for (int x = 0; x < testWidth; x++)
+            {
+                // Create a radial gradient with some fingerprint-like pattern
+                int dx = x - testWidth / 2;
+                int dy = y - testHeight / 2;
+                float distance = (float)Math.Sqrt(dx * dx + dy * dy);
+                byte value = (byte)(Math.Sin(distance / 10) * 127 + 128);
+                testImageData[y * testWidth + x] = value;
+            }
+        }
+        
+        QualityScore = 75;
+        CaptureStatusMessage = "Test image loaded";
+        Console.WriteLine("[OfficialAuthenticateViewModel] Generating test preview image...");
+        
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            PreviewImage = ConvertBytesToBitmap(testImageData, (uint)testWidth, (uint)testHeight);
+            Console.WriteLine($"[OfficialAuthenticateViewModel] ✓ Test image displayed");
+        }, DispatcherPriority.Input);
     }
 }

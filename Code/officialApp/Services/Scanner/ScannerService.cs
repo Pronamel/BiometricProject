@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace officialApp.Services.Scanner
 {
@@ -15,7 +16,9 @@ namespace officialApp.Services.Scanner
         private bool _disposed = false;
         private bool _isDllLoaded = false;
         
-        // Capture timeout tracking
+        // Frame tracking and diagnostics
+        private int _previewFrameCount = 0;  // Counter for preview frames received
+        private bool _hasReceivedPreviewFrame = false;  // Flag to detect if preview callback ever fires
         private DateTime _captureStartTime = DateTime.MinValue;
         private const int CAPTURE_TIMEOUT_SECONDS = 60; // Maximum time to wait for a good fingerprint
         
@@ -420,6 +423,10 @@ namespace officialApp.Services.Scanner
 
             try
             {
+                // Reset frame counter and preview flag for new capture session
+                _previewFrameCount = 0;
+                _hasReceivedPreviewFrame = false;
+                
                 Console.WriteLine($"[ScannerService] Attempting to start capture with device handle: {_deviceHandle}, imageType: {imageType}");
                 Console.WriteLine("[ScannerService] Waiting for finger placement and quality validation...");
                 Console.WriteLine($"[ScannerService] ⏰ Timeout set to {CAPTURE_TIMEOUT_SECONDS} seconds");
@@ -649,7 +656,15 @@ namespace officialApp.Services.Scanner
         {
             try
             {
-                Console.WriteLine($"[ScannerService] Preview callback invoked - deviceHandle: {deviceHandle}");
+                _previewFrameCount++;
+                _hasReceivedPreviewFrame = true;  // Flag that preview is working
+                
+                // Log every frame in first 5, then every 10 to avoid spam
+                bool shouldLog = _previewFrameCount <= 5 || _previewFrameCount % 10 == 0;
+                if (shouldLog)
+                {
+                    Console.WriteLine($"[ScannerService] ✓ [Preview Frame #{_previewFrameCount}] Buffer: {(imageData.Buffer != IntPtr.Zero ? "valid" : "NULL")}, Size: {imageData.Width}x{imageData.Height}");
+                }
                 
                 // Always try to get quality first, before any buffer validation
                 // This ensures quality updates even if image data has issues
@@ -665,7 +680,10 @@ namespace officialApp.Services.Scanner
                     nfiqQualityScore = IBScanUltimateWrapper.IBSU_GetNFIQScore(_deviceHandle);
                     if (nfiqQualityScore >= 0)
                     {
-                        Console.WriteLine($"[ScannerService] Preview: NFIQ Quality = {nfiqQualityScore}%");
+                        if (_previewFrameCount % 10 == 0)
+                        {
+                            Console.WriteLine($"[ScannerService] Preview: NFIQ Quality = {nfiqQualityScore}%");
+                        }
                         nfiqIsValid = true;
                     }
                 }
@@ -677,7 +695,6 @@ namespace officialApp.Services.Scanner
                 // Try to marshal and get histogram quality
                 if (imageData.Buffer != IntPtr.Zero && imageData.Width > 0 && imageData.Height > 0)
                 {
-                    Console.WriteLine("[ScannerService] Calling MarshalImageBuffer...");
                     imageBuffer = IBScanUltimateWrapper.MarshalImageBuffer(
                         imageData.Buffer,
                         (int)imageData.Width,
@@ -692,14 +709,17 @@ namespace officialApp.Services.Scanner
                         
                         // Use NFIQ if available, otherwise use histogram quality
                         qualityScore = nfiqIsValid ? nfiqQualityScore : (int)histogramQuality;
-                        Console.WriteLine($"[ScannerService] Preview using {(nfiqIsValid ? "NFIQ" : "Histogram")} quality: {qualityScore}%");
+                        if (shouldLog)
+                        {
+                            Console.WriteLine($"[ScannerService] Preview quality: {qualityScore}%");
+                        }
                     }
                 }
                 else
                 {
                     // Even if buffer is invalid, use NFIQ if available
                     qualityScore = nfiqIsValid ? nfiqQualityScore : 0;
-                    Console.WriteLine($"[ScannerService] ⚠️ Preview callback: Invalid image data, using quality score: {qualityScore}%");
+                    Console.WriteLine($"[ScannerService] ⚠️ [Preview Frame #{_previewFrameCount}] Invalid image buffer");
                 }
 
                 // ALWAYS fire the event with quality score, even if image is invalid
@@ -716,9 +736,12 @@ namespace officialApp.Services.Scanner
                     IsSuccess = hasValidImage
                 };
 
-                Console.WriteLine("[ScannerService] Invoking PreviewImageAvailable event with quality: " + qualityScore);
                 PreviewImageAvailable?.Invoke(this, args);
-                Console.WriteLine($"[ScannerService] ✓ Preview callback complete - Quality: {qualityScore}%");
+                
+                if (shouldLog)
+                {
+                    Console.WriteLine($"[ScannerService] ✓ Preview event fired - Frame #{_previewFrameCount}");
+                }
             }
             catch (Exception ex)
             {
@@ -818,6 +841,23 @@ namespace officialApp.Services.Scanner
                     const int MIN_QUALITY_THRESHOLD = 10;
                     
                     bool shouldAccept = qualityScore >= MIN_QUALITY_THRESHOLD;
+
+                    // ALWAYS fire preview event with current image data for real-time display
+                    // This ensures the image updates in the UI as quality builds, even if not yet accepted
+                    var previewArgs = new ScannerEventArgs
+                    {
+                        ImageData = imageBuffer,
+                        Width = imageData.Width,
+                        Height = imageData.Height,
+                        ResolutionX = imageData.ResolutionX,
+                        ResolutionY = imageData.ResolutionY,
+                        BitsPerPixel = imageData.BitsPerPixel,
+                        QualityScore = qualityScore,
+                        IsFinalImage = imageData.IsFinal,
+                        IsSuccess = true
+                    };
+                    
+                    PreviewImageAvailable?.Invoke(this, previewArgs);
 
                     if (!shouldAccept)
                     {
