@@ -16,4 +16,22 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="FingerprintComparer">
+      <HintPath>Fingerprinting\FingerprintComparer.dll</HintPath>
+    </Reference>
+    <Reference Include="SourceAFIS">
+      <HintPath>Fingerprinting\SourceAFIS.dll</HintPath>
+    </Reference>
+    <Reference Include="SixLabors.ImageSharp">
+      <HintPath>Fingerprinting\SixLabors.ImageSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Dahomey.Cbor">
+      <HintPath>Fingerprinting\Dahomey.Cbor.dll</HintPath>
+    </Reference>
+    <Reference Include="System.IO.Pipelines">
+      <HintPath>Fingerprinting\System.IO.Pipelines.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>

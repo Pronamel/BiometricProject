@@ -64,8 +64,8 @@
                 BorderBrush="Black"
                 FontSize="20">
                 <StackPanel>
-                    <TextBlock Text="Register" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                    <TextBlock Text="Voters" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Create" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="User" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
                 </StackPanel>
             </Button>
             

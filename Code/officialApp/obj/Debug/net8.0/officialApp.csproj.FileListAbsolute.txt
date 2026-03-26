@@ -89,3 +89,6 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\obj\Debug\
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\obj\Debug\net8.0\officialApp.pdb
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\obj\Debug\net8.0\officialApp.genruntimeconfig.cache
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\obj\Debug\net8.0\ref\officialApp.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\bin\Debug\net8.0\Microsoft.Win32.SystemEvents.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\bin\Debug\net8.0\System.Drawing.Common.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\officialApp\bin\Debug\net8.0\runtimes\win\lib\net8.0\Microsoft.Win32.SystemEvents.dll

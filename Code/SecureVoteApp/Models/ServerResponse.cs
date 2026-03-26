@@ -182,3 +182,46 @@ public class CastVoteResponse
     [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
 }
+
+// Fingerprint Verification Models
+public class FingerprintVerificationRequest
+{
+    [JsonPropertyName("voterId")]
+    public string VoterId { get; set; } = string.Empty;
+    
+    [JsonPropertyName("context")]
+    public string Context { get; set; } = string.Empty;
+    
+    [JsonPropertyName("credential")]
+    public string Credential { get; set; } = string.Empty;
+    
+    [JsonPropertyName("fingerprintImage")]
+    public string FingerprintImage { get; set; } = string.Empty; // Base64 encoded
+}
+
+public class FingerprintVerificationResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+    
+    [JsonPropertyName("verified")]
+    public bool Verified { get; set; }
+    
+    [JsonPropertyName("isMatch")]
+    public bool IsMatch { get; set; }
+    
+    [JsonPropertyName("matchScore")]
+    public double MatchScore { get; set; }
+    
+    [JsonPropertyName("score")]
+    public double Score { get; set; }
+    
+    [JsonPropertyName("threshold")]
+    public double Threshold { get; set; }
+    
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+    
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; }
+}

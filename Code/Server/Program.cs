@@ -5,8 +5,10 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.AspNetCore.Http.Json;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -16,6 +18,7 @@ using Server.Services;
 using Server.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SourceAFIS;
 
 //===========================================
 // BUILDER CONFIGURATION
@@ -38,6 +41,15 @@ Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Configured to listen on http://loc
 // Add basic services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+//===========================================
+// JSON SERIALIZATION CONFIGURATION
+//===========================================
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+{
+    options.SerializerOptions.PropertyNameCaseInsensitive = true;
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
 
 //===========================================
 // JWT CONFIGURATION
@@ -196,6 +208,55 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Request body logging middleware - specifically for fingerprint uploads
+app.Use(async (context, next) =>
+{
+    var method = context.Request.Method;
+    var path = context.Request.Path;
+    
+    if (method == "POST" && path.StartsWithSegments("/api/official/upload-fingerprint"))
+    {
+        Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] 🔍 [MIDDLEWARE] Fingerprint upload request received");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MIDDLEWARE] Content-Type: {context.Request.ContentType}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MIDDLEWARE] Content-Length: {context.Request.ContentLength}");
+        
+        // Read the body
+        context.Request.EnableBuffering();
+        using (var reader = new StreamReader(context.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 1024, leaveOpen: true))
+        {
+            string requestBody = await reader.ReadToEndAsync();
+            context.Request.Body.Position = 0;
+            
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MIDDLEWARE] Request body length: {requestBody.Length} bytes");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MIDDLEWARE] Request body preview (first 500 chars):");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {requestBody.Substring(0, Math.Min(500, requestBody.Length))}...");
+            
+            // Try to parse JSON to show structure
+            try
+            {
+                var json = JsonDocument.Parse(requestBody);
+                var root = json.RootElement;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MIDDLEWARE] JSON properties found:");
+                foreach (var prop in root.EnumerateObject())
+                {
+                    string value = prop.Value.ValueKind switch
+                    {
+                        JsonValueKind.String => prop.Value.GetString()?.Substring(0, Math.Min(50, prop.Value.GetString()?.Length ?? 0)) + "...",
+                        _ => prop.Value.ToString().Substring(0, Math.Min(50, prop.Value.ToString().Length))
+                    };
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - {prop.Name}: {value}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MIDDLEWARE] Failed to parse JSON: {ex.Message}");
+            }
+        }
+    }
+    
+    await next();
+});
+
 // Request logging middleware
 app.Use(async (context, next) =>
 {
@@ -277,6 +338,7 @@ var summaries = new[]
 //===========================================
 // API ENDPOINTS - AUTHENTICATION
 //===========================================
+// gets login from database and checks if official exists with those credentials, then generates JWT token with station and official info
 app.MapPost("/auth/official-login", async (OfficialLoginRequest request, DatabaseService dbService, TokenCounter counter, 
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
     ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes) =>
@@ -346,6 +408,10 @@ app.MapPost("/auth/official-login", async (OfficialLoginRequest request, Databas
 })
 .WithName("OfficialLogin");
 
+
+
+
+// Voter session creation - validates voter ID, creates a voting session, and returns a JWT token with session info
 app.MapPost("/auth/voter-session", (VoterSessionRequest request, VoterService voterService, TokenCounter counter) =>
 {
     if (voterService.ValidateVoterId(request.VoterId))
@@ -385,6 +451,7 @@ app.MapPost("/auth/voter-session", (VoterSessionRequest request, VoterService vo
 //===========================================
 // API ENDPOINTS - ACCESS CODE MANAGEMENT
 //===========================================
+// Official sets the access code for their polling station (code is pre-hashed from the app and stored directly in DB)
 app.MapPost("/api/official/set-access-code", async (SetAccessCodeRequest request, ClaimsPrincipal user, 
     [FromServices] ApplicationDbContext dbContext) =>
 {
@@ -845,6 +912,370 @@ app.MapGet("/api/official/database", async (DatabaseService db) =>
 .WithName("OfficialDatabaseAccess");
 
 //===========================================
+// API ENDPOINTS - OFFICIAL DATA UPDATE
+//===========================================
+app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, DatabaseService dbService) =>
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ================== FINGERPRINT UPLOAD ENDPOINT CALLED ==================");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📸 Fingerprint upload request received");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Content-Type: {httpContext.Request.ContentType}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Content-Length: {httpContext.Request.ContentLength}");
+
+    string username = string.Empty;
+    string password = string.Empty;
+    string fingerprintBase64 = string.Empty;
+    
+    try
+    {
+        // Parse raw body manually so this endpoint still runs even if body binding would fail.
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Raw JSON length: {rawBody.Length}");
+        if (rawBody.Length > 0)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Raw JSON preview: {rawBody.Substring(0, Math.Min(300, rawBody.Length))}...");
+        }
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+
+        username = root.TryGetProperty("username", out var usernameElement)
+            ? usernameElement.GetString() ?? string.Empty
+            : string.Empty;
+
+        password = root.TryGetProperty("password", out var passwordElement)
+            ? passwordElement.GetString() ?? string.Empty
+            : string.Empty;
+
+        // Support both field names
+        if (root.TryGetProperty("fingerPrintScan", out var fpElement))
+        {
+            fingerprintBase64 = fpElement.GetString() ?? string.Empty;
+        }
+        else if (root.TryGetProperty("fingerprintData", out var legacyElement))
+        {
+            fingerprintBase64 = legacyElement.GetString() ?? string.Empty;
+        }
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Parsed username present: {!string.IsNullOrEmpty(username)}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Parsed password present: {!string.IsNullOrEmpty(password)}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Parsed fingerprint data present: {!string.IsNullOrEmpty(fingerprintBase64)}");
+
+        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing credentials");
+            return Results.BadRequest(new {
+                success = false,
+                message = "Username and password are required"
+            });
+        }
+
+        if (string.IsNullOrEmpty(fingerprintBase64))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing fingerprint data");
+            return Results.BadRequest(new {
+                success = false,
+                message = "Fingerprint data is required (fingerPrintScan must be PNG format)"
+            });
+        }
+
+        // Decode base64 to bytes
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Converting base64 to bytes...");
+        byte[] fingerprintBytes = Convert.FromBase64String(fingerprintBase64);
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Decoded: {fingerprintBytes.Length} bytes");
+        
+        // Validate PNG format (check magic bytes: 89 50 4E 47 = .PNG)
+        if (fingerprintBytes.Length < 8 || 
+            fingerprintBytes[0] != 0x89 || 
+            fingerprintBytes[1] != 0x50 || 
+            fingerprintBytes[2] != 0x4E || 
+            fingerprintBytes[3] != 0x47)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Invalid PNG format - magic bytes not found");
+            return Results.BadRequest(new {
+                success = false,
+                message = "Fingerprint must be in PNG format"
+            });
+        }
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Valid PNG format confirmed");
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Updating fingerprint in database...");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Username: '{username}'");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Fingerprint size: {fingerprintBytes.Length} bytes (PNG)");
+        
+        // Update the official's fingerprint in database
+        bool updateSuccessful = await dbService.UpdateOfficialFingerprintAsync(
+            username,
+            password,
+            fingerprintBytes
+        );
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] DatabaseService returned: {updateSuccessful}");
+        
+        if (updateSuccessful)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Fingerprint upload successful for {username}");
+            return Results.Ok(new { 
+                success = true, 
+                message = "Fingerprint uploaded successfully",
+                dataSize = fingerprintBytes.Length
+            });
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Authentication failed for {username}");
+            return Results.Json(new {
+                success = false, 
+                message = "Invalid username or password" 
+            }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+    }
+    catch (FormatException ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Invalid base64 format: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
+        return Results.BadRequest(new { 
+            success = false, 
+            message = "Fingerprint data must be valid base64 encoded",
+            error = ex.Message
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error uploading fingerprint: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Exception type: {ex.GetType().FullName}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
+        return Results.BadRequest(new { 
+            success = false, 
+            message = $"Fingerprint upload failed: {ex.Message}",
+            error = ex.ToString()
+        });
+    }
+    finally
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ================== FINGERPRINT UPLOAD ENDPOINT COMPLETE ==================");
+    }
+})
+.WithName("OfficialUploadFingerprint");
+
+//===========================================
+// API ENDPOINTS - FINGERPRINT VERIFICATION
+//===========================================
+app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, DatabaseService dbService) =>
+{
+    const double MATCH_THRESHOLD = 40.0;
+    
+    try
+    {
+        // Validate UserType field
+        if (string.IsNullOrEmpty(request.UserType))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing UserType indicator");
+            return Results.BadRequest(new { 
+                success = false, 
+                message = "UserType (official/voter) is required" 
+            });
+        }
+
+        if (request.UserType != "official" && request.UserType != "voter")
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid UserType: {request.UserType}");
+            return Results.BadRequest(new { 
+                success = false, 
+                message = "UserType must be either 'official' or 'voter'" 
+            });
+        }
+
+        // Validate scanned fingerprint is present
+        if (string.IsNullOrEmpty(request.ScannedFingerprint))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing scanned fingerprint");
+            return Results.BadRequest(new { 
+                success = false, 
+                message = "Scanned fingerprint is required" 
+            });
+        }
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fingerprint verification request - UserType: {request.UserType}");
+
+        byte[]? storedFingerprintBytes = null;
+        string userIdentifier = "";
+        string userType = request.UserType;
+
+        // Branch logic based on UserType
+        if (request.UserType == "official")
+        {
+            // OFFICIAL VERIFICATION PATH
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔐 Processing OFFICIAL fingerprint verification");
+
+            // Validate official credentials
+            if (string.IsNullOrEmpty(request.Username) || string.IsNullOrEmpty(request.Password))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing username or password for official");
+                return Results.BadRequest(new { 
+                    success = false, 
+                    message = "Username and password are required for officials" 
+                });
+            }
+
+            // Fetch official from database
+            var official = await dbService.GetOfficialByCredentialsAsync(request.Username, request.Password);
+            
+            if (official == null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Record not found - no official with credentials for {request.Username}");
+                return Results.BadRequest(new { 
+                    success = false, 
+                    message = "Record not found" 
+                });
+            }
+
+            // Get stored fingerprint from database
+            if (official.FingerPrintScan == null || official.FingerPrintScan.Length == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ No stored fingerprint found for official {request.Username}");
+                return Results.BadRequest(new { 
+                    success = false, 
+                    message = "No stored fingerprint on record" 
+                });
+            }
+
+            storedFingerprintBytes = official.FingerPrintScan;
+            userIdentifier = official.OfficialId.ToString();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official found, retrieving stored fingerprint ({storedFingerprintBytes.Length} bytes)");
+        }
+        else if (request.UserType == "voter")
+        {
+            // VOTER VERIFICATION PATH
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🗳️  Processing VOTER fingerprint verification");
+
+            // Validate voter ID
+            if (string.IsNullOrEmpty(request.VoterId))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing VoterId for voter verification");
+                return Results.BadRequest(new { 
+                    success = false, 
+                    message = "VoterId is required for voters" 
+                });
+            }
+
+            // Parse VoterId as Guid
+            if (!Guid.TryParse(request.VoterId, out Guid voterGuid))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid VoterId format: {request.VoterId}");
+                return Results.BadRequest(new { 
+                    success = false, 
+                    message = "VoterId must be a valid GUID" 
+                });
+            }
+
+            // Fetch voter from database by VoterId
+            var voter = await dbService.GetVoterByIdAsync(voterGuid);
+            
+            if (voter == null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Record not found - no voter with ID {request.VoterId}");
+                return Results.BadRequest(new { 
+                    success = false, 
+                    message = "Record not found" 
+                });
+            }
+
+            // Get stored fingerprint from database
+            if (voter.FingerprintScan == null || voter.FingerprintScan.Length == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ No stored fingerprint found for voter {voter.FirstName} {voter.LastName}");
+                return Results.BadRequest(new { 
+                    success = false, 
+                    message = "No stored fingerprint on record" 
+                });
+            }
+
+            storedFingerprintBytes = voter.FingerprintScan;
+            userIdentifier = voter.VoterId.ToString();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter found, retrieving stored fingerprint ({storedFingerprintBytes.Length} bytes)");
+        }
+
+        // COMMON FINGERPRINT COMPARISON LOGIC (applies to both official and voter)
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Decoding scanned fingerprint from base64...");
+        byte[] scannedFingerprintBytes = Convert.FromBase64String(request.ScannedFingerprint);
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Scanned fingerprint size: {scannedFingerprintBytes.Length} bytes");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stored fingerprint size: {storedFingerprintBytes.Length} bytes");
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Loading fingerprint images...");
+        
+        // Load both fingerprints and create fingerprint objects
+        var scannedImage = new FingerprintImage(scannedFingerprintBytes);
+        var storedImage = new FingerprintImage(storedFingerprintBytes);
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Extracting fingerprint features...");
+        var scannedTemplate = new FingerprintTemplate(scannedImage);
+        var storedTemplate = new FingerprintTemplate(storedImage);
+
+        // Compare fingerprints
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Comparing scanned fingerprint against stored fingerprint...");
+        var matcher = new FingerprintMatcher(scannedTemplate);
+        double score = matcher.Match(storedTemplate);
+
+        // Determine if match
+        bool isMatch = score >= MATCH_THRESHOLD;
+        double margin = isMatch ? score - MATCH_THRESHOLD : MATCH_THRESHOLD - score;
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fingerprint comparison complete - Score: {score:F2}, Match: {isMatch}");
+
+        if (isMatch)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ FINGERPRINT MATCH - {userType.ToUpper()}: {userIdentifier}");
+            return Results.Ok(new 
+            { 
+                success = true, 
+                isMatch = true,
+                userType = userType,
+                message = "Fingerprint match",
+                score = Math.Round(score, 2),
+                threshold = MATCH_THRESHOLD,
+                margin = Math.Round(margin, 2),
+                timestamp = DateTime.Now
+            });
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ FINGERPRINT NO MATCH - {userType.ToUpper()}: {userIdentifier} (Score: {score:F2})");
+            return Results.BadRequest(new { 
+                success = false, 
+                isMatch = false,
+                userType = userType,
+                message = "Fingerprint scan is not a match",
+                score = Math.Round(score, 2),
+                threshold = MATCH_THRESHOLD,
+                margin = Math.Round(margin, 2)
+            });
+        }
+    }
+    catch (FormatException ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid base64 format: {ex.Message}");
+        return Results.BadRequest(new { 
+            success = false, 
+            message = "Invalid base64 format for scanned fingerprint" 
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Error during fingerprint verification: {ex.Message}");
+        return Results.BadRequest(new { 
+            success = false, 
+            message = $"Fingerprint verification failed: {ex.Message}" 
+        });
+    }
+})
+.WithName("VerifyFingerprints");
+
+//===========================================
 // START APPLICATION
 //===========================================
 app.Run();
@@ -870,6 +1301,12 @@ record VoterAccessRequest(
 
 record GenerateCodeRequest(
     string VoterId
+);
+
+record UpdateFingerprintRequest(
+    string Username,
+    string Password,
+    string FingerPrintScan  // Base64 encoded fingerprint image data
 );
 
 record SetAccessCodeRequest(
@@ -928,6 +1365,15 @@ record VoteNotification(
     string StationId,
     string County,
     string Constituency
+);
+
+// Fingerprint verification models
+record VerifyFingerprintsRequest(
+    string UserType,              // "official" or "voter" - identifies the type of user
+    string? Username,             // Official username for database lookup (null for voters)
+    string? Password,             // Official password for authentication (null for voters)
+    string? VoterId,              // Voter unique ID as string (null for officials)
+    string ScannedFingerprint     // Base64 encoded newly scanned fingerprint (PNG format)
 );
 
 // Thread-safe token counter for unique identities

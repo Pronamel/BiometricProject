@@ -24,6 +24,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly OfficialMenuView _officialMenuView;
     private readonly OfficialGenerateAccessCodeView _officialGenerateAccessCodeView;
     private readonly OfficialVotingPollingManagerView _officialVotingPollingManagerView;
+    private readonly OfficialAddVoterView _officialAddVoterView;
     
     // Navigation service
     private readonly INavigationService _navigationService;
@@ -38,6 +39,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OfficialMenuViewModel officialMenuViewModel,
         OfficialGenerateAccessCodeViewModel officialGenerateAccessCodeViewModel,
         OfficialVotingPollingManagerViewModel officialVotingPollingManagerViewModel,
+        OfficialAddVoterViewModel officialAddVoterViewModel,
         INavigationService navigationService)
     {
         // Get navigation service instance
@@ -52,6 +54,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _officialMenuView = new OfficialMenuView { DataContext = officialMenuViewModel };
         _officialGenerateAccessCodeView = new OfficialGenerateAccessCodeView { DataContext = officialGenerateAccessCodeViewModel };
         _officialVotingPollingManagerView = new OfficialVotingPollingManagerView { DataContext = officialVotingPollingManagerViewModel };
+        _officialAddVoterView = new OfficialAddVoterView { DataContext = officialAddVoterViewModel };
         
         // Initialize navigation service with all view factories
         ((NavigationService)_navigationService).Initialize(
@@ -59,10 +62,11 @@ public partial class MainWindowViewModel : ViewModelBase
             () => _officialAuthenticateView,
             () => _officialMenuView,
             () => _officialGenerateAccessCodeView,
-            () => _officialVotingPollingManagerView
+            () => _officialVotingPollingManagerView,
+            () => _officialAddVoterView
         );
         
-        // Set initial view to Official Login
+        // Set initial view to Official Authenticate
         CurrentView = _officialLoginView;
     }
 

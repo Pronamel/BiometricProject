@@ -34,4 +34,7 @@ public interface IApiService
     Task<bool> SubmitCodeForVerificationAsync(string accessCode);
     Task<VoterCommandResponse?> ListenForCommandsAsync();
     Task<bool> SendStatusUpdateAsync(string status, string? additionalData = null);
+    
+    // Fingerprint Verification
+    Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint);
 }

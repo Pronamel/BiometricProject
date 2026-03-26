@@ -1,0 +1,261 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:officialApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="900"
+            x:Class="officialApp.Views.OfficialAddVoterView"
+            x:DataType="vm:OfficialAddVoterViewModel">
+
+    <Design.DataContext>
+        <vm:OfficialAddVoterViewModel/>
+    </Design.DataContext>
+
+    <ScrollViewer Background="#f6f2e6">
+        <StackPanel VerticalAlignment="Top" HorizontalAlignment="Center" Spacing="15" Width="700" Margin="20">
+            <TextBlock Text="Create User"
+                      FontSize="28"
+                      FontWeight="Bold"
+                      Foreground="black"
+                      HorizontalAlignment="Center"/>
+
+            <TextBlock Text="Choose user type, complete fields, scan fingerprint, then submit."
+                      TextWrapping="Wrap"
+                      Foreground="#555555"
+                      FontSize="14"
+                      HorizontalAlignment="Center"/>
+
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                <Button Content="Create Voter"
+                        Width="160"
+                        Height="42"
+                        FontSize="14"
+                        FontWeight="Bold"
+                    Command="{Binding SwitchToCreateVoterModeCommand}"
+                    Background="#d97509"
+                    Foreground="White"/>
+
+                <Button Content="Create Official"
+                        Width="160"
+                        Height="42"
+                        FontSize="14"
+                        FontWeight="Bold"
+                    Command="{Binding SwitchToCreateOfficialModeCommand}"
+                    Background="#6b4423"
+                    Foreground="White"/>
+            </StackPanel>
+
+            <Separator Background="#ddd" Height="2" Margin="0,10,0,10"/>
+
+            <StackPanel IsVisible="{Binding IsCreateVoterMode}" Spacing="10">
+                <TextBlock Text="Voter Details" FontSize="16" FontWeight="Bold" Foreground="black"/>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="5">
+                        <TextBlock Text="First Name" Foreground="black" FontSize="14"/>
+                        <TextBox Text="{Binding FirstName}" Watermark="Enter first name" Height="40" FontSize="14" Padding="10"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="5">
+                        <TextBlock Text="Last Name" Foreground="black" FontSize="14"/>
+                        <TextBox Text="{Binding LastName}" Watermark="Enter last name" Height="40" FontSize="14" Padding="10"/>
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Date of Birth" Foreground="black" FontSize="14"/>
+                    <TextBox Text="{Binding DateOfBirth}" Watermark="DD/MM/YYYY" Height="40" FontSize="14" Padding="10"/>
+                </StackPanel>
+
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Address Line 1" Foreground="black" FontSize="14"/>
+                    <TextBox Text="{Binding AddressLine1}" Watermark="Enter address line 1" Height="40" FontSize="14" Padding="10"/>
+                </StackPanel>
+
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Address Line 2" Foreground="black" FontSize="14"/>
+                    <TextBox Text="{Binding AddressLine2}" Watermark="Enter address line 2" Height="40" FontSize="14" Padding="10"/>
+                </StackPanel>
+
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Post Code" Foreground="black" FontSize="14"/>
+                    <TextBox Text="{Binding PostCode}" Watermark="Enter post code" Height="40" FontSize="14" Padding="10"/>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="5">
+                        <TextBlock Text="County" Foreground="black" FontSize="14"/>
+                        <ComboBox SelectedItem="{Binding SelectedCounty}"
+                                  ItemsSource="{Binding CountyOptions}"
+                                  Height="40"
+                                  FontSize="14"
+                                  PlaceholderText="Select county"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="5">
+                        <TextBlock Text="Constituency" Foreground="black" FontSize="14"/>
+                        <ComboBox SelectedItem="{Binding SelectedConstituency}"
+                                  ItemsSource="{Binding ConstituencyOptions}"
+                                  Height="40"
+                                  FontSize="14"
+                                  PlaceholderText="Select constituency"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding IsCreateOfficialMode}" Spacing="10">
+                <TextBlock Text="Official Details" FontSize="16" FontWeight="Bold" Foreground="black"/>
+
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Username" Foreground="black" FontSize="14"/>
+                    <TextBox Text="{Binding OfficialUsername}"
+                            Watermark="Enter official username"
+                            Height="40"
+                            FontSize="14"
+                            Padding="10"/>
+                </StackPanel>
+
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Password" Foreground="black" FontSize="14"/>
+                    <TextBox Text="{Binding Password}"
+                            Watermark="Enter password"
+                            Height="40"
+                            FontSize="14"
+                            Padding="10"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- ===== FINGERPRINT CAPTURE SECTION ===== -->
+            <Separator Background="#ddd" Height="2" Margin="0,10,0,10"/>
+            <TextBlock Text="Fingerprint Capture" FontSize="16" FontWeight="Bold" Foreground="black"/>
+
+            <!-- Device Status with Refresh -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                <TextBlock Text="{Binding DeviceStatus}"
+                        FontSize="12"
+                        Foreground="DarkGreen"
+                        HorizontalAlignment="Center"
+                        FontWeight="Bold"
+                        VerticalAlignment="Center"/>
+                <Button Content="Refresh" 
+                        Background="Gray" 
+                        Foreground="White"
+                        Width="60" 
+                        Height="28"
+                        FontSize="12"
+                        Command="{Binding RefreshScannerStatusCommand}"/>
+            </StackPanel>
+
+            <!-- Capture Status Message -->
+            <TextBlock Text="{Binding CaptureStatusMessage}"
+                    FontSize="12"
+                    Foreground="DarkBlue"
+                    HorizontalAlignment="Center"
+                    FontWeight="Bold"
+                    TextWrapping="Wrap"/>
+
+            <!-- Quality Score Display -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                <TextBlock Text="Quality:"
+                        FontSize="12"
+                        Foreground="Black"
+                        VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{Binding QualityScore}"
+                            FontSize="14"
+                            Foreground="DarkGreen"
+                            FontWeight="Bold"/>
+                    <TextBlock Text="%"
+                            FontSize="14"
+                            Foreground="DarkGreen"
+                            FontWeight="Bold"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Start Scanning Button -->
+            <Button Content="Start Scanning"
+                    Background="Blue"
+                    Foreground="White"
+                    Width="150"
+                    Height="40"
+                    FontSize="14"
+                    FontWeight="Bold"
+                    HorizontalAlignment="Center"
+                    Command="{Binding StartScanningCommand}"
+                    IsEnabled="{Binding !IsCapturing}"/>
+
+            <!-- Live Preview Image -->
+            <Panel Background="Black" 
+                   Width="250"
+                   Height="250"
+                   HorizontalAlignment="Center">
+                <Image Source="{Binding PreviewImage}"
+                    Width="250"
+                    Height="250"
+                    Stretch="Uniform"
+                    HorizontalAlignment="Center"/>
+            </Panel>
+
+            <!-- Test Image Button -->
+            <Button Content="Test Image" 
+                    Background="Orange" 
+                    Foreground="White"
+                    Width="120" 
+                    Height="40"
+                    FontSize="12"
+                    FontWeight="Bold"
+                    HorizontalAlignment="Center"
+                    Command="{Binding TestPreviewImageCommand}"
+                    ToolTip.Tip="Display test fingerprint image"/>
+
+            <!-- Instructions -->
+            <StackPanel>   
+                <TextBlock Text="Place finger on the scanner"
+                        FontSize="16"
+                        Foreground="Black"
+                        HorizontalAlignment="Center"
+                        FontWeight="Bold"/>
+                <TextBlock Text="Press lightly and hold for 3 seconds" 
+                        FontSize="12"
+                        Foreground="Black"
+                        HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Status Message -->
+            <TextBlock x:Name="StatusMessage"
+                      Text="{Binding StatusMessage}"
+                      TextWrapping="Wrap"
+                      Foreground="{Binding StatusColor}"
+                      FontSize="12"
+                      HorizontalAlignment="Center"/>
+            
+            <!-- Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Center" Margin="0,20,0,0">
+                
+                <Button 
+                    Command="{Binding SubmitCommand}"
+                    Background="#27ae60"  
+                    Width="120"
+                    Height="50" 
+                    BorderThickness="2"
+                    BorderBrush="Black"
+                    FontSize="16">
+                    <TextBlock Text="Submit" Foreground="white"/>
+                </Button>
+                
+                <Button 
+                    Command="{Binding CancelCommand}"
+                    Background="#e74c3c"  
+                    Width="120"
+                    Height="50" 
+                    BorderThickness="2"
+                    BorderBrush="Black"
+                    FontSize="16">
+                    <TextBlock Text="Cancel" Foreground="white"/>
+                </Button>
+                
+            </StackPanel>
+            
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

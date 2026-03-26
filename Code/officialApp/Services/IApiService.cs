@@ -28,4 +28,22 @@ public interface IApiService
     
     // Database Queries
     Task<List<dynamic>?> GetAllVotersAsync();
+    
+    // Fingerprint Verification
+    Task<FingerprintComparisonResponse?> CompareFingerpringsAsync(byte[] fingerprint1, byte[] fingerprint2);
+    Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint);
+    
+    // Fingerprint Management
+    Task<bool> UploadOfficialFingerprintAsync(string username, string password, byte[] fingerprintData);
+    Task<bool> CreateOfficialWithFingerprintAsync(string username, string password, byte[] fingerprintData);
+    Task<bool> CreateVoterWithFingerprintAsync(
+        string firstName,
+        string lastName,
+        string dateOfBirth,
+        string addressLine1,
+        string addressLine2,
+        string postCode,
+        string county,
+        string constituency,
+        byte[] fingerprintData);
 }

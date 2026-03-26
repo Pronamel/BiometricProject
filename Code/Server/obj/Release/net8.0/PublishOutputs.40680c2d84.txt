@@ -3,6 +3,7 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\appsettings.Development.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\appsettings.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\appsettings.Production.json
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\FingerprintAlgorithum\FingerprintComparer.deps.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\publish\appsettings.Development.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\publish\appsettings.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\publish\appsettings.Production.json
@@ -100,3 +101,10 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\tr\Microsoft.CodeAnalysis.Workspaces.resources.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\zh-Hans\Microsoft.CodeAnalysis.Workspaces.resources.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\zh-Hant\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\Dahomey.Cbor.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\FingerprintComparer.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\SixLabors.ImageSharp.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\SourceAFIS.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\FingerprintComparer.pdb
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\SourceAFIS.pdb
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\publish\SourceAFIS.xml

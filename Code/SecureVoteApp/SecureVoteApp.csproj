@@ -15,9 +15,14 @@
 
   <!-- IBScanUltimate SDK DLL references -->
   <ItemGroup>
-    <None Update="IBScanUltimate_SDK\bin\IBScanUltimate.dll">
+    <Content Include="IBScanUltimate_SDK\bin\x64-windows\IBScanUltimate.dll">
+      <Link>IBScanUltimate.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
+    <Content Include="IBScanUltimate_SDK\bin\x64-windows\ACamSDK.dll">
+      <Link>ACamSDK.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -40,5 +45,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="7.0.11" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
   </ItemGroup>
 </Project>

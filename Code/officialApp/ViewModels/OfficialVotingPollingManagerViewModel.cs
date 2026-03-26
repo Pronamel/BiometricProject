@@ -175,6 +175,13 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         _voteListeningCancellation?.Cancel();
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official stopped listening for votes");
     }
+
+    [RelayCommand]
+    private void GoBack()
+    {
+        StopVoteListening();
+        _navigationService.NavigateToOfficialMenu();
+    }
     
     [RelayCommand]
     private void Execute()

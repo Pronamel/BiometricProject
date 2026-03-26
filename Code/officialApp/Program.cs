@@ -56,6 +56,7 @@ class Program
         services.AddSingleton<OfficialMenuViewModel>();
         services.AddSingleton<OfficialGenerateAccessCodeViewModel>();
         services.AddSingleton<OfficialVotingPollingManagerViewModel>();
+        services.AddSingleton<OfficialAddVoterViewModel>();
         services.AddSingleton<MainWindowViewModel>();
     }
 }

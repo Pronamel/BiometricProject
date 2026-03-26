@@ -3,7 +3,7 @@
             xmlns:vm="using:SecureVoteApp.ViewModels"
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
+            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
             x:Class="SecureVoteApp.Views.VoterUI.AuthenticateUserView"
             x:DataType="vm:AuthenticateUserViewModel">
 
@@ -17,48 +17,73 @@
 
     <Grid Background="#f6f2e6">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-            <!-- Buttons for scan results -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
-                <Button Content="Fail Scan" 
-                        Background="Red" 
-                        Foreground="White"
-                        Width="100" 
-                        Height="40"
-                        FontSize="14"
-                        FontWeight="Bold"
-                        Command="{Binding ScanFingerPrintInvalidCommand}"/>
+            <!-- Start Scanning Button -->
+            <Button Content="Start Scanning"
+                    Background="Purple"
+                    Foreground="White"
+                    Width="150"
+                    Height="40"
+                    FontSize="14"
+                    FontWeight="Bold"
+                    HorizontalAlignment="Center"
+                    Command="{Binding StartScanningCommand}"
+                    IsEnabled="{Binding !IsCapturing}"/>
 
+            <!-- Live Preview Image -->
+            <Panel Background="Black" 
+                   Width="250"
+                   Height="250"
+                   HorizontalAlignment="Center">
+                <Image Source="{Binding PreviewImage}"
+                    Width="250"
+                    Height="250"
+                    Stretch="Uniform"
+                    HorizontalAlignment="Center"/>
+            </Panel>
 
-                <Button Content="Good Scan" 
-                        Background="Green" 
-                        Foreground="White"
-                        Width="100" 
-                        Height="40"
-                        FontSize="14"
-                        FontWeight="Bold"
-                        Command="{Binding ScanFingerPrintValidCommand}"/>
-            </StackPanel>
-            
-            <Image Source="{Binding ImageSource}"
-                Width="180"
-                Height="180"
-                Stretch="Uniform"/>
-            <StackPanel>   
-                <TextBlock Text="Place finger on the scanner"
-                        FontSize="35"
-                        Foreground="Black"
-                        HorizontalAlignment="Center"/>
-                <TextBlock Text="Press lightly and hold for 3 seconds" 
-                        FontSize="20"
-                        Foreground="Black"
-                        HorizontalAlignment="Center"/>
+            <!-- Image and Live Scan Text Side by Side -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="30" Margin="-20,0,0,0">
+                <Image Source="{Binding ImageSource}"
+                    Width="180"
+                    Height="180"
+                    Stretch="Uniform"/>
+                
+                <StackPanel VerticalAlignment="Center">   
+                    <TextBlock Text="Place finger on the scanner"
+                            FontSize="35"
+                            Foreground="Black"
+                            HorizontalAlignment="Center"/>
+                    <TextBlock Text="Press lightly and hold for 3 seconds" 
+                            FontSize="20"
+                            Foreground="Black"
+                            HorizontalAlignment="Center"/>
 
-                <TextBlock Text="{Binding StatusMessage}" 
-                        FontSize="18"
-                        Foreground="red"
-                        HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding CaptureStatusMessage}" 
+                            FontSize="18"
+                            Foreground="red"
+                            HorizontalAlignment="Center"/>
+
+                    <TextBlock Text="{Binding StatusMessage}" 
+                            FontSize="16"
+                            Foreground="green"
+                            HorizontalAlignment="Center"
+                            Margin="0,10,0,0"/>
+                </StackPanel>
             </StackPanel>
 
         </StackPanel>
+
+        <!-- Sign Out Button at Bottom Left -->
+        <Button Content="Back" 
+                Background="Crimson" 
+                Foreground="White"
+                Width="100" 
+                Height="35"
+                FontSize="12"
+                FontWeight="Bold"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="10"
+                Command="{Binding BackCommand}"/>
     </Grid>
 </UserControl>

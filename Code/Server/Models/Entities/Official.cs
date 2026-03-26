@@ -10,6 +10,7 @@ namespace Server.Models.Entities
         public DateTime? LastLogin { get; set; }
         public Guid? AssignedCountyId { get; set; }
         public Guid? AssignedPollingStationId { get; set; }
+        public byte[]? FingerPrintScan { get; set; }
 
         public PollingStation? AssignedPollingStation { get; set; }
     }

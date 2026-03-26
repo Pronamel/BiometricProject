@@ -101,8 +101,8 @@ public partial class OfficialLoginViewModel : ViewModelBase
                 // Wait a moment to show success message
                 await Task.Delay(1000);
                 
-                // Navigate to biometric authentication
-                _navigationService.NavigateToOfficialAuthenticate();
+                // Pass credentials to the authenticate view before navigating
+                _navigationService.NavigateToOfficialAuthenticate(Username, Password);
             }
             else
             {

@@ -19,10 +19,32 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="10,10,10,5">
-            <TextBlock Text="Official Voting Polling Manager" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black" FontSize="18" FontWeight="Bold"/>
-        </StackPanel>
+        <!-- Header with Back Button -->
+        <Grid Grid.Row="0" Margin="10,10,10,5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Back Button -->
+            <Button Grid.Column="0" 
+                    Content="← Back" 
+                    Command="{Binding GoBackCommand}"
+                    Padding="10,5"
+                    VerticalAlignment="Center"
+                    Background="#E0E0E0"
+                    Foreground="Black"/>
+            
+            <!-- Title -->
+            <TextBlock Grid.Column="1"
+                       Text="Official Voting Polling Manager" 
+                       HorizontalAlignment="Left" 
+                       Margin="15,0,0,5" 
+                       Foreground="black" 
+                       FontSize="18" 
+                       FontWeight="Bold"
+                       VerticalAlignment="Center"/>
+        </Grid>
 
         <!-- Main Content Area - Split Left/Right -->
         <Grid Grid.Row="1" Margin="10">

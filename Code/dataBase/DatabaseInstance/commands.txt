@@ -11,3 +11,18 @@ opens the database
 
 lists tables in the database
 	/dt
+
+
+
+CHECKS IF FILES ARE PNG IN OFFICIALS 	
+SELECT 
+    "OfficialId",
+    "Username",
+    ENCODE(SUBSTRING("FingerPrintScan" FROM 1 FOR 8), 'hex') as "FileSignature",
+    CASE 
+        WHEN ENCODE(SUBSTRING("FingerPrintScan" FROM 1 FOR 8), 'hex') = '89504e470d0a1a0a'
+        THEN 'PNG'
+        ELSE 'Unknown or Invalid'
+    END as "FileType"
+FROM "Officials"
+WHERE "FingerPrintScan" IS NOT NULL;

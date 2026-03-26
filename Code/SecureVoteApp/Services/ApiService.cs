@@ -546,4 +546,78 @@ public class ApiService : IApiService
             return false;
         }
     }
+
+    //--------------------------------------------
+    // Fingerprint Verification Methods
+    //--------------------------------------------
+
+    public async Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(voterId))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error: VoterId is empty");
+                return null;
+            }
+
+            if (scannedFingerprint == null || scannedFingerprint.Length == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error: Scanned fingerprint is empty");
+                return null;
+            }
+
+            // Convert scanned fingerprint to base64
+            string scannedFingerprintBase64 = Convert.ToBase64String(scannedFingerprint);
+
+            var verifyRequest = new 
+            { 
+                userType = "voter",  // Identifier indicating this is a voter
+                username = (string?)null,  // Not applicable for voters
+                password = (string?)null,  // Not applicable for voters
+                voterId = voterId,
+                scannedFingerprint = scannedFingerprintBase64
+            };
+
+            var jsonContent = JsonSerializer.Serialize(verifyRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📸 Sending fingerprint verification request to /api/verify-prints");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   UserType: voter");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   VoterId: {voterId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Scanned fingerprint size: {scannedFingerprint.Length} bytes");
+
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/verify-prints", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📥 Fingerprint verification response status: {response.StatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var verifyResponse = JsonSerializer.Deserialize<FingerprintVerificationResponse>(responseContent, _jsonOptions);
+                
+                if (verifyResponse != null)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Fingerprint verification result:");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Match: {verifyResponse.IsMatch}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Score: {verifyResponse.Score}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Threshold: {verifyResponse.Threshold}");
+                }
+                
+                return verifyResponse;
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Fingerprint verification failed: {responseContent}");
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error verifying fingerprint: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack: {ex.StackTrace}");
+            return null;
+        }
+    }
 }

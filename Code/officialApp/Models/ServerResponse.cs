@@ -49,3 +49,28 @@ public class VoteInfo
     [JsonPropertyName("officialId")]
     public string OfficialId { get; set; } = string.Empty;
 }
+
+// Fingerprint verification models
+public class FingerprintComparisonResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+    
+    [JsonPropertyName("isMatch")]
+    public bool IsMatch { get; set; }
+    
+    [JsonPropertyName("score")]
+    public double Score { get; set; }
+    
+    [JsonPropertyName("threshold")]
+    public double Threshold { get; set; }
+    
+    [JsonPropertyName("margin")]
+    public double Margin { get; set; }
+    
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; }
+    
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+}

@@ -5,9 +5,12 @@ using Avalonia.Media.Imaging;
 using Avalonia;
 using Avalonia.Threading;
 using System;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using officialApp.Services.Scanner;
+using officialApp.Services;
 
 namespace officialApp.ViewModels;
 
@@ -19,6 +22,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     
     private readonly INavigationService _navigationService;
     private readonly IScannerService _scannerService;
+    private readonly IApiService _apiService;
 
     // ==========================================
     // OBSERVABLE PROPERTIES
@@ -29,12 +33,6 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
 
     [ObservableProperty]
     private Bitmap? imageSource;
-
-    [ObservableProperty]
-    private string deviceStatus = "Checking scanner...";
-
-    [ObservableProperty]
-    private bool isScannerConnected = false;
 
     [ObservableProperty]
     private Bitmap? previewImage = null;
@@ -48,6 +46,13 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     [ObservableProperty]
     private string captureStatusMessage = "Ready to scan";
 
+    // Credentials received from login
+    [ObservableProperty]
+    private string username = "";
+
+    [ObservableProperty]
+    private string password = "";
+
     // ==========================================
     // PUBLIC PROPERTIES
     // ==========================================
@@ -58,11 +63,13 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     // Quality threshold for feedback and acceptance (must match ScannerService MIN_QUALITY_THRESHOLD)
     private const int QUALITY_THRESHOLD = 10;
     private byte[]? _capturedFingerprintData = null;        // Raw image data (200,000 bytes) - for display
+    private uint _capturedFingerprintWidth = 0;             // Width of captured fingerprint image
+    private uint _capturedFingerprintHeight = 0;            // Height of captured fingerprint image
 
     // ==========================================
     // IMAGE MANAGEMENT METHODS
     // ==========================================
-
+    
     private Bitmap LoadImage(string fileName)
     {
         return new Bitmap(
@@ -117,43 +124,163 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
         }
     }
 
-    public void imageHandler()
-    {
-        
-    }
-
     // ==========================================
-    // SCANNER DEVICE MANAGEMENT
+    // FINGERPRINT COMPARISON METHODS
     // ==========================================
 
-    public void CheckScannerConnectivity()
+    private byte[]? LoadBaselineFingerprintFromAssets()
     {
         try
         {
-            Console.WriteLine("[OfficialAuthenticateViewModel] CheckScannerConnectivity started");
+            Console.WriteLine("[OfficialAuthenticateViewModel] Loading baseline fingerprint from Assets...");
             
-            int deviceCount = _scannerService.GetDeviceCount();
-            Console.WriteLine($"[OfficialAuthenticateViewModel] Device count: {deviceCount}");
-
-            if (deviceCount > 0)
+            // Load the baseline fingerprint PNG image from Assets - return PNG binary data directly
+            using (var stream = AssetLoader.Open(new Uri("avares://officialApp/Assets/fingerprint_BaseLine.png")))
             {
-                IsScannerConnected = true;
-                string deviceInfo = _scannerService.GetDeviceDescription(0);
-                DeviceStatus = $"Scanner Connected: {deviceInfo}";
-                Console.WriteLine($"[OfficialAuthenticateViewModel] ✓ Scanner connected: {deviceInfo}");
-            }
-            else
-            {
-                IsScannerConnected = false;
-                DeviceStatus = "No scanner device detected";
-                Console.WriteLine("[OfficialAuthenticateViewModel] ❌ No scanner devices found");
+                using (var memoryStream = new MemoryStream())
+                {
+                    stream.CopyTo(memoryStream);
+                    byte[] pngData = memoryStream.ToArray();
+                    
+                    Console.WriteLine($"[OfficialAuthenticateViewModel] ✓ Baseline fingerprint loaded: {pngData.Length} bytes (PNG format)");
+                    return pngData;  // Return PNG file data, not extracted grayscale bytes
+                }
             }
         }
         catch (Exception ex)
         {
-            IsScannerConnected = false;
-            DeviceStatus = $"Error checking scanner: {ex.Message}";
-            Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ Error: {ex.Message}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ Error loading baseline fingerprint: {ex.Message}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Stack: {ex.StackTrace}");
+            return null;
+        }
+    }
+
+    private byte[]? ConvertGrayscaleToImageData(byte[] grayscaleData, uint width, uint height)
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Console.WriteLine("[OfficialAuthenticateViewModel] ❌ Grayscale to PNG conversion is Windows only");
+                return null;
+            }
+
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Converting grayscale data to PNG ({width}x{height})...");
+
+#pragma warning disable CA1416
+            // Create 8-bit indexed bitmap from grayscale data
+            using (var bitmap = new System.Drawing.Bitmap((int)width, (int)height, System.Drawing.Imaging.PixelFormat.Format8bppIndexed))
+            {
+                // Set grayscale palette (0-255)
+                var palette = bitmap.Palette;
+                for (int i = 0; i < 256; i++)
+                {
+                    palette.Entries[i] = System.Drawing.Color.FromArgb(i, i, i);
+                }
+                bitmap.Palette = palette;
+
+                // Copy grayscale data to bitmap
+                var rect = new System.Drawing.Rectangle(0, 0, (int)width, (int)height);
+                var bitmapData = bitmap.LockBits(rect, System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format8bppIndexed);
+                
+                try
+                {
+                    System.Runtime.InteropServices.Marshal.Copy(grayscaleData, 0, bitmapData.Scan0, grayscaleData.Length);
+                }
+                finally
+                {
+                    bitmap.UnlockBits(bitmapData);
+                }
+
+                // Save bitmap as PNG to byte array
+                using (var memoryStream = new MemoryStream())
+                {
+                    bitmap.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+                    byte[] pngData = memoryStream.ToArray();
+                    Console.WriteLine($"[OfficialAuthenticateViewModel] ✓ Converted to PNG: {pngData.Length} bytes");
+                    return pngData;
+                }
+            }
+#pragma warning restore CA1416
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ Error converting grayscale to PNG: {ex.Message}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Stack: {ex.StackTrace}");
+            return null;
+        }
+    }
+
+    private async Task CompareFingerprints()
+    {
+        try
+        {
+            if (_capturedFingerprintData == null || _capturedFingerprintData.Length == 0)
+            {
+                Console.WriteLine("[OfficialAuthenticateViewModel] ❌ No captured fingerprint data available");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(Username) || string.IsNullOrEmpty(Password))
+            {
+                Console.WriteLine("[OfficialAuthenticateViewModel] ❌ No credentials available for fingerprint verification");
+                CaptureStatusMessage = "Error: Missing credentials";
+                validFingerPrintScan = false;
+                return;
+            }
+
+            Console.WriteLine("[OfficialAuthenticateViewModel] Starting fingerprint verification via API...");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Username: {Username}");
+            
+            // Convert captured grayscale data to PNG format
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Encoding scanner data to PNG format ({_capturedFingerprintWidth}x{_capturedFingerprintHeight})...");
+            
+            var scannedImagePng = ConvertGrayscaleToImageData(_capturedFingerprintData, _capturedFingerprintWidth, _capturedFingerprintHeight);
+            if (scannedImagePng == null || scannedImagePng.Length == 0)
+            {
+                Console.WriteLine("[OfficialAuthenticateViewModel] ❌ Failed to encode captured fingerprint as PNG");
+                CaptureStatusMessage = "Error: Could not process scanned fingerprint";
+                validFingerPrintScan = false;
+                return;
+            }
+
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Encoded fingerprint size: {scannedImagePng.Length} bytes (PNG)");
+
+            // Call the server verify-prints endpoint with username, password, and scanned fingerprint
+            // The server will fetch the stored fingerprint from the database and compare
+            Console.WriteLine("[OfficialAuthenticateViewModel] Calling /api/verify-prints endpoint...");
+            var verificationResult = await _apiService.VerifyFingerprintAsync(Username, Password, scannedImagePng);
+
+            if (verificationResult == null || !verificationResult.Success)
+            {
+                Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ Fingerprint verification failed: {verificationResult?.Message}");
+                CaptureStatusMessage = $"Error: {verificationResult?.Message}";
+                validFingerPrintScan = false;
+                return;
+            }
+
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Fingerprint verification result:");
+            Console.WriteLine($"[OfficialAuthenticateViewModel]   Match: {verificationResult.IsMatch}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel]   Score: {verificationResult.Score}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel]   Threshold: {verificationResult.Threshold}");
+
+            // Set validation based on match result
+            validFingerPrintScan = verificationResult.IsMatch;
+            
+            if (verificationResult.IsMatch)
+            {
+                Console.WriteLine("[OfficialAuthenticateViewModel] ✓ FINGERPRINT VERIFIED - Authentication successful");
+            }
+            else
+            {
+                Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ FINGERPRINT DOES NOT MATCH - Score {verificationResult.Score} below threshold {verificationResult.Threshold}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[OfficialAuthenticateViewModel] ❌ Error verifying fingerprint: {ex.Message}");
+            Console.WriteLine($"[OfficialAuthenticateViewModel] Stack: {ex.StackTrace}");
+            validFingerPrintScan = false;
         }
     }
 
@@ -161,10 +288,11 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public OfficialAuthenticateViewModel(INavigationService navigationService, IScannerService scannerService)
+    public OfficialAuthenticateViewModel(INavigationService navigationService, IScannerService scannerService, IApiService apiService)
     {
         _navigationService = navigationService;
         _scannerService = scannerService;
+        _apiService = apiService;
         
         // Initialize with default fingerprint image
         ImageSource = LoadImage("fingerPrint.png");
@@ -177,12 +305,6 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     // ==========================================
     // COMMANDS
     // ==========================================
-
-    [RelayCommand]
-    private void RefreshScannerStatus()
-    {
-        CheckScannerConnectivity();
-    }
 
     [RelayCommand]
     private void StartScanning()
@@ -239,6 +361,10 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
         try
         {
             Console.WriteLine($"[OfficialAuthenticateViewModel] Preview image received: {args.Width}x{args.Height}, Quality: {args.QualityScore}%, ImageData: {(args.ImageData != null ? args.ImageData.Length : 0)} bytes");
+            
+            // Store scanner dimensions for later use in fingerprint conversion
+            _capturedFingerprintWidth = args.Width;
+            _capturedFingerprintHeight = args.Height;
             
             // Dispatch all UI updates to the main thread to ensure proper Avalonia binding notifications
             Dispatcher.UIThread.InvokeAsync(() =>
@@ -301,17 +427,19 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
             {
                 if (args.IsSuccess)
                 {
-                    CaptureStatusMessage = $"Fingerprint captured! Quality: {args.QualityScore}%";
-                    Console.WriteLine("[OfficialAuthenticateViewModel] ✓ Fingerprint data saved");
+                    CaptureStatusMessage = $"Fingerprint captured! Quality: {args.QualityScore}% - Comparing...";
+                    Console.WriteLine("[OfficialAuthenticateViewModel] ✓ Fingerprint data saved - starting comparison");
                     
-                    // Auto-trigger successful scan
-                    validFingerPrintScan = true;
-                    scannAttempts++;
-                    
-                    // Schedule UI update and navigation with null-check
+                    // Start fingerprint comparison asynchronously
                     Task.Run(async () =>
                     {
+                        // Compare the fingerprints with the baseline
+                        await CompareFingerprints();
+                        
+                        // After comparison, schedule UI update and navigation
                         await Task.Delay(1000);
+                        scannAttempts++;
+                        
                         if (_navigationService != null)
                         {
                             await attemptHandler(scannAttempts, validFingerPrintScan);
@@ -459,21 +587,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
-    private async Task ScanFingerPrintValid()
-    {
-        scannAttempts++;
-        validFingerPrintScan = true;
-        await attemptHandler(scannAttempts, validFingerPrintScan);
-    }
 
-    [RelayCommand]
-    private async Task ScanFingerPrintInvalid()
-    {
-        scannAttempts++;
-        validFingerPrintScan = false;
-        await attemptHandler(scannAttempts, validFingerPrintScan);
-    }
 
     [RelayCommand]
     private void Back()
@@ -482,35 +596,11 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void TestPreviewImage()
+    private void SignOut()
     {
-        // Generate a test fingerprint pattern (grayscale)
-        int testWidth = 256;
-        int testHeight = 256;
-        byte[] testImageData = new byte[testWidth * testHeight];
-        
-        // Create a simple gradient pattern for testing
-        for (int y = 0; y < testHeight; y++)
-        {
-            for (int x = 0; x < testWidth; x++)
-            {
-                // Create a radial gradient with some fingerprint-like pattern
-                int dx = x - testWidth / 2;
-                int dy = y - testHeight / 2;
-                float distance = (float)Math.Sqrt(dx * dx + dy * dy);
-                byte value = (byte)(Math.Sin(distance / 10) * 127 + 128);
-                testImageData[y * testWidth + x] = value;
-            }
-        }
-        
-        QualityScore = 75;
-        CaptureStatusMessage = "Test image loaded";
-        Console.WriteLine("[OfficialAuthenticateViewModel] Generating test preview image...");
-        
-        Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            PreviewImage = ConvertBytesToBitmap(testImageData, (uint)testWidth, (uint)testHeight);
-            Console.WriteLine($"[OfficialAuthenticateViewModel] ✓ Test image displayed");
-        }, DispatcherPriority.Input);
+        _apiService.Logout();
+        _navigationService.NavigateToOfficialLogin();
     }
+
+
 }

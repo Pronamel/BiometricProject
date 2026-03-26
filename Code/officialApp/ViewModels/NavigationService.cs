@@ -11,10 +11,11 @@ namespace officialApp.ViewModels;
 public interface INavigationService
 {
     void NavigateToOfficialLogin();
-    void NavigateToOfficialAuthenticate();
+    void NavigateToOfficialAuthenticate(string username = "", string password = "");
     void NavigateToOfficialMenu();
     void NavigateToOfficialGenerateAccessCode();
     void NavigateToOfficialVotingPollingManager();
+    void NavigateToOfficialAddVoter();
     void NavigateToView(UserControl view);
     
     // Events to notify when navigation happens
@@ -45,6 +46,7 @@ public class NavigationService : INavigationService
     private UserControl? _officialMenuView;
     private UserControl? _officialGenerateAccessCodeView;
     private UserControl? _officialVotingPollingManagerView;
+    private UserControl? _officialAddVoterView;
 
     // ==========================================
     // PRIVATE FIELDS - VIEW FACTORY FUNCTIONS
@@ -56,6 +58,7 @@ public class NavigationService : INavigationService
     private Func<UserControl>? _getOfficialMenuView;
     private Func<UserControl>? _getOfficialGenerateAccessCodeView;
     private Func<UserControl>? _getOfficialVotingPollingManagerView;
+    private Func<UserControl>? _getOfficialAddVoterView;
 
     // ==========================================
     // INITIALIZATION METHODS
@@ -67,13 +70,15 @@ public class NavigationService : INavigationService
         Func<UserControl> getOfficialAuthenticateView,
         Func<UserControl> getOfficialMenuView,
         Func<UserControl> getOfficialGenerateAccessCodeView,
-        Func<UserControl> getOfficialVotingPollingManagerView)
+        Func<UserControl> getOfficialVotingPollingManagerView,
+        Func<UserControl> getOfficialAddVoterView)
     {
         _getOfficialLoginView = getOfficialLoginView;
         _getOfficialAuthenticateView = getOfficialAuthenticateView;
         _getOfficialMenuView = getOfficialMenuView;
         _getOfficialGenerateAccessCodeView = getOfficialGenerateAccessCodeView;
         _getOfficialVotingPollingManagerView = getOfficialVotingPollingManagerView;
+        _getOfficialAddVoterView = getOfficialAddVoterView;
     }
 
     // ==========================================
@@ -89,10 +94,18 @@ public class NavigationService : INavigationService
             NavigationRequested?.Invoke(_officialLoginView);
     }
     
-    public void NavigateToOfficialAuthenticate()
+    public void NavigateToOfficialAuthenticate(string username = "", string password = "")
     {
         if (_officialAuthenticateView == null && _getOfficialAuthenticateView != null)
             _officialAuthenticateView = _getOfficialAuthenticateView();
+
+        // Pass credentials to the viewmodel if provided
+        if (_officialAuthenticateView != null && _officialAuthenticateView.DataContext is OfficialAuthenticateViewModel vm)
+        {
+            vm.Username = username;
+            vm.Password = password;
+            Console.WriteLine($"[NavigationService] Set credentials for OfficialAuthenticateViewModel: {username}");
+        }
 
         if (_officialAuthenticateView != null)
             NavigationRequested?.Invoke(_officialAuthenticateView);
@@ -123,6 +136,15 @@ public class NavigationService : INavigationService
 
         if (_officialVotingPollingManagerView != null)
             NavigationRequested?.Invoke(_officialVotingPollingManagerView);
+    }
+
+    public void NavigateToOfficialAddVoter()
+    {
+        if (_officialAddVoterView == null && _getOfficialAddVoterView != null)
+            _officialAddVoterView = _getOfficialAddVoterView();
+
+        if (_officialAddVoterView != null)
+            NavigationRequested?.Invoke(_officialAddVoterView);
     }
 
     public void NavigateToView(UserControl view)

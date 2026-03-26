@@ -17,55 +17,9 @@
 
     <Grid Background="#f6f2e6">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-            <!-- Device Status with Refresh -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                <TextBlock Text="{Binding DeviceStatus}"
-                        FontSize="14"
-                        Foreground="DarkGreen"
-                        HorizontalAlignment="Center"
-                        FontWeight="Bold"
-                        VerticalAlignment="Center"/>
-                <Button Content="Refresh" 
-                        Background="Gray" 
-                        Foreground="White"
-                        Width="60" 
-                        Height="28"
-                        FontSize="12"
-                        Command="{Binding RefreshScannerStatusCommand}"/>
-            </StackPanel>
-
-            <!-- Capture Status Message -->
-            <TextBlock Text="{Binding CaptureStatusMessage}"
-                    FontSize="14"
-                    Foreground="DarkBlue"
-                    HorizontalAlignment="Center"
-                    FontWeight="Bold"/>
-
-            <!-- Quality Score Display -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                <TextBlock Text="Quality:"
-                        FontSize="14"
-                        Foreground="Black"
-                        VerticalAlignment="Center"/>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
-                    <TextBlock Text="{Binding QualityScore}"
-                            FontSize="18"
-                            Foreground="DarkGreen"
-                            FontWeight="Bold"/>
-                    <TextBlock Text="%"
-                            FontSize="18"
-                            Foreground="DarkGreen"
-                            FontWeight="Bold"/>
-                </StackPanel>
-                <TextBlock Text="(need 10%)"
-                        FontSize="12"
-                        Foreground="Gray"
-                        VerticalAlignment="Center"/>
-            </StackPanel>
-
             <!-- Start Scanning Button -->
             <Button Content="Start Scanning"
-                    Background="Blue"
+                    Background="Purple"
                     Foreground="White"
                     Width="150"
                     Height="40"
@@ -87,59 +41,43 @@
                     HorizontalAlignment="Center"/>
             </Panel>
 
-            <!-- Original test buttons -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
-                <Button Content="Fail Scan" 
-                        Background="Red" 
-                        Foreground="White"
-                        Width="100" 
-                        Height="40"
-                        FontSize="14"
-                        FontWeight="Bold"
-                        Command="{Binding ScanFingerPrintInvalidCommand}"
-                        IsEnabled="{Binding !IsCapturing}"/>
+            <!-- Image and Live Scan Text Side by Side -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="30" Margin="-20,0,0,0">
+                <Image Source="{Binding ImageSource}"
+                    Width="180"
+                    Height="180"
+                    Stretch="Uniform"/>
+                
+                <StackPanel VerticalAlignment="Center">   
+                    <TextBlock Text="Place finger on the scanner"
+                            FontSize="35"
+                            Foreground="Black"
+                            HorizontalAlignment="Center"/>
+                    <TextBlock Text="Press lightly and hold for 3 seconds" 
+                            FontSize="20"
+                            Foreground="Black"
+                            HorizontalAlignment="Center"/>
 
-                <Button Content="Good Scan" 
-                        Background="Green" 
-                        Foreground="White"
-                        Width="100" 
-                        Height="40"
-                        FontSize="14"
-                        FontWeight="Bold"
-                        Command="{Binding ScanFingerPrintValidCommand}"
-                        IsEnabled="{Binding !IsCapturing}"/>
-
-                <Button Content="Test Image" 
-                        Background="Orange" 
-                        Foreground="White"
-                        Width="100" 
-                        Height="40"
-                        FontSize="14"
-                        FontWeight="Bold"
-                        Command="{Binding TestPreviewImageCommand}"
-                        ToolTip.Tip="Display test fingerprint image"/>
-            </StackPanel>
-            
-            <Image Source="{Binding ImageSource}"
-                Width="180"
-                Height="180"
-                Stretch="Uniform"/>
-            <StackPanel>   
-                <TextBlock Text="Place finger on the scanner"
-                        FontSize="35"
-                        Foreground="Black"
-                        HorizontalAlignment="Center"/>
-                <TextBlock Text="Press lightly and hold for 3 seconds" 
-                        FontSize="20"
-                        Foreground="Black"
-                        HorizontalAlignment="Center"/>
-
-                <TextBlock Text="{Binding StatusMessage}" 
-                        FontSize="18"
-                        Foreground="red"
-                        HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding StatusMessage}" 
+                            FontSize="18"
+                            Foreground="red"
+                            HorizontalAlignment="Center"/>
+                </StackPanel>
             </StackPanel>
 
         </StackPanel>
+
+        <!-- Sign Out Button at Bottom Left -->
+        <Button Content="Sign Out" 
+                Background="Crimson" 
+                Foreground="White"
+                Width="100" 
+                Height="35"
+                FontSize="12"
+                FontWeight="Bold"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="10"
+                Command="{Binding SignOutCommand}"/>
     </Grid>
 </UserControl>

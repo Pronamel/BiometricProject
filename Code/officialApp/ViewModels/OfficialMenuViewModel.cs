@@ -48,8 +48,7 @@ public partial class OfficialMenuViewModel : ViewModelBase
     [RelayCommand]
     private void Reports()
     {
-        // TODO: Implement reports functionality
-        // _navigationService.NavigateToReports();
+        _navigationService.NavigateToOfficialAddVoter();
     }
 
     [RelayCommand]

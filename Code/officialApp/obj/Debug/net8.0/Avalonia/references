@@ -40,6 +40,7 @@ C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Micro
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Microsoft.VisualBasic.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Microsoft.Win32.Primitives.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Microsoft.Win32.Registry.dll
+C:\Users\alexa\.nuget\packages\microsoft.win32.systemevents\8.0.0\lib\net8.0\Microsoft.Win32.SystemEvents.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\mscorlib.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\netstandard.dll
 C:\Users\alexa\.nuget\packages\skiasharp\2.88.9\lib\net6.0\SkiaSharp.dll
@@ -73,6 +74,7 @@ C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\Syste
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\System.Diagnostics.TraceSource.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\System.Diagnostics.Tracing.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\System.dll
+C:\Users\alexa\.nuget\packages\system.drawing.common\8.0.0\lib\net8.0\System.Drawing.Common.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\System.Drawing.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\System.Drawing.Primitives.dll
 C:\Users\alexa\.nuget\packages\microsoft.netcore.app.ref\8.0.25\ref\net8.0\System.Dynamic.Runtime.dll

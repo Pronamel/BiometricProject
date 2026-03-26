@@ -1,6 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.IO;
+using System.Drawing;
+using System.Drawing.Imaging;
 
 namespace officialApp.Services.Scanner
 {
@@ -12,35 +15,19 @@ namespace officialApp.Services.Scanner
         private int _deviceHandle = -1;
         private bool _isDeviceOpen = false;
         private bool _isCaptureActive = false;
-        private bool _isSpoofDetected = false;
         private bool _disposed = false;
         private bool _isDllLoaded = false;
         private bool _captureCompleted = false;  // Flag to prevent processing after successful completion
-        
-        // Frame tracking and diagnostics
-        private int _previewFrameCount = 0;  // Counter for preview frames received
-        private bool _hasReceivedPreviewFrame = false;  // Flag to detect if preview callback ever fires
-        private DateTime _captureStartTime = DateTime.MinValue;
-        private const int CAPTURE_TIMEOUT_SECONDS = 60; // Maximum time to wait for a good fingerprint
-        
-        // Frame tracking - detect when motion stops and restart capture if needed
-        private DateTime _lastFrameTime = DateTime.MinValue;
-        private const int FRAME_TIMEOUT_MILLISECONDS = 500; // If no frame in 0.5 seconds, restart capture
-        private System.Threading.Timer? _frameWatchdogTimer = null;
 
         // Store callback delegates to prevent garbage collection - MUST be non-nullable and keep references alive
         private readonly IBScanUltimateWrapper.PreviewImageCallback _previewCallback;
         private readonly IBScanUltimateWrapper.ResultImageExCallback _resultCallback;
-        private readonly IBScanUltimateWrapper.DeviceCountCallback _deviceCountCallback;
         private readonly IBScanUltimateWrapper.FingerQualityCallback _fingerQualityCallback;
-        private readonly IBScanUltimateWrapper.CompleteAcquisitionCallback _completeAcquisitionCallback;
 
         // Store function pointers to keep them valid - CRITICAL for callback stability
         private IntPtr _previewCallbackPtr = IntPtr.Zero;
         private IntPtr _resultCallbackPtr = IntPtr.Zero;
-        private IntPtr _deviceCountCallbackPtr = IntPtr.Zero;
         private IntPtr _fingerQualityCallbackPtr = IntPtr.Zero;
-        private IntPtr _completeAcquisitionCallbackPtr = IntPtr.Zero;
 
         #endregion
 
@@ -59,9 +46,7 @@ namespace officialApp.Services.Scanner
             // Initialize callback delegates BEFORE try block - these MUST be non-null to prevent garbage collection
             _previewCallback = OnPreviewImageAvailable;
             _resultCallback = OnResultImageAvailable;
-            _deviceCountCallback = OnDeviceCountChanged;
             _fingerQualityCallback = OnFingerQualityUpdate;
-            _completeAcquisitionCallback = OnCompleteAcquisition;
 
             try
             {
@@ -304,23 +289,7 @@ namespace officialApp.Services.Scanner
                             Console.WriteLine($"[ScannerService] ⚠️ Quality callback registration returned: {cbResult}");
                         }
                         
-                        // Register complete acquisition callback - CRITICAL: fires when AUTO_CAPTURE finishes
-                        if (_completeAcquisitionCallback == null) throw new InvalidOperationException("Complete acquisition callback not initialized");
-                        _completeAcquisitionCallbackPtr = Marshal.GetFunctionPointerForDelegate<IBScanUltimateWrapper.CompleteAcquisitionCallback>(_completeAcquisitionCallback);
-                        cbResult = IBScanUltimateWrapper.IBSU_RegisterCallbacks(
-                            _deviceHandle,
-                            IBScanUltimateWrapper.COMPLETE_ACQUISITION_EVENT,
-                            _completeAcquisitionCallbackPtr,
-                            IntPtr.Zero);
-                        
-                        if (IBScanUltimateWrapper.IsSuccess(cbResult))
-                        {
-                            Console.WriteLine("[ScannerService] ✓ Complete acquisition callback registered - will fire when AUTO_CAPTURE completes");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"[ScannerService] ⚠️ Complete acquisition callback registration returned: {cbResult}");
-                        }
+
                     }
                     catch (Exception cbEx)
                     {
@@ -369,14 +338,11 @@ namespace officialApp.Services.Scanner
                     _isDeviceOpen = false;
                     _deviceHandle = -1;
                     _isCaptureActive = false;
-                    _captureStartTime = DateTime.MinValue;  // Reset timeout
                     
                     // Clear cached function pointers
                     _previewCallbackPtr = IntPtr.Zero;
                     _resultCallbackPtr = IntPtr.Zero;
-                    _deviceCountCallbackPtr = IntPtr.Zero;
                     _fingerQualityCallbackPtr = IntPtr.Zero;
-                    _completeAcquisitionCallbackPtr = IntPtr.Zero;
                     
                     Console.WriteLine("[ScannerService] ✓ Device closed successfully");
                     return true;
@@ -388,12 +354,9 @@ namespace officialApp.Services.Scanner
                     _isDeviceOpen = false;
                     _deviceHandle = -1;
                     _isCaptureActive = false;
-                    _captureStartTime = DateTime.MinValue;  // Reset timeout
                     _previewCallbackPtr = IntPtr.Zero;
                     _resultCallbackPtr = IntPtr.Zero;
-                    _deviceCountCallbackPtr = IntPtr.Zero;
                     _fingerQualityCallbackPtr = IntPtr.Zero;
-                    _completeAcquisitionCallbackPtr = IntPtr.Zero;
                     return true; // Treat as success anyway
                 }
             }
@@ -447,24 +410,10 @@ namespace officialApp.Services.Scanner
 
             try
             {
-                // Reset frame counter and preview flag for new capture session
-                _previewFrameCount = 0;
-                _hasReceivedPreviewFrame = false;
                 _captureCompleted = false;  // Reset capture completion flag
                 
                 Console.WriteLine($"[ScannerService] Attempting to start capture with device handle: {_deviceHandle}, imageType: {imageType}");
                 Console.WriteLine("[ScannerService] Waiting for finger placement and quality validation...");
-                Console.WriteLine($"[ScannerService] ⏰ Timeout set to {CAPTURE_TIMEOUT_SECONDS} seconds");
-                
-                // Start timeout clock
-                // NOTE: Do NOT use watchdog timer with AUTO_CAPTURE
-                // AUTO_CAPTURE auto-completes when quality is good
-                // Watchdog would break quality accumulation by restarting capture repeatedly
-                _captureStartTime = DateTime.Now;
-                _lastFrameTime = DateTime.Now;
-                
-                Console.WriteLine("[ScannerService] ✓ Frame watchdog timer disabled for AUTO_CAPTURE");
-                Console.WriteLine("[ScannerService] AUTO_CAPTURE will auto-complete when quality is sufficient");
                 
                 // Use AUTO_CONTRAST + AUTO_CAPTURE for proper auto-completion
                 // AUTO_CONTRAST: Automatically adjusts image contrast for better quality
@@ -482,14 +431,12 @@ namespace officialApp.Services.Scanner
                 if (IBScanUltimateWrapper.IsSuccess(result))
                 {
                     _isCaptureActive = true;
-                    Console.WriteLine("[ScannerService] ✓ Fingerprint capture started - watchdog will keep capture alive");
+                    Console.WriteLine("[ScannerService] ✓ Fingerprint capture started");
                     Console.WriteLine("[ScannerService] ⏳ Waiting for fingerprint...");
                     return true;
                 }
                 else
                 {
-                    _frameWatchdogTimer?.Dispose();
-                    _frameWatchdogTimer = null;
                     RaiseError($"Failed to start capture with status: {result}");
                     return false;
                 }
@@ -508,15 +455,11 @@ namespace officialApp.Services.Scanner
 
             try
             {
-                // Watchdog timer is not used with AUTO_CAPTURE (already null)
-                // AUTO_CAPTURE auto-completes on its own when quality is good
-                
                 int result = IBScanUltimateWrapper.IBSU_CancelCaptureImage(_deviceHandle);
 
                 if (IBScanUltimateWrapper.IsSuccess(result))
                 {
                     _isCaptureActive = false;
-                    _captureStartTime = DateTime.MinValue;  // Reset timeout
                     Console.WriteLine("[ScannerService] ✓ Fingerprint capture stopped");
                     return true;
                 }
@@ -608,6 +551,77 @@ namespace officialApp.Services.Scanner
             }
         }
 
+        /// <summary>
+        /// <summary>
+        /// Saves the captured fingerprint image to the Assets folder for debugging/verification
+        /// Windows only (System.Drawing is Windows-only)
+        /// </summary>
+        private void SaveCapturedImageToAssets(byte[] imageData, uint width, uint height, int bitsPerPixel, int qualityScore)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Console.WriteLine($"[ScannerService] ⚠️ SaveCapturedImageToAssets skipped - Windows only");
+                return;
+            }
+
+            try
+            {
+                // Get the project's Assets directory
+                string assetsPath = Path.Combine(
+                    AppContext.BaseDirectory,
+                    "..",
+                    "..",
+                    "..",
+                    "Assets"
+                );
+
+                // Ensure directory exists
+                if (!Directory.Exists(assetsPath))
+                {
+                    Directory.CreateDirectory(assetsPath);
+                    Console.WriteLine($"[ScannerService] Created Assets directory: {assetsPath}");
+                }
+
+                // Generate unique filename with timestamp
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
+                string filename = $"fingerprint_{timestamp}_Q{qualityScore}.png";
+                string filepath = Path.Combine(assetsPath, filename);
+
+                // Create bitmap from grayscale data
+#pragma warning disable CA1416
+                using (Bitmap bitmap = new Bitmap((int)width, (int)height, PixelFormat.Format8bppIndexed))
+                {
+                    // Set up grayscale color palette
+                    ColorPalette palette = bitmap.Palette;
+                    for (int i = 0; i < 256; i++)
+                    {
+                        palette.Entries[i] = Color.FromArgb(i, i, i);
+                    }
+                    bitmap.Palette = palette;
+
+                    // Copy image data to bitmap
+                    BitmapData bitmapData = bitmap.LockBits(
+                        new Rectangle(0, 0, (int)width, (int)height),
+                        ImageLockMode.WriteOnly,
+                        PixelFormat.Format8bppIndexed);
+
+                    // Copy the raw image data to the bitmap
+                    Marshal.Copy(imageData, 0, bitmapData.Scan0, imageData.Length);
+                    bitmap.UnlockBits(bitmapData);
+
+                    // Save as PNG
+                    bitmap.Save(filepath, ImageFormat.Png);
+                    Console.WriteLine($"[ScannerService] ✓ Captured fingerprint saved to: {filepath}");
+                }
+#pragma warning restore CA1416
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ScannerService] ⚠️ Error saving captured image: {ex.Message}");
+                Console.WriteLine($"[ScannerService] Stack trace: {ex.StackTrace}");
+            }
+        }
+
         #endregion
 
         #region Spoof Detection
@@ -688,15 +702,8 @@ namespace officialApp.Services.Scanner
                         return;
                     }
                 }
-                _previewFrameCount++;
-                _hasReceivedPreviewFrame = true;  // Flag that preview is working
                 
-                // Log every frame in first 5, then every 10 to avoid spam
-                bool shouldLog = _previewFrameCount <= 5 || _previewFrameCount % 10 == 0;
-                if (shouldLog)
-                {
-                    Console.WriteLine($"[ScannerService] ✓ [Preview Frame #{_previewFrameCount}] Buffer: {(imageData.Buffer != IntPtr.Zero ? "valid" : "NULL")}, Size: {imageData.Width}x{imageData.Height}");
-                }
+                Console.WriteLine($"[ScannerService] ✓ [Preview] Buffer: {(imageData.Buffer != IntPtr.Zero ? "valid" : "NULL")}, Size: {imageData.Width}x{imageData.Height}");
                 
                 // Compute quality using the image buffer when available
                 int qualityScore = 0;
@@ -733,10 +740,7 @@ namespace officialApp.Services.Scanner
                             if (IBScanUltimateWrapper.IsSuccess(nfiqResult))
                             {
                                 nfiqIsValid = true;
-                                if (_previewFrameCount % 10 == 0)
-                                {
-                                    Console.WriteLine($"[ScannerService] Preview: NFIQ Quality = {nfiqQualityScore}%");
-                                }
+                                Console.WriteLine($"[ScannerService] Preview: NFIQ Quality = {nfiqQualityScore}%");
                             }
                             else
                             {
@@ -753,17 +757,14 @@ namespace officialApp.Services.Scanner
                         
                         // Use NFIQ if available, otherwise use histogram quality
                         qualityScore = nfiqIsValid ? nfiqQualityScore : (int)histogramQuality;
-                        if (shouldLog)
-                        {
-                            Console.WriteLine($"[ScannerService] Preview quality: {qualityScore}%");
-                        }
+                        Console.WriteLine($"[ScannerService] Preview quality: {qualityScore}%");
                     }
                 }
                 else
                 {
                     // Even if buffer is invalid, use NFIQ if available
                     qualityScore = nfiqIsValid ? nfiqQualityScore : 0;
-                    Console.WriteLine($"[ScannerService] ⚠️ [Preview Frame #{_previewFrameCount}] Invalid image buffer");
+                    Console.WriteLine($"[ScannerService] ⚠️ Invalid image buffer");
                 }
 
                 // ALWAYS fire the event with quality score, even if image is invalid
@@ -781,11 +782,7 @@ namespace officialApp.Services.Scanner
                 };
 
                 PreviewImageAvailable?.Invoke(this, args);
-                
-                if (shouldLog)
-                {
-                    Console.WriteLine($"[ScannerService] ✓ Preview event fired - Frame #{_previewFrameCount}");
-                }
+                Console.WriteLine($"[ScannerService] ✓ Preview event fired");
             }
             catch (Exception ex)
             {
@@ -823,9 +820,6 @@ namespace officialApp.Services.Scanner
                     Console.WriteLine("[ScannerService] ❌ Result callback: imageData struct is default/empty");
                     return;
                 }
-                
-                // Track frame time immediately for watchdog monitoring
-                _lastFrameTime = DateTime.Now;
                 
                 Console.WriteLine($"[ScannerService] Result callback invoked - deviceHandle: {deviceHandle}");
                 
@@ -966,6 +960,10 @@ namespace officialApp.Services.Scanner
                             {
                                 FingerprintCaptured?.Invoke(this, args);
                                 Console.WriteLine("[ScannerService] ✓ FingerprintCaptured event invoked successfully");
+                                
+                                // Save the captured image to Assets folder for debugging/verification
+                                // COMMENTED OUT FOR NOW - will re-enable once database retrieval is implemented
+                                // SaveCapturedImageToAssets(imageBuffer, imageData.Width, imageData.Height, imageData.BitsPerPixel, qualityScore);
                             }
                             catch (Exception invokeEx)
                             {
@@ -1004,10 +1002,7 @@ namespace officialApp.Services.Scanner
             }
         }
 
-        private void OnDeviceCountChanged(int deviceCount, IntPtr pContext)
-        {
-            Console.WriteLine($"[ScannerService] Device count changed: {deviceCount}");
-        }
+
 
         private void OnFingerQualityUpdate(int deviceHandle, IntPtr pContext, IntPtr pQualityArray, int qualityArrayCount)
         {
@@ -1071,57 +1066,6 @@ namespace officialApp.Services.Scanner
             }
         }
 
-        private void OnCompleteAcquisition(int deviceHandle, IntPtr pContext, int imageType)
-        {
-            try
-            {
-                if (deviceHandle < 0)
-                {
-                    Console.WriteLine("[ScannerService] ⚠️ OnCompleteAcquisition: Invalid device handle");
-                    return;
-                }
-
-                if (!_isDeviceOpen)
-                {
-                    Console.WriteLine("[ScannerService] ⚠️ OnCompleteAcquisition: Device not open");
-                    return;
-                }
-
-                // Set completion flag SAFELY with thread-safety lock
-                lock (this)
-                {
-                    _captureCompleted = true;  // Signal that capture is done
-                }
-                
-                Console.WriteLine($"[ScannerService] ✓✓ COMPLETE_ACQUISITION callback fired! (imageType={imageType})");
-                Console.WriteLine($"[ScannerService] AUTO_CAPTURE has finished - capture is now complete");
-                Console.WriteLine($"[ScannerService] IsFinal should now be True in the result image callback");
-                Console.WriteLine($"[ScannerService] Waiting for result callback with IsFinal=true...");
-                
-                // The COMPLETE_ACQUISITION event signals that AUTO_CAPTURE finished successfully
-                // The result image should now have IsFinal=true and contain the final fingerprint
-                // The result callback will fire next with IsFinal=true
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ScannerService] ⚠️ Error in complete acquisition callback: {ex.GetType().Name}: {ex.Message}");
-                Console.WriteLine($"[ScannerService] Stack: {ex.StackTrace}");
-                RaiseError($"Error in complete acquisition callback: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Watchdog timer callback - DISABLED for AUTO_CAPTURE mode
-        /// AUTO_CAPTURE doesn't need watchdog; it auto-completes when quality is good
-        /// Watchdog caused quality accumulation to fail by restarting capture repeatedly
-        /// </summary>
-        private void FrameWatchdogCallback(object? state)
-        {
-            // DO NOT USE with AUTO_CAPTURE - watching for motion stops and restarting
-            // would break the quality accumulation and prevent capture completion
-            return;
-        }
-
         #endregion
 
         #region Error Handling
@@ -1131,16 +1075,6 @@ namespace officialApp.Services.Scanner
             Console.WriteLine($"[ScannerService] ❌ ERROR: {errorMessage}");
             ErrorOccurred?.Invoke(this, errorMessage);
         }
-
-        #endregion
-
-        #region Template Extraction
-
-        /// <summary>
-        /// Extracts ISO/ANSI fingerprint template from captured image buffer.
-        /// Called from result callback with the actual image data.
-        /// </summary>
-
 
         #endregion
 
@@ -1159,10 +1093,6 @@ namespace officialApp.Services.Scanner
 
             if (disposing)
             {
-                // Stop watchdog timer first
-                _frameWatchdogTimer?.Dispose();
-                _frameWatchdogTimer = null;
-                
                 // Close device if open
                 if (_isDeviceOpen)
                 {

@@ -38,6 +38,7 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\appsettings.Development.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\appsettings.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\appsettings.Production.json
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\FingerprintAlgorithum\FingerprintComparer.deps.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\publish\appsettings.Development.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\publish\appsettings.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\publish\appsettings.Production.json
@@ -137,6 +138,13 @@ C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\tr\Microsoft.CodeAnalysis.Workspaces.resources.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\zh-Hans\Microsoft.CodeAnalysis.Workspaces.resources.dll
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\zh-Hant\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\Dahomey.Cbor.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\FingerprintComparer.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\SixLabors.ImageSharp.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\SourceAFIS.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\FingerprintComparer.pdb
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\SourceAFIS.pdb
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Debug\net8.0\SourceAFIS.xml
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\obj\Debug\net8.0\Server.csproj.AssemblyReference.cache
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\obj\Debug\net8.0\rpswa.dswa.cache.json
 C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\obj\Debug\net8.0\Server.GeneratedMSBuildEditorConfig.editorconfig
