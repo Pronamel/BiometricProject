@@ -11,7 +11,7 @@ public interface IApiService
     Task<OfficialLoginResponse?> LoginAsync(string username, string password);
     bool IsAuthenticated { get; }
     string? CurrentOfficialId { get; }
-    void Logout();
+    Task<bool> LogoutAsync();
     
     // Connection & Device Management
     Task<bool> TestConnectionAsync();
@@ -35,8 +35,8 @@ public interface IApiService
     
     // Fingerprint Management
     Task<bool> UploadOfficialFingerprintAsync(string username, string password, byte[] fingerprintData);
-    Task<bool> CreateOfficialWithFingerprintAsync(string username, string password, byte[] fingerprintData);
     Task<bool> CreateVoterWithFingerprintAsync(
+        string nationalInsuranceNumber,
         string firstName,
         string lastName,
         string dateOfBirth,
@@ -46,4 +46,13 @@ public interface IApiService
         string county,
         string constituency,
         byte[] fingerprintData);
+    Task<bool> CreateOfficialWithFingerprintAsync(
+        string username,
+        string password,
+        string assignedPollingStationId,
+        string assignedCountyId,
+        byte[] fingerprintData);
+    
+    // Polling Stations
+    Task<List<PollingStationOption>?> GetAllPollingStationsAsync();
 }

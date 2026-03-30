@@ -596,9 +596,9 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void SignOut()
+    private async Task SignOut()
     {
-        _apiService.Logout();
+        await _apiService.LogoutAsync();
         _navigationService.NavigateToOfficialLogin();
     }
 

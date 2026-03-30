@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -20,6 +21,9 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool isCreateOfficialMode = false;
+
+    [ObservableProperty]
+    private string nationalInsuranceNumber = string.Empty;
 
     [ObservableProperty]
     private string firstName = string.Empty;
@@ -47,6 +51,9 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
     [ObservableProperty]
     private string officialUsername = string.Empty;
+
+    [ObservableProperty]
+    private string selectedPollingStation = string.Empty;
 
     [ObservableProperty]
     private string password = string.Empty;
@@ -81,6 +88,17 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
     public List<string> CountyOptions => UKCounties.Counties;
     public List<string> ConstituencyOptions => UKConstituencies.Constituencies;
+    
+    // Polling stations - store full objects internally
+    private List<PollingStationOption> _allPollingStations = new List<PollingStationOption>();
+    
+    // Polling station options list - display strings for UI
+    private List<string> _pollingStationOptions = new List<string>();
+    public List<string> PollingStationOptions 
+    { 
+        get => _pollingStationOptions;
+        set => SetProperty(ref _pollingStationOptions, value);
+    }
 
     private byte[]? _capturedFingerprintData = null;
     private uint _capturedFingerprintWidth = 0;
@@ -93,6 +111,81 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         _apiService = apiService;
         _scannerService = scannerService;
         CheckScannerConnectivity();
+        
+        // Pre-fill form with test data for fingerprint scanning
+        PopulateTestData();
+    }
+
+    private void PopulateTestData()
+    {
+        // Fixed test data for consistent database testing
+        FirstName = "TestVoter";
+        LastName = "BiometricTest";
+        NationalInsuranceNumber = "AB123456C";
+        DateOfBirth = "15/05/1985";
+        AddressLine1 = "123 Test Street";
+        AddressLine2 = "Flat 5";
+        PostCode = "SW1A 1AA";
+        
+        // Select first available county and constituency if available
+        if (UKCounties.Counties.Count > 0)
+        {
+            SelectedCounty = UKCounties.Counties[0];
+        }
+        
+        if (UKConstituencies.Constituencies.Count > 0)
+        {
+            SelectedConstituency = UKConstituencies.Constituencies[0];
+        }
+    }
+
+    private async Task LoadPollingStations()
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 Fetching polling stations from server...");
+            StatusMessage = "Loading polling stations...";
+            StatusColor = "black";
+            
+            var pollingStations = await _apiService.GetAllPollingStationsAsync();
+            
+            if (pollingStations != null && pollingStations.Count > 0)
+            {
+                // Store full objects internally for later lookup
+                _allPollingStations = pollingStations;
+                
+                // Convert to display format (Code - County - Constituency)
+                var options = pollingStations
+                    .Select((ps, index) => $"{ps.DisplayName}")
+                    .ToList();
+                
+                PollingStationOptions = options;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Loaded {options.Count} polling stations");
+                
+                // Auto-select first option if available
+                if (options.Count > 0)
+                {
+                    SelectedPollingStation = options[0];
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Auto-selected: {SelectedPollingStation}");
+                }
+                
+                StatusMessage = "";
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  No polling stations returned from server");
+                PollingStationOptions = new List<string> { "No stations available" };
+                StatusMessage = "No polling stations available";
+                StatusColor = "#e67e22";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error loading polling stations: {ex.Message}");
+            PollingStationOptions = new List<string> { $"Error: {ex.Message}" };
+            StatusMessage = $"Error: {ex.Message}";
+            StatusColor = "#e74c3c";
+        }
     }
 
     [RelayCommand]
@@ -104,11 +197,14 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void SwitchToCreateOfficialMode()
+    private async Task SwitchToCreateOfficialMode()
     {
+        // Load polling stations when user clicks Create Official button
+        await LoadPollingStations();
+        
+        // Switch to official mode after loading
         IsCreateOfficialMode = true;
         IsCreateVoterMode = false;
-        StatusMessage = string.Empty;
     }
 
     [RelayCommand]
@@ -127,6 +223,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         {
             if (string.IsNullOrWhiteSpace(FirstName) ||
                 string.IsNullOrWhiteSpace(LastName) ||
+                string.IsNullOrWhiteSpace(NationalInsuranceNumber) ||
                 string.IsNullOrWhiteSpace(DateOfBirth) ||
                 string.IsNullOrWhiteSpace(AddressLine1) ||
                 string.IsNullOrWhiteSpace(PostCode) ||
@@ -146,6 +243,13 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 StatusColor = "#e74c3c";
                 return;
             }
+
+            if (string.IsNullOrWhiteSpace(SelectedPollingStation))
+            {
+                StatusMessage = "Please select a polling station";
+                StatusColor = "#e74c3c";
+                return;
+            }
         }
 
         try
@@ -159,6 +263,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
             bool submitSuccess = IsCreateVoterMode
                 ? await _apiService.CreateVoterWithFingerprintAsync(
+                    NationalInsuranceNumber,
                     FirstName,
                     LastName,
                     DateOfBirth,
@@ -168,10 +273,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                     SelectedCounty,
                     SelectedConstituency,
                     pngFingerprintData)
-                : await _apiService.CreateOfficialWithFingerprintAsync(
-                    OfficialUsername,
-                    Password,
-                    pngFingerprintData);
+                : await CreateOfficialWithPollingStation(pngFingerprintData);
 
             if (submitSuccess)
             {
@@ -200,6 +302,61 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         }
     }
 
+    private async Task<bool> CreateOfficialWithPollingStation(byte[] fingerprintData)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(SelectedPollingStation) || _allPollingStations.Count == 0)
+            {
+                StatusMessage = "No polling station selected";
+                StatusColor = "#e74c3c";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No polling station selected");
+                return false;
+            }
+
+            // Find the selected polling station by display name
+            var selectedStation = _allPollingStations
+                .FirstOrDefault(ps => ps.DisplayName == SelectedPollingStation);
+
+            if (selectedStation == null)
+            {
+                StatusMessage = "Selected polling station not found";
+                StatusColor = "#e74c3c";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Selected polling station not found: {SelectedPollingStation}");
+                return false;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🏛️  Creating official with polling station:");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Station ID: {selectedStation.PollingStationId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {selectedStation.County}");
+
+            if (string.IsNullOrWhiteSpace(selectedStation.County))
+            {
+                StatusMessage = "Selected polling station has no county assigned";
+                StatusColor = "#e74c3c";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ County is not assigned to polling station");
+                return false;
+            }
+
+            // Call the API with extracted polling station data
+            bool result = await _apiService.CreateOfficialWithFingerprintAsync(
+                OfficialUsername,
+                Password,
+                selectedStation.PollingStationId.ToString(),
+                selectedStation.County,
+                fingerprintData);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error creating official: {ex.Message}";
+            StatusColor = "#e74c3c";
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Exception in CreateOfficialWithPollingStation: {ex.Message}");
+            return false;
+        }
+    }
+
     [RelayCommand]
     private void Cancel()
     {
@@ -208,6 +365,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
     private void ClearForm()
     {
+        NationalInsuranceNumber = string.Empty;
         FirstName = string.Empty;
         LastName = string.Empty;
         DateOfBirth = string.Empty;
@@ -219,11 +377,12 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
         OfficialUsername = string.Empty;
         Password = string.Empty;
-
-        PreviewImage = null;
+        SelectedPollingStation = string.Empty;
+        
         _capturedFingerprintData = null;
-        QualityScore = 0;
-        CaptureStatusMessage = "Ready to scan";
+        PreviewImage = null;
+        StatusMessage = "Ready for next entry";
+        StatusColor = "black";
     }
 
     // ==========================================
@@ -370,12 +529,6 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             if (args.IsSuccess)
             {
                 _capturedFingerprintData = args.ImageData;
-                
-                // Save fingerprint as PNG
-                if (args.ImageData != null)
-                {
-                    SaveFingerprintAsPng(args.ImageData, args.Width, args.Height);
-                }
             }
 
             Dispatcher.UIThread.InvokeAsync(() =>
@@ -563,57 +716,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         }
     }
 
-    private void SaveFingerprintAsPng(byte[] grayscaleData, uint width, uint height)
-    {
-        try
-        {
-            if (!OperatingSystem.IsWindows())
-            {
-                Console.WriteLine("[OfficialAddVoterViewModel] ❌ PNG saving is Windows only");
-                return;
-            }
 
-            Console.WriteLine($"[OfficialAddVoterViewModel] Saving fingerprint as PNG ({width}x{height})...");
-
-#pragma warning disable CA1416
-            using (var bitmap = new System.Drawing.Bitmap((int)width, (int)height, System.Drawing.Imaging.PixelFormat.Format8bppIndexed))
-            {
-                var palette = bitmap.Palette;
-                for (int i = 0; i < 256; i++)
-                {
-                    palette.Entries[i] = System.Drawing.Color.FromArgb(i, i, i);
-                }
-                bitmap.Palette = palette;
-
-                var rect = new System.Drawing.Rectangle(0, 0, (int)width, (int)height);
-                var bitmapData = bitmap.LockBits(rect, System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format8bppIndexed);
-                
-                try
-                {
-                    System.Runtime.InteropServices.Marshal.Copy(grayscaleData, 0, bitmapData.Scan0, grayscaleData.Length);
-                }
-                finally
-                {
-                    bitmap.UnlockBits(bitmapData);
-                }
-
-                string fingerprintDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BiometricVoting", "Fingerprints");
-                Directory.CreateDirectory(fingerprintDir);
-
-                string fileName = $"fingerprint_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.png";
-                string filePath = Path.Combine(fingerprintDir, fileName);
-                
-                bitmap.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
-                Console.WriteLine($"[OfficialAddVoterViewModel] ✓ Fingerprint saved to: {filePath}");
-            }
-#pragma warning restore CA1416
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[OfficialAddVoterViewModel] ❌ Error saving fingerprint as PNG: {ex.Message}");
-            Console.WriteLine($"[OfficialAddVoterViewModel] Stack: {ex.StackTrace}");
-        }
-    }
 
     [RelayCommand]
     private void TestPreviewImage()

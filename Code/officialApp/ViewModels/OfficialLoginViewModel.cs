@@ -104,6 +104,11 @@ public partial class OfficialLoginViewModel : ViewModelBase
                 // Pass credentials to the authenticate view before navigating
                 _navigationService.NavigateToOfficialAuthenticate(Username, Password);
             }
+            else if (loginResponse != null && loginResponse.Code == "ALREADY_LOGGED_IN")
+            {
+                LoginStatus = "❌ Login rejected - User Already Logged In";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Login rejected for {Username} - account already logged in elsewhere");
+            }
             else
             {
                 LoginStatus = "❌ Invalid username or password";

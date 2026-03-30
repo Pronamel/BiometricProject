@@ -50,7 +50,7 @@ public class VoterService
             var constituencyRequests = countyDict.GetOrAdd(constituency, _ => new ConcurrentBag<string>());
             constituencyRequests.Add(requestMessage);
 
-            var countyConnDict = _countyActiveConnections.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>?>());
+            var countyConnDict = _countyActiveConnections.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>());
             var constituencyConnDict = countyConnDict.GetOrAdd(constituency, _ => new ConcurrentDictionary<string, TaskCompletionSource<List<string>>>());
 
             // Send to all officials currently registered in the channel

@@ -108,9 +108,6 @@ var activeOfficials = new ConcurrentDictionary<string, (string OfficialId, strin
 // Official polling station hashes: OfficialId -> (County, Constituency, HashedCode)
 var officialPollingStationHashes = new ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)>();
 
-// Voter ID assignment counter
-var voterIdCounter = 0;
-
 //===========================================
 // SERVICE REGISTRATION
 //===========================================
@@ -123,7 +120,16 @@ builder.Services.AddSingleton(activeOfficials);
 builder.Services.AddSingleton(officialPollingStationHashes);
 builder.Services.AddSingleton(tokenCounter);
 builder.Services.AddSingleton<VoterService>();
-builder.Services.AddSingleton<OfficialService>();
+builder.Services.AddSingleton(serviceProvider =>
+    new OfficialService(
+        serviceProvider.GetRequiredService<ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>>>(),
+        serviceProvider.GetRequiredService<ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>>>(),
+        serviceProvider.GetRequiredService<ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>>>(),
+        serviceProvider.GetRequiredService<ConcurrentDictionary<string, DateTime>>(),
+        serviceProvider.GetRequiredService<ConcurrentDictionary<string, (string, string, string, DateTime, List<int>)>>(),
+        serviceProvider.GetRequiredService<ApplicationDbContext>()
+    )
+);
 builder.Services.AddScoped<DatabaseService>();
 
 //===========================================
@@ -339,7 +345,7 @@ var summaries = new[]
 // API ENDPOINTS - AUTHENTICATION
 //===========================================
 // gets login from database and checks if official exists with those credentials, then generates JWT token with station and official info
-app.MapPost("/auth/official-login", async (OfficialLoginRequest request, DatabaseService dbService, TokenCounter counter, 
+app.MapPost("/auth/official-login", async (OfficialLoginRequest request, DatabaseService dbService, TokenCounter counter, OfficialService officialService,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
     ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes) =>
 {
@@ -354,6 +360,19 @@ app.MapPost("/auth/official-login", async (OfficialLoginRequest request, Databas
         return Results.Unauthorized();
     }
     
+    // Check if official is already logged in
+    var officialId = official.OfficialId.ToString();
+    if (officialService.IsOfficialAlreadyLoggedIn(officialId))
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Login REJECTED - Official {officialId} is already logged in elsewhere");
+        return Results.Conflict(new { 
+            success = false, 
+            message = "This account is currently active on another device or location. Only one device can be logged in per account at a time. Please have the other user logout first, or contact your administrator if you believe this is an error.",
+            code = "ALREADY_LOGGED_IN",
+            details = "Account session conflict: concurrent login not allowed"
+        });
+    }
+    
     if (official.AssignedPollingStation == null)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No polling station assigned for {request.Username}");
@@ -364,16 +383,16 @@ app.MapPost("/auth/official-login", async (OfficialLoginRequest request, Databas
     var county = pollingStation.County ?? "Unknown";
     var constituency = pollingStation.Constituency?.Name ?? "Unknown";
     var stationId = pollingStation.PollingStationId.ToString();
-    var systemCode = $"OFF-{pollingStation.PollingStationCode}";
+    var pollingStationCode = pollingStation.PollingStationCode ?? "Unknown";
+    var systemCode = $"OFF-{pollingStationCode}";
     var uniqueTokenId = counter.GetNextId();
-    var officialId = official.OfficialId.ToString();
     
     // Store the hashed polling station code with county/constituency (direct from DB - NO re-hashing)
-    officialPollingStationHashes[officialId] = (county, constituency, pollingStation.PollingStationCode);
+    officialPollingStationHashes[officialId] = (county, constituency, pollingStationCode);
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Stored polling station hash for official {officialId}:");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {county}");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {constituency}");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Hash (length {pollingStation.PollingStationCode.Length}): {pollingStation.PollingStationCode}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Hash (length {pollingStationCode.Length}): {pollingStationCode}");
     
     // Register this official system with their code (already hashed from DB)
     var systemKey = $"{county}_{systemCode}_{officialId}";
@@ -407,6 +426,115 @@ app.MapPost("/auth/official-login", async (OfficialLoginRequest request, Databas
     });
 })
 .WithName("OfficialLogin");
+
+// ============================================
+// OFFICIAL LOGOUT ENDPOINT
+// ============================================
+// Removes official from all channels and clears session data
+app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
+    ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes,
+    ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> countyActiveConnections,
+    ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>> countyVoteChannels) =>
+{
+    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
+    var county = user.FindFirst("county")?.Value;
+    var constituency = user.FindFirst("constituency")?.Value;
+    var systemCode = user.FindFirst("systemCode")?.Value;
+    
+    if (string.IsNullOrEmpty(officialId))
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Logout failed: Official ID not found in token");
+        return Results.BadRequest(new { success = false, message = "Official ID not found in token" });
+    }
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} logging out from {county}/{constituency}");
+    
+    var removalSummary = new Dictionary<string, bool>();
+    
+    // 1. Remove from activeOfficials dictionary
+    if (!string.IsNullOrEmpty(county) && !string.IsNullOrEmpty(systemCode))
+    {
+        var systemKey = $"{county}_{systemCode}_{officialId}";
+        var removed = activeOfficials.TryRemove(systemKey, out _);
+        removalSummary["activeOfficials"] = removed;
+        
+        if (removed)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Removed official {officialId} from activeOfficials");
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Official {officialId} not found in activeOfficials");
+        }
+    }
+    
+    // 2. Remove from officialPollingStationHashes dictionary
+    var hashRemoved = officialPollingStationHashes.TryRemove(officialId, out _);
+    removalSummary["pollingStationHashes"] = hashRemoved;
+    
+    if (hashRemoved)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Removed polling station hash for official {officialId}");
+    }
+    else
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Polling station hash not found for official {officialId}");
+    }
+    
+    // 3. Remove from countyActiveConnections (if they're currently waiting for requests)
+    var connRemoved = false;
+    if (!string.IsNullOrEmpty(county) && !string.IsNullOrEmpty(constituency))
+    {
+        if (countyActiveConnections.TryGetValue(county, out var constituencyDict))
+        {
+            if (constituencyDict.TryGetValue(constituency, out var officialConnections))
+            {
+                connRemoved = officialConnections.TryRemove(officialId, out _);
+            }
+        }
+    }
+    removalSummary["activeConnections"] = connRemoved;
+    
+    if (connRemoved)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Removed official {officialId} from active connections in {county}/{constituency}");
+    }
+    else
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Official {officialId} not in active connections");
+    }
+    
+    // 4. Clear their personal vote queue
+    var queueRemoved = false;
+    if (!string.IsNullOrEmpty(county))
+    {
+        if (countyVoteChannels.TryGetValue(county, out var officialQueues))
+        {
+            queueRemoved = officialQueues.TryRemove(officialId, out _);
+        }
+    }
+    removalSummary["voteQueues"] = queueRemoved;
+    
+    if (queueRemoved)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Cleared vote queue for official {officialId} in {county}");
+    }
+    else
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Vote queue not found for official {officialId}");
+    }
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official {officialId} fully logged out and removed from all channels");
+    
+    return Results.Ok(new { 
+        success = true, 
+        message = $"Official {officialId} successfully logged out",
+        removedFrom = removalSummary
+    });
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialLogout");
 
 
 
@@ -447,6 +575,177 @@ app.MapPost("/auth/voter-session", (VoterSessionRequest request, VoterService vo
     return Results.BadRequest(new { success = false, message = "Invalid voter ID" });
 })
 .WithName("VoterSession");
+
+// Create a voter record in the database from official app input.
+app.MapPost("/api/official/create-voter", async (CreateVoterRequest request, DatabaseService dbService) =>
+{
+    if (string.IsNullOrWhiteSpace(request.FirstName) ||
+        string.IsNullOrWhiteSpace(request.LastName) ||
+        string.IsNullOrWhiteSpace(request.DateOfBirth) ||
+        string.IsNullOrWhiteSpace(request.AddressLine1))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "FirstName, LastName, DateOfBirth, and AddressLine1 are required"
+        });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Constituency) || string.IsNullOrWhiteSpace(request.County))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "County and Constituency are required"
+        });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.FingerPrintScan))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Fingerprint scan is required"
+        });
+    }
+
+    if (!DateTime.TryParse(request.DateOfBirth, out var parsedDateOfBirth))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "DateOfBirth is invalid"
+        });
+    }
+
+    byte[] fingerprintData;
+    try
+    {
+        fingerprintData = Convert.FromBase64String(request.FingerPrintScan);
+    }
+    catch
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "FingerPrintScan must be valid base64"
+        });
+    }
+
+    var result = await dbService.CreateVoterAsync(
+        request.NationalInsuranceNumber,
+        request.FirstName,
+        request.LastName,
+        parsedDateOfBirth,
+        request.AddressLine1,
+        request.AddressLine2,
+        request.PostCode,
+        request.County,
+        request.Constituency,
+        fingerprintData);
+
+    if (!result.Success)
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = result.Message
+        });
+    }
+
+    return Results.Ok(new
+    {
+        success = true,
+        message = result.Message,
+        voterId = result.VoterId,
+        constituency = request.Constituency,
+        county = request.County,
+        registeredDate = DateTime.Now.Date
+    });
+})
+.WithName("CreateVoter");
+
+// Create an official record in the database from official app input.
+app.MapPost("/api/official/create-official", async (CreateOfficialRequest request, DatabaseService dbService) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Username) ||
+        string.IsNullOrWhiteSpace(request.Password))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Username and Password are required"
+        });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.AssignedPollingStationId))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "AssignedPollingStationId is required"
+        });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.FingerPrintScan))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Fingerprint scan is required"
+        });
+    }
+
+    // Parse polling station ID as GUID
+    if (!Guid.TryParse(request.AssignedPollingStationId, out var pollingStationId))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "AssignedPollingStationId must be a valid GUID"
+        });
+    }
+
+    byte[] fingerprintData;
+    try
+    {
+        fingerprintData = Convert.FromBase64String(request.FingerPrintScan);
+    }
+    catch
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "FingerPrintScan must be valid base64"
+        });
+    }
+
+    var result = await dbService.CreateOfficialAsync(
+        request.Username,
+        request.Password,
+        pollingStationId,
+        fingerprintData);
+
+    if (!result.Success)
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = result.Message
+        });
+    }
+
+    return Results.Ok(new
+    {
+        success = true,
+        message = result.Message,
+        officialId = result.OfficialId,
+        username = request.Username,
+        pollingStationId = pollingStationId,
+        createdDate = DateTime.Now.Date
+    });
+})
+.WithName("CreateOfficial");
 
 //===========================================
 // API ENDPOINTS - ACCESS CODE MANAGEMENT
@@ -495,6 +794,11 @@ app.MapPost("/api/official/set-access-code", async (SetAccessCodeRequest request
 })
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialSetAccessCode");
+
+
+
+
+
 
 app.MapPost("/api/voter/verify-access-code", async (VerifyAccessCodeRequest request, 
     [FromServices] ApplicationDbContext dbContext) =>
@@ -909,7 +1213,19 @@ app.MapGet("/api/official/database", async (DatabaseService db) =>
     return Results.Ok(voters);
 })
 .RequireAuthorization(policy => policy.RequireRole("official"))
-.WithName("OfficialDatabaseAccess");
+.WithName("GetAllVoters");
+
+// Fetch all polling stations for dropdown in official creation
+app.MapGet("/api/polling-stations", async (DatabaseService db) =>
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] GET /api/polling-stations - Fetching polling stations for official app");
+    
+    var pollingStations = await db.GetAllPollingStationsAsync();
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Returning {pollingStations.Count} polling stations");
+    return Results.Ok(pollingStations);
+})
+.WithName("GetPollingStations");
 
 //===========================================
 // API ENDPOINTS - OFFICIAL DATA UPDATE
@@ -1201,6 +1517,12 @@ app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, Data
         }
 
         // COMMON FINGERPRINT COMPARISON LOGIC (applies to both official and voter)
+        if (storedFingerprintBytes == null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to retrieve stored fingerprint");
+            return Results.BadRequest(new { success = false, message = "Failed to retrieve stored fingerprint" });
+        }
+
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Decoding scanned fingerprint from base64...");
         byte[] scannedFingerprintBytes = Convert.FromBase64String(request.ScannedFingerprint);
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Scanned fingerprint size: {scannedFingerprintBytes.Length} bytes");
@@ -1292,6 +1614,26 @@ record VoterSessionRequest(
     string VoterId,  // NIN or voter identifier
     string County,
     string Constituency
+);
+
+record CreateVoterRequest(
+    string NationalInsuranceNumber,
+    string FirstName,
+    string LastName,
+    string DateOfBirth,
+    string AddressLine1,
+    string AddressLine2,
+    string PostCode,
+    string County,
+    string Constituency,
+    string FingerPrintScan
+);
+
+record CreateOfficialRequest(
+    string Username,
+    string Password,
+    string AssignedPollingStationId,
+    string FingerPrintScan
 );
 
 record VoterAccessRequest(

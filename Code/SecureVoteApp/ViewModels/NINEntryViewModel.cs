@@ -27,6 +27,15 @@ public partial class NINEntryViewModel : ViewModelBase
 
     // Public properties for compiled bindings
     [ObservableProperty]
+    private string fullName = string.Empty;
+
+    [ObservableProperty]
+    private string dateOfBirth = string.Empty;
+
+    [ObservableProperty]
+    private string nationalInsuranceNumber = string.Empty;
+
+    [ObservableProperty]
     private string blueTextHave = "I don't have a National Insurance Number";
     
     //I do have a National Insurance Number
@@ -47,6 +56,11 @@ public partial class NINEntryViewModel : ViewModelBase
     public NINEntryViewModel(INavigationService navigationService)
     {
         _navigationService = navigationService;
+        
+        // Populate with TestVoter data
+        FullName = "TestVoter BiometricTest";
+        DateOfBirth = "15/05/1985";
+        NationalInsuranceNumber = "AB123456C";
     }
 
 

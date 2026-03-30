@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Server.Data;
@@ -20,6 +21,44 @@ public class DatabaseService
     public async Task<List<Voter>> GetAllVotersAsync()
     {
         return await _dbContext.Voters.ToListAsync();
+    }
+
+    public async Task<List<PollingStationDto>> GetAllPollingStationsAsync()
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Fetching all polling stations for dropdown");
+            
+            var pollingStations = await _dbContext.PollingStations
+                .Include(ps => ps.Constituency)
+                .ToListAsync();
+
+            var pollingStationDtos = pollingStations.Select(ps => new PollingStationDto(
+                ps.PollingStationId,
+                ps.PollingStationCode ?? "Unknown",
+                ps.County ?? "Unknown",
+                ps.Constituency?.Name ?? "Unknown",
+                $"{ps.PollingStationCode} - {ps.County} ({ps.Constituency?.Name})"
+            )).ToList();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found {pollingStationDtos.Count} polling stations");
+            foreach (var ps in pollingStationDtos.Take(5))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - {ps.DisplayName}");
+            }
+            if (pollingStationDtos.Count > 5)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   ... and {pollingStationDtos.Count - 5} more");
+            }
+
+            return pollingStationDtos;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error retrieving polling stations: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return new List<PollingStationDto>();
+        }
     }
 
     public async Task<Official?> GetOfficialByCredentialsAsync(string username, string password)
@@ -140,4 +179,136 @@ public class DatabaseService
             return null;
         }
     }
+
+    public async Task<(bool Success, string Message, Guid? VoterId)> CreateVoterAsync(
+        string nationalInsuranceNumber,
+        string firstName,
+        string lastName,
+        DateTime dateOfBirth,
+        string addressLine1,
+        string? previousAddress,
+        string postCode,
+        string county,
+        string constituencyName,
+        byte[] fingerprintData)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(firstName) ||
+                string.IsNullOrWhiteSpace(lastName) ||
+                string.IsNullOrWhiteSpace(addressLine1) ||
+                string.IsNullOrWhiteSpace(county) ||
+                string.IsNullOrWhiteSpace(constituencyName) ||
+                fingerprintData == null ||
+                fingerprintData.Length == 0)
+            {
+                return (false, "Missing required fields", null);
+            }
+
+            var constituency = await _dbContext.Constituencies
+                .FirstOrDefaultAsync(c => c.Name == constituencyName.Trim());
+
+            if (constituency == null)
+            {
+                return (false, "Constituency name not found", null);
+            }
+
+            var voter = new Voter
+            {
+                NationalId = nationalInsuranceNumber.Trim(),
+                ConstituencyId = constituency.ConstituencyId,
+                FirstName = firstName.Trim(),
+                LastName = lastName.Trim(),
+                DateOfBirth = new DateTime(dateOfBirth.Year, dateOfBirth.Month, dateOfBirth.Day, 0, 0, 0, DateTimeKind.Utc),
+                AddressLine1 = addressLine1.Trim(),
+                PreviousAddress = string.IsNullOrWhiteSpace(previousAddress) ? "NA" : previousAddress.Trim(),
+                Postcode = postCode.Trim(),
+                FingerprintScan = fingerprintData,
+                HasVoted = false,
+                RegisteredDate = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day, 0, 0, 0, DateTimeKind.Utc),
+                County = county.Trim()
+            };
+
+            _dbContext.Voters.Add(voter);
+            await _dbContext.SaveChangesAsync();
+
+            return (true, "Voter created successfully", voter.VoterId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error creating voter: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return (false, "Failed to create voter", null);
+        }
+    }
+
+    public async Task<(bool Success, string Message, Guid? OfficialId)> CreateOfficialAsync(
+        string username,
+        string plainTextPassword,
+        Guid pollingStationId,
+        byte[] fingerprintData)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(username) ||
+                string.IsNullOrWhiteSpace(plainTextPassword) ||
+                fingerprintData == null ||
+                fingerprintData.Length == 0)
+            {
+                return (false, "Missing required fields", null);
+            }
+
+            // Verify polling station exists
+            var pollingStation = await _dbContext.PollingStations
+                .FirstOrDefaultAsync(ps => ps.PollingStationId == pollingStationId);
+
+            if (pollingStation == null)
+            {
+                return (false, "Polling station not found", null);
+            }
+
+            // Hash the password using SHA256
+            using (var sha256 = System.Security.Cryptography.SHA256.Create())
+            {
+                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(plainTextPassword));
+                var passwordHash = Convert.ToBase64String(hashedBytes);
+
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔐 Password hashed with SHA256 for official: {username}");
+
+                var official = new Official
+                {
+                    OfficialId = Guid.NewGuid(),
+                    Username = username.Trim(),
+                    PasswordHash = passwordHash,
+                    LastLogin = null,
+                    AssignedPollingStationId = pollingStationId,
+                    FingerPrintScan = fingerprintData
+                };
+
+                _dbContext.Officials.Add(official);
+                await _dbContext.SaveChangesAsync();
+
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official created successfully: {username}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Official ID: {official.OfficialId}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Polling Station: {pollingStation.PollingStationCode} ({pollingStation.County})");
+
+                return (true, "Official created successfully", official.OfficialId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error creating official: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return (false, "Failed to create official", null);
+        }
+    }
 }
+
+// DTO for polling stations response
+public record PollingStationDto(
+    Guid PollingStationId,
+    string Code,
+    string County,
+    string Constituency,
+    string DisplayName
+);

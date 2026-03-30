@@ -551,76 +551,7 @@ namespace SecureVoteApp.Services.Scanner
             }
         }
 
-        /// <summary>
-        /// <summary>
-        /// Saves the captured fingerprint image to the Assets folder for debugging/verification
-        /// Windows only (System.Drawing is Windows-only)
-        /// </summary>
-        private void SaveCapturedImageToAssets(byte[] imageData, uint width, uint height, int bitsPerPixel, int qualityScore)
-        {
-            if (!OperatingSystem.IsWindows())
-            {
-                Console.WriteLine($"[ScannerService] ⚠️ SaveCapturedImageToAssets skipped - Windows only");
-                return;
-            }
 
-            try
-            {
-                // Get the project's Assets directory
-                string assetsPath = Path.Combine(
-                    AppContext.BaseDirectory,
-                    "..",
-                    "..",
-                    "..",
-                    "Assets"
-                );
-
-                // Ensure directory exists
-                if (!Directory.Exists(assetsPath))
-                {
-                    Directory.CreateDirectory(assetsPath);
-                    Console.WriteLine($"[ScannerService] Created Assets directory: {assetsPath}");
-                }
-
-                // Generate unique filename with timestamp
-                string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");
-                string filename = $"fingerprint_{timestamp}_Q{qualityScore}.png";
-                string filepath = Path.Combine(assetsPath, filename);
-
-                // Create bitmap from grayscale data
-#pragma warning disable CA1416
-                using (Bitmap bitmap = new Bitmap((int)width, (int)height, PixelFormat.Format8bppIndexed))
-                {
-                    // Set up grayscale color palette
-                    ColorPalette palette = bitmap.Palette;
-                    for (int i = 0; i < 256; i++)
-                    {
-                        palette.Entries[i] = Color.FromArgb(i, i, i);
-                    }
-                    bitmap.Palette = palette;
-
-                    // Copy image data to bitmap
-                    BitmapData bitmapData = bitmap.LockBits(
-                        new Rectangle(0, 0, (int)width, (int)height),
-                        ImageLockMode.WriteOnly,
-                        PixelFormat.Format8bppIndexed);
-
-                    // Copy the raw image data to the bitmap
-                    Marshal.Copy(imageData, 0, bitmapData.Scan0, imageData.Length);
-                    bitmap.UnlockBits(bitmapData);
-
-                    // Save as PNG
-                    bitmap.Save(filepath, ImageFormat.Png);
-                    Console.WriteLine($"[ScannerService] ✓ Captured fingerprint saved to: {filepath}");
-                }
-#pragma warning restore CA1416
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ScannerService] ⚠️ Error saving captured image: {ex.Message}");
-                Console.WriteLine($"[ScannerService] Stack trace: {ex.StackTrace}");
-            }
-        }
 
         #endregion
 

@@ -15,9 +15,10 @@ namespace Server.Models.Entities
         public string AddressLine1 { get; set; } = string.Empty;
         public string PreviousAddress { get; set; } = string.Empty;
         public string Postcode { get; set; } = string.Empty;
+        public string County { get; set; } = string.Empty;
         public byte[]? FingerprintScan { get; set; }
         public bool HasVoted { get; set; }
-        public DateTime RegisteredDate { get; set; } = DateTime.UtcNow;
+        public DateTime RegisteredDate { get; set; }
 
         public Constituency? Constituency { get; set; }
     }

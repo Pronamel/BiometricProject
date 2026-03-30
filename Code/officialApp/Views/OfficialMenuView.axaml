@@ -71,19 +71,49 @@
             
         </StackPanel>
 
-        <!-- Test Voters Button (Bottom) -->
-        <Button 
-            Command="{Binding FetchVotersTestCommand}"
-            Background="#6b4423"  
-            Width="150"
-            Height="50" 
-            BorderThickness="2"
-            BorderBrush="Black"
-            FontSize="14"
-            VerticalAlignment="Bottom"
-            Margin="0,0,0,10"
-            HorizontalAlignment="Center">
-            <TextBlock Text="Test: Fetch Voters" Foreground="white"/>
-        </Button>
+        <!-- Bottom Controls: Status Message and Buttons -->
+        <StackPanel Orientation="Vertical" 
+                   VerticalAlignment="Bottom" 
+                   HorizontalAlignment="Center"
+                   Spacing="10"
+                   Margin="0,0,0,15">
+            
+            <!-- Status Message -->
+            <TextBlock Text="{Binding StatusMessage}" 
+                       Foreground="{Binding StatusColor}"
+                       HorizontalAlignment="Center"
+                       FontSize="12"
+                       Height="20"/>
+            
+            <!-- Bottom Buttons Row -->
+            <StackPanel Orientation="Horizontal" 
+                       HorizontalAlignment="Center"
+                       Spacing="15">
+                
+                <!-- Test Voters Button -->
+                <Button 
+                    Command="{Binding FetchVotersTestCommand}"
+                    Background="#6b4423"  
+                    Width="150"
+                    Height="50" 
+                    BorderThickness="2"
+                    BorderBrush="Black"
+                    FontSize="14">
+                    <TextBlock Text="Test: Fetch Voters" Foreground="white"/>
+                </Button>
+                
+                <!-- Logout Button -->
+                <Button 
+                    Command="{Binding LogoutCommand}"
+                    Background="#e74c3c"  
+                    Width="120"
+                    Height="50" 
+                    BorderThickness="2"
+                    BorderBrush="Black"
+                    FontSize="14">
+                    <TextBlock Text="Logout" Foreground="white" FontWeight="Bold"/>
+                </Button>
+            </StackPanel>
+        </StackPanel>
     </Grid>
 </UserControl>

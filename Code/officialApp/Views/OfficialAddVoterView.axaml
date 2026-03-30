@@ -68,6 +68,11 @@
                 </StackPanel>
 
                 <StackPanel Spacing="5">
+                    <TextBlock Text="National Insurance Number" Foreground="black" FontSize="14"/>
+                    <TextBox Text="{Binding NationalInsuranceNumber}" Watermark="Enter national insurance number" Height="40" FontSize="14" Padding="10"/>
+                </StackPanel>
+
+                <StackPanel Spacing="5">
                     <TextBlock Text="Address Line 1" Foreground="black" FontSize="14"/>
                     <TextBox Text="{Binding AddressLine1}" Watermark="Enter address line 1" Height="40" FontSize="14" Padding="10"/>
                 </StackPanel>
@@ -122,6 +127,15 @@
                             Height="40"
                             FontSize="14"
                             Padding="10"/>
+                </StackPanel>
+
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Polling Station" Foreground="black" FontSize="14"/>
+                    <ComboBox SelectedItem="{Binding SelectedPollingStation}"
+                              ItemsSource="{Binding PollingStationOptions}"
+                              Height="40"
+                              FontSize="14"
+                              PlaceholderText="Select polling station"/>
                 </StackPanel>
             </StackPanel>
 

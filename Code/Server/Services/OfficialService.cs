@@ -12,6 +12,7 @@ public class OfficialService
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _countyVoterCodes;
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> _countyActiveConnections;
     private readonly ConcurrentDictionary<string, DateTime> _activeVotingSessions;
+    private readonly ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> _activeOfficials;
     private readonly ApplicationDbContext _dbContext;
 
     public OfficialService(
@@ -19,12 +20,14 @@ public class OfficialService
         ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> countyVoterCodes,
         ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> countyActiveConnections,
         ConcurrentDictionary<string, DateTime> activeVotingSessions,
+        ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
         ApplicationDbContext dbContext)
     {
         _countyChannels = countyChannels;
         _countyVoterCodes = countyVoterCodes;
         _countyActiveConnections = countyActiveConnections;
         _activeVotingSessions = activeVotingSessions;
+        _activeOfficials = activeOfficials;
         _dbContext = dbContext;
     }
 
@@ -90,7 +93,7 @@ public class OfficialService
         var countyDict = _countyChannels.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentBag<string>>());
         var countyRequests = countyDict.GetOrAdd(constituency, _ => new ConcurrentBag<string>());
 
-        var countyConnDict = _countyActiveConnections.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>?>());
+        var countyConnDict = _countyActiveConnections.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>());
         var constituencyConnDict = countyConnDict.GetOrAdd(constituency, _ => new ConcurrentDictionary<string, TaskCompletionSource<List<string>>>());
 
         // Create task completion source for this specific official
@@ -198,5 +201,17 @@ public class OfficialService
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Revoked session for voter {voterId}");
         }
         return removed;
+    }
+
+    public bool IsOfficialAlreadyLoggedIn(string officialId)
+    {
+        var isLoggedIn = _activeOfficials.Values.Any(v => v.OfficialId == officialId);
+        
+        if (isLoggedIn)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Official {officialId} is already logged in elsewhere");
+        }
+        
+        return isLoggedIn;
     }
 }

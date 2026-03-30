@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -83,10 +84,11 @@ public class ApiService : IApiService
             var responseContent = await response.Content.ReadAsStringAsync();
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Response Body: {responseContent}");
 
+            // Try to deserialize response regardless of status code to capture error details
+            var loginResponse = JsonSerializer.Deserialize<OfficialLoginResponse>(responseContent, _jsonOptions);
+
             if (response.IsSuccessStatusCode)
             {
-                var loginResponse = JsonSerializer.Deserialize<OfficialLoginResponse>(responseContent, _jsonOptions);
-
                 if (loginResponse?.Success == true && !string.IsNullOrEmpty(loginResponse.Token))
                 {
                     // Store authentication state
@@ -101,6 +103,16 @@ public class ApiService : IApiService
 
                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {username} logged in successfully");
                     return loginResponse;
+                }
+            }
+            else
+            {
+                // Handle error responses (409 Conflict, 401 Unauthorized, etc.)
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Login failed with status {response.StatusCode}");
+                if (loginResponse != null)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error code: {loginResponse.Code}, Message: {loginResponse.Message}");
+                    return loginResponse;  // Return response with error details
                 }
             }
 
@@ -153,6 +165,40 @@ public class ApiService : IApiService
         }
     }
 
+    private string ConvertDateToIso8601(string dateString)
+    {
+        // Convert UK date format (DD/MM/yyyy) to ISO 8601 (yyyy-MM-dd)
+        // Supports both DD/MM/yyyy and MM/DD/yyyy formats via TryParse
+        try
+        {
+            // Try parsing with UK format first (DD/MM/yyyy)
+            if (DateTime.TryParseExact(dateString, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime parsedDate))
+            {
+                return parsedDate.ToString("yyyy-MM-dd");
+            }
+            
+            // Fallback: try US format (MM/DD/yyyy)
+            if (DateTime.TryParseExact(dateString, "MM/dd/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out parsedDate))
+            {
+                return parsedDate.ToString("yyyy-MM-dd");
+            }
+            
+            // Last resort: try ISO format already
+            if (DateTime.TryParse(dateString, out parsedDate))
+            {
+                return parsedDate.ToString("yyyy-MM-dd");
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Could not parse date '{dateString}' in any format");
+            return dateString; // Return as-is if parsing fails
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Error converting date: {ex.Message}");
+            return dateString;
+        }
+    }
+
     public async Task<bool> SetAccessCodeAsync(string accessCode)
     {
         try
@@ -197,13 +243,59 @@ public class ApiService : IApiService
         }
     }
 
-    public void Logout()
+    public async Task<bool> LogoutAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_jwtToken))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No active session - local logout only");
+                ClearLocalSession();
+                return true;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending logout request to server...");
+
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/auth/official-logout");
+            AddAuthorizationHeader(request);
+
+            var response = await _httpClient.SendAsync(request);
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Logout response status: {response.StatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Server logout successful: {responseContent}");
+                ClearLocalSession();
+                return true;
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Server logout failed with status {response.StatusCode}");
+                ClearLocalSession(); // Clear local session even if server logout fails
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error during logout: {ex.Message}");
+            ClearLocalSession(); // Clear local session even on exception
+            return false;
+        }
+    }
+
+    private void ClearLocalSession()
     {
         _jwtToken = null;
         _tokenExpiry = DateTime.MinValue;
         _currentOfficialId = null;
         _currentStationId = null;
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official logged out");
+        _currentCounty = null;
+        _currentConstituency = null;
+        _currentSystemCode = null;
+        _currentTokenId = 0;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Local session cleared");
     }
 
     private void AddAuthorizationHeader(HttpRequestMessage request)
@@ -324,6 +416,45 @@ public class ApiService : IApiService
         catch (Exception ex)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching data: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<List<PollingStationOption>?> GetAllPollingStationsAsync()
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Fetching polling stations from server");
+            
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/polling-stations");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+                var pollingStations = JsonSerializer.Deserialize<List<PollingStationOption>>(jsonString, _jsonOptions);
+                
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Retrieved {pollingStations?.Count ?? 0} polling stations");
+                if (pollingStations != null)
+                {
+                    foreach (var ps in pollingStations.Take(3))
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - {ps.DisplayName}");
+                    }
+                }
+                
+                return pollingStations;
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to fetch polling stations: {response.StatusCode}");
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error: {errorContent}");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching polling stations: {ex.Message}");
             return null;
         }
     }
@@ -512,11 +643,20 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<bool> CreateOfficialWithFingerprintAsync(string username, string password, byte[] fingerprintData)
+    public async Task<bool> CreateOfficialWithFingerprintAsync(
+        string username,
+        string password,
+        string assignedPollingStationId,
+        string assignedCountyId,
+        byte[] fingerprintData)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || fingerprintData == null || fingerprintData.Length == 0)
+            if (string.IsNullOrWhiteSpace(username) ||
+                string.IsNullOrWhiteSpace(password) ||
+                string.IsNullOrWhiteSpace(assignedPollingStationId) ||
+                fingerprintData == null ||
+                fingerprintData.Length == 0)
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ CreateOfficial failed: missing required fields");
                 return false;
@@ -527,11 +667,15 @@ public class ApiService : IApiService
             {
                 username,
                 password,
+                assignedPollingStationId,
                 fingerPrintScan = fingerprintBase64
             };
 
             var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📤 Creating official: {username}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Polling Station ID: {assignedPollingStationId}");
 
             var response = await _httpClient.PostAsync($"{_baseUrl}/api/official/create-official", content);
             var responseBody = await response.Content.ReadAsStringAsync();
@@ -553,6 +697,7 @@ public class ApiService : IApiService
     }
 
     public async Task<bool> CreateVoterWithFingerprintAsync(
+        string nationalInsuranceNumber,
         string firstName,
         string lastName,
         string dateOfBirth,
@@ -565,7 +710,27 @@ public class ApiService : IApiService
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(firstName) ||
+            Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ========== CREATE VOTER REQUEST STARTED ==========");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Target URL: {_baseUrl}/api/official/create-voter");
+            
+            // CHECK AUTHENTICATION STATUS FIRST
+            if (!IsAuthenticated)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ AUTHENTICATION ERROR: Official is not authenticated");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Please log in before creating a voter");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Current Token Valid: {!string.IsNullOrEmpty(_jwtToken) && DateTime.UtcNow < _tokenExpiry}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ========== CREATE VOTER REQUEST FAILED - NOT AUTHENTICATED ==========\n");
+                return false;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Authentication verified - Official is logged in");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Official ID: {_currentOfficialId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Station ID: {_currentStationId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {_currentCounty}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {_currentConstituency}");
+            
+            if (string.IsNullOrWhiteSpace(nationalInsuranceNumber) ||
+                string.IsNullOrWhiteSpace(firstName) ||
                 string.IsNullOrWhiteSpace(lastName) ||
                 string.IsNullOrWhiteSpace(dateOfBirth) ||
                 string.IsNullOrWhiteSpace(addressLine1) ||
@@ -575,16 +740,34 @@ public class ApiService : IApiService
                 fingerprintData == null ||
                 fingerprintData.Length == 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ CreateVoter failed: missing required fields");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ VALIDATION ERROR: Missing required voter fields");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   NI: {(string.IsNullOrWhiteSpace(nationalInsuranceNumber) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   FirstName: {(string.IsNullOrWhiteSpace(firstName) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   LastName: {(string.IsNullOrWhiteSpace(lastName) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   DateOfBirth: {(string.IsNullOrWhiteSpace(dateOfBirth) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   AddressLine1: {(string.IsNullOrWhiteSpace(addressLine1) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   PostCode: {(string.IsNullOrWhiteSpace(postCode) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {(string.IsNullOrWhiteSpace(county) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {(string.IsNullOrWhiteSpace(constituency) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Fingerprint Data: {(fingerprintData == null || fingerprintData.Length == 0 ? "MISSING" : $"{fingerprintData.Length} bytes")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ========== CREATE VOTER REQUEST FAILED - VALIDATION ERROR ==========\n");
                 return false;
             }
 
             string fingerprintBase64 = Convert.ToBase64String(fingerprintData);
+            
+            // Convert date from UK format (DD/MM/yyyy) to ISO format (yyyy-MM-dd) for server
+            string isoDateOfBirth = ConvertDateToIso8601(dateOfBirth);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Date conversion: '{dateOfBirth}' -> '{isoDateOfBirth}'");
+            
+            // Create voter request with all required fields
+            // NOTE: Official context (officialId, stationId, county, constituency) is extracted from JWT token claims server-side
             var request = new
             {
+                nationalInsuranceNumber,
                 firstName,
                 lastName,
-                dateOfBirth,
+                dateOfBirth = isoDateOfBirth,
                 addressLine1,
                 addressLine2,
                 postCode,
@@ -596,22 +779,83 @@ public class ApiService : IApiService
             var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync($"{_baseUrl}/api/official/create-voter", content);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📤 Sending request payload:");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   === VOTER DATA ===");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   FirstName: {firstName}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   LastName: {lastName}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   NI Number: {nationalInsuranceNumber}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   DOB (original): {dateOfBirth}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   DOB (converted to ISO): {isoDateOfBirth}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Address: {addressLine1}, {addressLine2}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   PostCode: {postCode}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {county}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {constituency}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Fingerprint Bytes: {fingerprintData.Length}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   === OFFICIAL CONTEXT ===");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Official ID: {_currentOfficialId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Station ID: {_currentStationId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Token ID: {_currentTokenId}");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔗 Making authenticated HTTP POST request with Bearer token...");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Full URL: {_baseUrl}/api/official/create-voter");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Content-Type: application/json");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Authorization: Bearer [token present: {!string.IsNullOrEmpty(_jwtToken)}]");
+            
+            var response = await SendAuthenticatedPostAsync("/api/official/create-voter", content);
+            
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📥 Response received - Status Code: {response.StatusCode}");
             var responseBody = await response.Content.ReadAsStringAsync();
+            
+            if (responseBody.Length > 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Response Body: {responseBody}");
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Response body is empty");
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ 404 NOT FOUND: The server cannot find the endpoint");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Possible causes:");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   1. Server is not running or not accessible");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   2. Endpoint /api/official/create-voter is not registered on the server");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   3. Network/proxy issue preventing request from reaching server");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   4. Server returned 404 due to invalid routing configuration");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ========== CREATE VOTER REQUEST FAILED - 404 NOT FOUND ==========\n");
+                return false;
+            }
 
             if (response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter created successfully: {firstName} {lastName}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ========== CREATE VOTER REQUEST COMPLETED SUCCESSFULLY ==========\n");
                 return true;
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Voter creation failed: {response.StatusCode} - {responseBody}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ SERVER ERROR: Voter creation failed");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Status Code: {response.StatusCode}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Response: {responseBody}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ========== CREATE VOTER REQUEST FAILED ==========\n");
             return false;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error creating voter: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ EXCEPTION during CreateVoter: {ex.GetType().Name}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error Message: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack Trace: {ex.StackTrace}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ========== CREATE VOTER REQUEST FAILED WITH EXCEPTION ==========\n");
             return false;
         }
     }
+}
+
+public class PollingStationOption
+{
+    public Guid PollingStationId { get; set; }
+    public string? Code { get; set; }
+    public string? County { get; set; }
+    public string? Constituency { get; set; }
+    public string? DisplayName { get; set; }
 }

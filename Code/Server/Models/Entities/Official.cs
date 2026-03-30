@@ -8,7 +8,6 @@ namespace Server.Models.Entities
         public string? Username { get; set; }
         public string? PasswordHash { get; set; }
         public DateTime? LastLogin { get; set; }
-        public Guid? AssignedCountyId { get; set; }
         public Guid? AssignedPollingStationId { get; set; }
         public byte[]? FingerPrintScan { get; set; }
 

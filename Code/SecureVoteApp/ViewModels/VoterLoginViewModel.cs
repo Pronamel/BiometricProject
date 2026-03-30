@@ -65,6 +65,9 @@ public partial class VoterLoginViewModel : ViewModelBase
         _navigationService = navigationService;
         _countyService = countyService;
         _apiService = apiService;
+        
+        // Populate with TestVoter data
+        SelectedCounty = "Bedfordshire";
     }
 
     // ==========================================
