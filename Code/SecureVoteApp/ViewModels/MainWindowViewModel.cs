@@ -75,7 +75,7 @@ public partial class MainWindowViewModel : ViewModelBase
         );
         
         // Set initial view to Voter Login
-        CurrentView = _ninEntryView;
+        CurrentView = _voterLoginView;
     }
 
 

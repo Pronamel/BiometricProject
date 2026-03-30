@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Server.Services;
 using Server.Data;
+using Server.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SourceAFIS;
@@ -844,6 +845,109 @@ app.MapPost("/api/voter/verify-access-code", async (VerifyAccessCodeRequest requ
     }
 })
 .WithName("VoterVerifyAccessCode");
+
+//===========================================
+// API ENDPOINTS - VOTER AUTHENTICATION LOOKUP
+//===========================================
+// Flexible voter lookup: by NIN (primary) or by FirstName + LastName + DateOfBirth (secondary)
+app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request, DatabaseService dbService) =>
+{
+    Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ===== VOTER AUTH LOOKUP ATTEMPT =====");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] County: {request.County}, Constituency: {request.Constituency}");
+    
+    // Validate that county and constituency are provided
+    if (string.IsNullOrWhiteSpace(request.County) || string.IsNullOrWhiteSpace(request.Constituency))
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing County or Constituency");
+        return Results.BadRequest(new VoterAuthLookupResponse(
+            false,
+            "County and Constituency are required",
+            null,
+            null,
+            null,
+            null
+        ));
+    }
+
+    Voter? voter = null;
+    string? matchedBy = null;
+
+    // Primary lookup: by NIN
+    if (!string.IsNullOrWhiteSpace(request.NationalInsuranceNumber))
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting NIN lookup: {request.NationalInsuranceNumber}");
+        voter = await dbService.GetVoterByNINAsync(
+            request.NationalInsuranceNumber,
+            request.County,
+            request.Constituency);
+        
+        if (voter is not null)
+        {
+            matchedBy = "NIN";
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by NIN");
+        }
+    }
+
+    // Fallback: by FirstName + LastName + DateOfBirth
+    if (voter is null && 
+        !string.IsNullOrWhiteSpace(request.FirstName) && 
+        !string.IsNullOrWhiteSpace(request.LastName) && 
+        !string.IsNullOrWhiteSpace(request.DateOfBirth))
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting Name+DOB lookup: {request.FirstName} {request.LastName} ({request.DateOfBirth})");
+        
+        // Parse DateOfBirth from string ("1985-11-23 00:00:00+00" format)
+        if (DateTime.TryParse(request.DateOfBirth, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var parsedDob))
+        {
+            voter = await dbService.GetVoterByNameAndDateAsync(
+                request.FirstName ?? string.Empty,
+                request.LastName ?? string.Empty,
+                parsedDob,
+                request.County,
+                request.Constituency);
+            
+            if (voter is not null)
+            {
+                matchedBy = "Name+DOB";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by Name+DOB");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Invalid DateOfBirth format: {request.DateOfBirth}");
+        }
+    }
+
+    // Return result
+    if (voter is not null)
+    {
+        var fullName = $"{voter.FirstName} {voter.LastName}";
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ VOTER AUTH LOOKUP SUCCESSFUL - Voter: {fullName}, ID: {voter.VoterId}, Matched By: {matchedBy}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
+        
+        return Results.Ok(new VoterAuthLookupResponse(
+            true,
+            "Voter found successfully",
+            voter.VoterId,
+            fullName,
+            voter.FingerprintScan,
+            matchedBy
+        ));
+    }
+
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ VOTER NOT FOUND - No matching voter in {request.County}/{request.Constituency}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
+    
+    return Results.BadRequest(new VoterAuthLookupResponse(
+        false,
+        "Voter not found. Please check your details and try again.",
+        null,
+        null,
+        null,
+        null
+    ));
+})
+.WithName("VoterLookupForAuth");
 
 //===========================================
 // API ENDPOINTS - VOTER-OFFICIAL LINKING
@@ -1716,6 +1820,25 @@ record VerifyFingerprintsRequest(
     string? Password,             // Official password for authentication (null for voters)
     string? VoterId,              // Voter unique ID as string (null for officials)
     string ScannedFingerprint     // Base64 encoded newly scanned fingerprint (PNG format)
+);
+
+// Voter authentication lookup models (flexible identification)
+record VoterAuthLookupRequest(
+    string? NationalInsuranceNumber,
+    string? FirstName,
+    string? LastName,
+    string? DateOfBirth,
+    string County,
+    string Constituency
+);
+
+record VoterAuthLookupResponse(
+    bool Success,
+    string Message,
+    Guid? VoterId,
+    string? FullName,
+    byte[]? FingerprintScan,
+    string? MatchedBy
 );
 
 // Thread-safe token counter for unique identities

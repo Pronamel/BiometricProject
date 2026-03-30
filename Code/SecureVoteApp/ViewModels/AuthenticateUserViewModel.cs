@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using SecureVoteApp.Services.Scanner;
 using SecureVoteApp.Services;
+using SecureVoteApp.Models;
 
 namespace SecureVoteApp.ViewModels;
 
@@ -23,6 +24,10 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IScannerService _scannerService;
     private readonly IApiService _apiService;
+    
+    // Voter authentication fields
+    private byte[]? _storedFingerprintBytes;
+    private Guid? _currentVoterId;
 
     // ==========================================
     // OBSERVABLE PROPERTIES
@@ -45,6 +50,12 @@ public partial class AuthenticateUserViewModel : ViewModelBase
 
     [ObservableProperty]
     private string captureStatusMessage = "Ready to scan";
+
+    [ObservableProperty]
+    private string voterFullName = string.Empty;
+
+    [ObservableProperty]
+    private string voterStatusMessage = string.Empty;
 
     // ==========================================
     // PUBLIC PROPERTIES
@@ -97,21 +108,25 @@ public partial class AuthenticateUserViewModel : ViewModelBase
         {
             SetImageSource("fingerPrintWrong.png");
             SetStatusMessage("You have 2 attempts left.");
+            VoterStatusMessage = ""; // Clear status on mismatch
         }
         else if (attempts == 2 && scanResult == false)
         {
             SetImageSource("fingerPrintWrong.png");
             SetStatusMessage("You have 1 attempts left.");
+            VoterStatusMessage = ""; // Clear status on mismatch
         }
         else if (attempts == 3 && scanResult == false)
         {
             SetImageSource("fingerPrintWrong.png");
             SetStatusMessage("You have no attempts left. Please Contact an official.");
+            VoterStatusMessage = "❌ Authentication failed after 3 attempts. You may have mistyped your details.";
         }
         else if (scanResult == true)
         {
             SetImageSource("fingerPrintCorrect.png");
             SetStatusMessage("Authentication successful. You may proceed to vote.");
+            VoterStatusMessage = "✅ Voter Found"; // Show green success message
             await Task.Delay(750);
             _navigationService.NavigateToBallot();
         }
@@ -268,6 +283,34 @@ public partial class AuthenticateUserViewModel : ViewModelBase
         QualityScore = 0;
         IsCapturing = false;
         CaptureStatusMessage = "Ready to scan";
+        
+        // Check if there's a pending voter lookup and initialize
+        if (_navigationService is NavigationService navService && navService.PendingVoterLookup != null)
+        {
+            Initialize(navService.PendingVoterLookup);
+            navService.PendingVoterLookup = null; // Clear after use
+        }
+    }
+
+    // ==========================================
+    // INITIALIZATION METHODS
+    // ==========================================
+
+    public void Initialize(VoterAuthLookupResponse lookup)
+    {
+        if (lookup == null || !lookup.VoterId.HasValue)
+        {
+            Console.WriteLine("[AuthenticateUserViewModel] ❌ Invalid lookup data - missing voter ID");
+            return;
+        }
+
+        _storedFingerprintBytes = lookup.FingerprintScan;
+        _currentVoterId = lookup.VoterId;
+        VoterFullName = lookup.FullName ?? "Unknown Voter";
+
+        Console.WriteLine($"[AuthenticateUserViewModel] ✓ Initialized with voter: {VoterFullName}");
+        Console.WriteLine($"[AuthenticateUserViewModel]   Voter ID: {_currentVoterId}");
+        Console.WriteLine($"[AuthenticateUserViewModel]   Fingerprint available: {(_storedFingerprintBytes?.Length ?? 0) > 0}");
     }
 
     // ==========================================

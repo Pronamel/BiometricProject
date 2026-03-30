@@ -149,6 +149,49 @@ public class VoterLinkResponse
     public string? Token { get; set; }
 }
 
+// Voter Authentication Lookup Models
+public class VoterAuthLookupRequest
+{
+    [JsonPropertyName("nationalInsuranceNumber")]
+    public string? NationalInsuranceNumber { get; set; }
+    
+    [JsonPropertyName("firstName")]
+    public string? FirstName { get; set; }
+    
+    [JsonPropertyName("lastName")]
+    public string? LastName { get; set; }
+    
+    [JsonPropertyName("dateOfBirth")]
+    public string? DateOfBirth { get; set; }
+    
+    [JsonPropertyName("county")]
+    public string County { get; set; } = string.Empty;
+    
+    [JsonPropertyName("constituency")]
+    public string Constituency { get; set; } = string.Empty;
+}
+
+public class VoterAuthLookupResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+    
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+    
+    [JsonPropertyName("voterId")]
+    public Guid? VoterId { get; set; }
+    
+    [JsonPropertyName("fullName")]
+    public string? FullName { get; set; }
+    
+    [JsonPropertyName("fingerprintScan")]
+    public byte[]? FingerprintScan { get; set; }
+    
+    [JsonPropertyName("matchedBy")]
+    public string? MatchedBy { get; set; }
+}
+
 // Vote casting models
 public class CastVoteRequest
 {

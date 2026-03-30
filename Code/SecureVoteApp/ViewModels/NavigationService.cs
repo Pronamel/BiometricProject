@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Controls;
+using SecureVoteApp.Models;
 
 namespace SecureVoteApp.ViewModels;
 
@@ -16,11 +17,15 @@ public interface INavigationService
     void NavigateToPersonalOrProxy();
     void NavigateToProxyVoteDetails();
     void NavigateToAuthenticateUser();
+    void NavigateToAuthenticateUser(VoterAuthLookupResponse lookup);
     void NavigateToBallot();
     void NavigateToConfirmation();
     void NavigateToResults();
     void NavigateToSettings();
     void NavigateToView(UserControl view);
+    
+    // Property to pass data between view models
+    VoterAuthLookupResponse? PendingVoterLookup { get; set; }
     
     // Events to notify when navigation happens
     event Action<UserControl>? NavigationRequested;
@@ -42,6 +47,15 @@ public class NavigationService : INavigationService
 
     // Event that the MainWindowViewModel will subscribe to
     public event Action<UserControl>? NavigationRequested;
+
+
+
+
+    // ==========================================
+    // PROPERTIES
+    // ==========================================
+
+    public VoterAuthLookupResponse? PendingVoterLookup { get; set; }
 
 
 
@@ -159,6 +173,18 @@ public class NavigationService : INavigationService
 
     public void NavigateToAuthenticateUser()
     {
+        if (_authenticateUserView == null && _getAuthenticateUserView != null)
+            _authenticateUserView = _getAuthenticateUserView();
+
+        if (_authenticateUserView != null)
+            NavigationRequested?.Invoke(_authenticateUserView);
+    }
+
+    public void NavigateToAuthenticateUser(VoterAuthLookupResponse lookup)
+    {
+        // Store the lookup data for the ViewModel to retrieve
+        PendingVoterLookup = lookup;
+        
         if (_authenticateUserView == null && _getAuthenticateUserView != null)
             _authenticateUserView = _getAuthenticateUserView();
 

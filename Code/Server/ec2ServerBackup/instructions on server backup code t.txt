@@ -1,0 +1,6 @@
+
+run this in powershell from anywhere. 
+
+scp -i C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server-Key.pem -r ec2-user@34.238.14.248:~/your-app-folder C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\ec2ServerBackup
+
+

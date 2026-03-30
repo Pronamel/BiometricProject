@@ -10,6 +10,7 @@ public interface IApiService
     // Authentication & Session Management
     Task<VoterSessionResponse?> CreateSessionAsync(string voterId, string county, string constituency, string? stationId = null);
     Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
+    Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? nin, string? firstName, string? lastName, string? dateOfBirth, string county, string constituency);
     
     // Vote Casting
     Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName);

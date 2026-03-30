@@ -302,6 +302,77 @@ public class DatabaseService
             return (false, "Failed to create official", null);
         }
     }
+
+    public async Task<Voter?> GetVoterByNINAsync(string nin, string county, string constituency)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by NIN: {nin} in {county}/{constituency}");
+            
+            var voter = await _dbContext.Voters
+                .Include(v => v.Constituency)
+                .FirstOrDefaultAsync(v => 
+                    v.NationalId == nin.Trim() && 
+                    v.County == county &&
+                    v.Constituency != null && v.Constituency.Name == constituency);
+
+            if (voter == null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with NIN '{nin}' in {county}/{constituency}");
+                return null;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by NIN: {voter.FirstName} {voter.LastName} (ID: {voter.VoterId})");
+            return voter;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by NIN: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return null;
+        }
+    }
+
+    public async Task<Voter?> GetVoterByNameAndDateAsync(
+        string firstName, string lastName, DateTime dateOfBirth, 
+        string county, string constituency)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by Name+DOB: {firstName} {lastName} ({dateOfBirth:yyyy-MM-dd}) in {county}/{constituency}");
+            
+            // Normalize search values: trim whitespace and uppercase for case-insensitive matching
+            var firstNameUpper = firstName.Trim().ToUpper();
+            var lastNameUpper = lastName.Trim().ToUpper();
+            
+            // Extract just the date part, ignoring time
+            var dobDate = dateOfBirth.Date;
+            
+            var voter = await _dbContext.Voters
+                .Include(v => v.Constituency)
+                .FirstOrDefaultAsync(v => 
+                    v.FirstName.ToUpper() == firstNameUpper &&
+                    v.LastName.ToUpper() == lastNameUpper &&
+                    v.DateOfBirth.Date == dobDate &&
+                    v.County == county &&
+                    v.Constituency != null && v.Constituency.Name == constituency);
+
+            if (voter == null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with Name '{firstName} {lastName}' DOB '{dateOfBirth:yyyy-MM-dd}' in {county}/{constituency}");
+                return null;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by Name+DOB: {voter.FirstName} {voter.LastName} (ID: {voter.VoterId})");
+            return voter;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by Name+DOB: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return null;
+        }
+    }
 }
 
 // DTO for polling stations response

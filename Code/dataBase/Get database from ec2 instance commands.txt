@@ -1,0 +1,9 @@
+make dump file on ec2 instance 
+
+	sudo -u postgres pg_dump voting_database > backup.sql
+
+
+
+run this from powershell 
+
+scp -i C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server-Key.pem ec2-user@52.0.63.9:~/backup.sql C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\dataBase\databaseBackupFromEc2

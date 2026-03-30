@@ -213,6 +213,63 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(
+        string? nin, string? firstName, string? lastName, string? dateOfBirth, 
+        string county, string constituency)
+    {
+        try
+        {
+            var lookupRequest = new VoterAuthLookupRequest
+            {
+                NationalInsuranceNumber = nin,
+                FirstName = firstName,
+                LastName = lastName,
+                DateOfBirth = dateOfBirth,
+                County = county,
+                Constituency = constituency
+            };
+
+            var jsonContent = JsonSerializer.Serialize(lookupRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking up voter for authentication:");
+            Console.WriteLine($"  NIN: {(string.IsNullOrEmpty(nin) ? "Not provided" : "***")}");
+            Console.WriteLine($"  Name: {(string.IsNullOrEmpty(firstName) ? "Not provided" : $"{firstName} {lastName}")}");
+            Console.WriteLine($"  County: {county}");
+            Console.WriteLine($"  Constituency: {constituency}");
+
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/voter/lookup-for-auth", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Lookup Response Status: {response.StatusCode}");
+
+            if (response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                var lookupResponse = JsonSerializer.Deserialize<VoterAuthLookupResponse>(responseContent, _jsonOptions);
+                if (lookupResponse != null)
+                {
+                    if (lookupResponse.Success)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found: {lookupResponse.FullName} (Matched by: {lookupResponse.MatchedBy})");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Voter not found: {lookupResponse.Message}");
+                    }
+                    return lookupResponse;
+                }
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Unexpected response: {responseContent}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Voter lookup error: {ex.Message}");
+            return null;
+        }
+    }
+
     public async Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName)
     {
         try
