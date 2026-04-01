@@ -19,12 +19,20 @@ using Server.Data;
 using Server.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using SourceAFIS;
+using System.Globalization;
 
 //===========================================
 // BUILDER CONFIGURATION
 //===========================================
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseDefaultServiceProvider(options =>
+{
+    options.ValidateScopes = true;
+    options.ValidateOnBuild = true;
+});
 
 // Configure Kestrel for Nginx reverse proxy
 // App listens ONLY on localhost:5000 (HTTP)
@@ -55,7 +63,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =
 //===========================================
 // JWT CONFIGURATION
 //===========================================
-var jwtSecret = "VerySecureSecretKey2026ForVotingSystem!MinimumOf256Bits";
+var jwtSecret = SecretsHelper.GetJWTSecret().GetAwaiter().GetResult();
 var jwtKey = Encoding.ASCII.GetBytes(jwtSecret);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -80,6 +88,21 @@ builder.Services.AddAuthorization();
 // DATABASE CONFIGURATION
 //===========================================
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("Missing ConnectionStrings:DefaultConnection in configuration.");
+}
+
+try
+{
+    var csb = new NpgsqlConnectionStringBuilder(connectionString);
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Database config loaded: Host={csb.Host}; Port={csb.Port}; Database={csb.Database}; Username={csb.Username}; SslMode={csb.SslMode}");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: Could not parse database connection string details: {ex.Message}");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
@@ -120,17 +143,8 @@ builder.Services.AddSingleton(activeVotingSessions);
 builder.Services.AddSingleton(activeOfficials);
 builder.Services.AddSingleton(officialPollingStationHashes);
 builder.Services.AddSingleton(tokenCounter);
-builder.Services.AddSingleton<VoterService>();
-builder.Services.AddSingleton(serviceProvider =>
-    new OfficialService(
-        serviceProvider.GetRequiredService<ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>>>(),
-        serviceProvider.GetRequiredService<ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>>>(),
-        serviceProvider.GetRequiredService<ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>>>(),
-        serviceProvider.GetRequiredService<ConcurrentDictionary<string, DateTime>>(),
-        serviceProvider.GetRequiredService<ConcurrentDictionary<string, (string, string, string, DateTime, List<int>)>>(),
-        serviceProvider.GetRequiredService<ApplicationDbContext>()
-    )
-);
+builder.Services.AddScoped<VoterService>();
+builder.Services.AddScoped<OfficialService>();
 builder.Services.AddScoped<DatabaseService>();
 
 //===========================================
@@ -288,7 +302,7 @@ app.Use(async (context, next) =>
 string GenerateJwtToken(string userId, string role, Dictionary<string, object>? additionalClaims = null)
 {
     var tokenHandler = new JwtSecurityTokenHandler();
-    var key = Encoding.ASCII.GetBytes("VerySecureSecretKey2026ForVotingSystem!MinimumOf256Bits");
+    var key = Encoding.ASCII.GetBytes(jwtSecret);
     
     var claims = new List<Claim>
     {
@@ -315,7 +329,7 @@ string GenerateJwtToken(string userId, string role, Dictionary<string, object>? 
     var tokenDescriptor = new SecurityTokenDescriptor
     {
         Subject = new ClaimsIdentity(claims),
-        Expires = role == "official" ? DateTime.UtcNow.AddHours(24) : DateTime.UtcNow.AddHours(8),
+        Expires = DateTime.UtcNow.AddHours(8),
         Issuer = "SecureVoteServer",
         Audience = "VotingClients",
         SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
@@ -423,7 +437,7 @@ app.MapPost("/auth/official-login", async (OfficialLoginRequest request, Databas
         systemCode = systemCode,
         constituency = constituency,
         tokenId = uniqueTokenId,
-        expiresAt = DateTime.UtcNow.AddHours(24)
+        expiresAt = DateTime.UtcNow.AddHours(8)
     });
 })
 .WithName("OfficialLogin");
@@ -537,45 +551,37 @@ app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialLogout");
 
-
-
-
-// Voter session creation - validates voter ID, creates a voting session, and returns a JWT token with session info
-app.MapPost("/auth/voter-session", (VoterSessionRequest request, VoterService voterService, TokenCounter counter) =>
+// Voter logout endpoint - revokes active voter session created during authentication
+app.MapPost("/auth/voter-logout", (ClaimsPrincipal user, VoterService voterService) =>
 {
-    if (voterService.ValidateVoterId(request.VoterId))
+    var voterId = user.FindFirst("nin")?.Value;
+
+    if (string.IsNullOrWhiteSpace(voterId))
     {
-        var uniqueTokenId = counter.GetNextId();
-        var sessionId = voterService.CreateVotingSession(request.VoterId);
-        
-        var additionalClaims = new Dictionary<string, object>
-        {
-            ["nin"] = request.VoterId,
-            ["session"] = sessionId,
-            ["county"] = request.County,
-            ["constituency"] = request.Constituency,
-            ["tokenId"] = uniqueTokenId
-        };
-        
-        var token = GenerateJwtToken($"voter_{request.VoterId}_{uniqueTokenId}", "voter", additionalClaims);
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter session: {request.VoterId} with session {sessionId} (Token ID: {uniqueTokenId})");
-        
-        return Results.Ok(new { 
-            success = true, 
-            token = token,
-            role = "voter",
-            voterId = request.VoterId,
-            sessionId = sessionId,
-            county = request.County,
-            tokenId = uniqueTokenId,
-            expiresAt = DateTime.UtcNow.AddHours(8)
-        });
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Voter logout failed: voter ID not found in token");
+        return Results.BadRequest(new { success = false, message = "Voter ID not found in token" });
     }
-    
-    return Results.BadRequest(new { success = false, message = "Invalid voter ID" });
+
+    var removed = voterService.RevokeVoterSession(voterId);
+
+    if (removed)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter {voterId} logged out and session removed");
+    }
+    else
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Voter {voterId} logout requested, but no active session was found");
+    }
+
+    return Results.Ok(new
+    {
+        success = true,
+        message = "Voter logout processed",
+        sessionRemoved = removed
+    });
 })
-.WithName("VoterSession");
+.RequireAuthorization(policy => policy.RequireRole("voter"))
+.WithName("VoterLogout");
 
 // Create a voter record in the database from official app input.
 app.MapPost("/api/official/create-voter", async (CreateVoterRequest request, DatabaseService dbService) =>
@@ -853,21 +859,6 @@ app.MapPost("/api/voter/verify-access-code", async (VerifyAccessCodeRequest requ
 app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request, DatabaseService dbService) =>
 {
     Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ===== VOTER AUTH LOOKUP ATTEMPT =====");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] County: {request.County}, Constituency: {request.Constituency}");
-    
-    // Validate that county and constituency are provided
-    if (string.IsNullOrWhiteSpace(request.County) || string.IsNullOrWhiteSpace(request.Constituency))
-    {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing County or Constituency");
-        return Results.BadRequest(new VoterAuthLookupResponse(
-            false,
-            "County and Constituency are required",
-            null,
-            null,
-            null,
-            null
-        ));
-    }
 
     Voter? voter = null;
     string? matchedBy = null;
@@ -877,9 +868,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting NIN lookup: {request.NationalInsuranceNumber}");
         voter = await dbService.GetVoterByNINAsync(
-            request.NationalInsuranceNumber,
-            request.County,
-            request.Constituency);
+            request.NationalInsuranceNumber);
         
         if (voter is not null)
         {
@@ -896,21 +885,35 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting Name+DOB lookup: {request.FirstName} {request.LastName} ({request.DateOfBirth})");
         
-        // Parse DateOfBirth from string ("1985-11-23 00:00:00+00" format)
-        if (DateTime.TryParse(request.DateOfBirth, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var parsedDob))
+        // Parse DOB as date-only to avoid timezone-driven day shifts.
+        var dobInput = request.DateOfBirth!.Trim();
+        DateTime parsedDob;
+
+        if (DateTime.TryParseExact(
+                dobInput,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var dateOnlyDob))
         {
+            parsedDob = DateTime.SpecifyKind(dateOnlyDob.Date, DateTimeKind.Unspecified);
             voter = await dbService.GetVoterByNameAndDateAsync(
                 request.FirstName ?? string.Empty,
                 request.LastName ?? string.Empty,
-                parsedDob,
-                request.County,
-                request.Constituency);
-            
-            if (voter is not null)
-            {
-                matchedBy = "Name+DOB";
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by Name+DOB");
-            }
+                parsedDob);
+        }
+        else if (DateTime.TryParse(
+                     dobInput,
+                     CultureInfo.InvariantCulture,
+                     DateTimeStyles.AllowWhiteSpaces,
+                     out var parsedDobWithTime))
+        {
+            parsedDob = DateTime.SpecifyKind(parsedDobWithTime.Date, DateTimeKind.Unspecified);
+
+            voter = await dbService.GetVoterByNameAndDateAsync(
+                request.FirstName ?? string.Empty,
+                request.LastName ?? string.Empty,
+                parsedDob);
         }
         else
         {
@@ -935,7 +938,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
         ));
     }
 
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ VOTER NOT FOUND - No matching voter in {request.County}/{request.Constituency}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ VOTER NOT FOUND - No matching voter found");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
     
     return Results.BadRequest(new VoterAuthLookupResponse(
@@ -1040,6 +1043,7 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
         ["county"] = request.County,
         ["constituency"] = request.Constituency,
         ["stationId"] = officialInfo.StationId,
+        ["officialId"] = officialInfo.OfficialId,
         ["tokenId"] = voterTokenId
     };
     var voterToken = GenerateJwtToken($"voter_{assignedVoterId}_{voterTokenId}", "voter", voterClaims);
@@ -1059,11 +1063,40 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
 .WithName("VoterLinkToOfficial");
 
 app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
+    ClaimsPrincipal user,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
     [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>> countyVoteChannels) =>
 {
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast attempt - Voter ID: {request.VoterId}, County: {request.County}, Constituency: {request.Constituency}, Station: {request.PollingStationCode}");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote for: {request.CandidateName} - {request.PartyName}");
+
+    // Validate cast request against voter token claims.
+    var tokenVoterId = user.FindFirst("voterId")?.Value;
+    var tokenCounty = user.FindFirst("county")?.Value;
+    var tokenConstituency = user.FindFirst("constituency")?.Value;
+    var tokenStationId = user.FindFirst("stationId")?.Value;
+    var tokenOfficialId = user.FindFirst("officialId")?.Value;
+
+    if (!int.TryParse(tokenVoterId, out var parsedTokenVoterId) || parsedTokenVoterId != request.VoterId)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - request voter ID {request.VoterId} does not match token voter ID {tokenVoterId}");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid voter token context",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (!string.Equals(tokenCounty, request.County, StringComparison.Ordinal) ||
+        !string.Equals(tokenConstituency, request.Constituency, StringComparison.Ordinal))
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - request county/constituency does not match token claims");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid location context",
+            DateTime.UtcNow
+        ));
+    }
     
     // Find ALL active officials
     var allOfficials = activeOfficials.ToList();
@@ -1087,6 +1120,36 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
     
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Officials in same constituency: {officialsInConstituency.Count}");
     
+    // Fallback: recover official association from token claims when in-memory list was reset.
+    if (officialsInConstituency.Count == 0)
+    {
+        var fallbackOfficials = allOfficials.Where(o =>
+            o.Value.Constituency == request.Constituency &&
+            (
+                (!string.IsNullOrEmpty(tokenOfficialId) && o.Value.OfficialId == tokenOfficialId) ||
+                (!string.IsNullOrEmpty(tokenStationId) && o.Value.StationId == tokenStationId)
+            ))
+            .ToList();
+
+        if (fallbackOfficials.Count > 0)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Recovered voter-official link from token claims for voter {request.VoterId}");
+
+            // Self-heal the in-memory link for subsequent requests.
+            foreach (var kvp in fallbackOfficials)
+            {
+                if (!kvp.Value.ConnectedVoters.Contains(request.VoterId))
+                {
+                    var healed = kvp.Value with { ConnectedVoters = new List<int>(kvp.Value.ConnectedVoters) { request.VoterId } };
+                    activeOfficials[kvp.Key] = healed;
+                }
+            }
+
+            officialsInConstituency = fallbackOfficials;
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Officials in same constituency after token fallback: {officialsInConstituency.Count}");
+        }
+    }
+
     if (officialsInConstituency.Count > 0)
     {
         // Create vote notification with county and constituency
@@ -1714,12 +1777,6 @@ record OfficialLoginRequest(
     string Password
 );
 
-record VoterSessionRequest(
-    string VoterId,  // NIN or voter identifier
-    string County,
-    string Constituency
-);
-
 record CreateVoterRequest(
     string NationalInsuranceNumber,
     string FirstName,
@@ -1827,9 +1884,7 @@ record VoterAuthLookupRequest(
     string? NationalInsuranceNumber,
     string? FirstName,
     string? LastName,
-    string? DateOfBirth,
-    string County,
-    string Constituency
+    string? DateOfBirth
 );
 
 record VoterAuthLookupResponse(

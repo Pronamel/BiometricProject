@@ -64,36 +64,6 @@ public class ServerHandler : IServerHandler
     // VOTER AUTHENTICATION & SESSION MANAGEMENT
     // ==========================================
     
-    public async Task<VoterSessionResponse?> CreateVoterSessionAsync(string voterId, string county, string? stationId = null)
-    {
-        try
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Creating voter session for {voterId} in {county} at station {stationId ?? "unassigned"}");
-            
-            // Provide a default value for constituency if null
-            var defaultConstituency = "DefaultConstituency";
-            var result = await _apiService.CreateSessionAsync(voterId, county, defaultConstituency, stationId);
-            
-            if (result?.Success == true)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter session created successfully");
-                StatusMessageReceived?.Invoke("Authenticated successfully");
-                return result;
-            }
-            else
-            {
-                StatusMessageReceived?.Invoke("Authentication failed");
-                return null;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Session creation error: {ex.Message}");
-            StatusMessageReceived?.Invoke($"Authentication error: {ex.Message}");
-            return null;
-        }
-    }
-    
     public void Logout()
     {
         StopContinuousListening();

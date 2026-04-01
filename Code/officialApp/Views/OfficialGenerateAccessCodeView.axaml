@@ -30,10 +30,9 @@
             
             <!-- Input Field -->
             <StackPanel Spacing="5">
-                <TextBlock Text="Access Code:" Foreground="black" FontSize="14"/>
+                <TextBlock Text="Access Code (e.g., BRAINTREE-2026):" Foreground="black" FontSize="14"/>
                 <TextBox x:Name="AccessCodeInput"
                         Text="{Binding AccessCode}"
-                        Watermark="Enter access code (e.g., BRAINTREE-2026)"
                         Height="40"
                         FontSize="14"
                         Padding="10"/>

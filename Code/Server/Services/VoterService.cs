@@ -123,4 +123,14 @@ public class VoterService
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Created voting session {sessionId} for voter {voterId}");
         return sessionId;
     }
+
+    public bool RevokeVoterSession(string voterId)
+    {
+        var removed = _activeVotingSessions.TryRemove(voterId, out _);
+        if (removed)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {voterId} session revoked");
+        }
+        return removed;
+    }
 }

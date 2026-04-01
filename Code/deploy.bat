@@ -57,7 +57,20 @@ echo.
 
 cd /d "%~dp0Server"
 
-scp -i "C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server-Key.pem" -r bin\Release\net8.0\publish\* ec2-user@34.238.14.248:/home/ec2-user/serverSpace
+echo Securing private key permissions...
+set "KEY_PATH=%~dp0Server-Key.pem"
+
+if not exist "%KEY_PATH%" (
+    echo ERROR: Key file not found at "%KEY_PATH%"
+    goto :end
+)
+
+REM Restrict key ACL so OpenSSH accepts it on Windows
+icacls "%KEY_PATH%" /inheritance:r >nul
+icacls "%KEY_PATH%" /remove:g "Users" "Authenticated Users" "Everyone" >nul 2>&1
+icacls "%KEY_PATH%" /grant:r "%USERNAME%:R" >nul
+
+scp -i "%~dp0Server-Key.pem" -r bin\Release\net8.0\publish\* ec2-user@34.238.14.248:/home/ec2-user/serverSpace
 
 echo.
 echo ================================================
@@ -65,4 +78,5 @@ echo DEPLOYMENT COMPLETE
 echo ================================================
 echo.
 
+:end
 pause

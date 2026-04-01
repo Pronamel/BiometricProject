@@ -8,12 +8,15 @@ using SecureVoteApp.ViewModels;
 using SecureVoteApp.Views.VoterUI;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using SecureVoteApp.Services;
+using Avalonia.Controls;
 
 namespace SecureVoteApp;
 
 public partial class App : Application
 {
     private IServiceProvider? _serviceProvider;
+    private bool _shutdownHandled;
 
     public override void Initialize()
     {
@@ -37,6 +40,46 @@ public partial class App : Application
             {
                 DataContext = _serviceProvider.GetRequiredService<MainWindowViewModel>(),
             };
+
+            if (desktop.MainWindow is Window mainWindow)
+            {
+                EventHandler<WindowClosingEventArgs>? onWindowClosing = null;
+                onWindowClosing = async (_, e) =>
+                {
+                    if (_shutdownHandled)
+                    {
+                        return;
+                    }
+
+                    _shutdownHandled = true;
+                    e.Cancel = true;
+
+                    try
+                    {
+                        var apiService = _serviceProvider?.GetService<IApiService>();
+                        if (apiService?.IsAuthenticated == true)
+                        {
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] App is closing - logging out voter session...");
+                            await apiService.LogoutAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error during SecureVote shutdown logout: {ex.Message}");
+                    }
+                    finally
+                    {
+                        if (onWindowClosing != null)
+                        {
+                            mainWindow.Closing -= onWindowClosing;
+                        }
+
+                        desktop.Shutdown();
+                    }
+                };
+
+                mainWindow.Closing += onWindowClosing;
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

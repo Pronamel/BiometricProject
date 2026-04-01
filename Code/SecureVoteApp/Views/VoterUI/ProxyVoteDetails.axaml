@@ -32,7 +32,7 @@
         <StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
             <StackPanel Spacing="20">
                 <StackPanel>
-                    <TextBlock Text="Full Name" 
+                    <TextBlock Text="Full Name (e.g., John Smith)" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -40,7 +40,7 @@
                 </StackPanel>
                 
                 <StackPanel>
-                    <TextBlock Text="Address" 
+                    <TextBlock Text="Address (e.g., 123 High Street, London)" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -48,7 +48,7 @@
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="National Insurance Number" 
+                    <TextBlock Text="National Insurance Number (e.g., AB123456C)" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -56,7 +56,7 @@
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Date Of Birth" 
+                    <TextBlock Text="Date of Birth (e.g., 1985-11-23)" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -71,7 +71,7 @@
         <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
             <StackPanel Spacing="20">
                 <StackPanel>
-                    <TextBlock Text="Proxy Fullname" 
+                    <TextBlock Text="Proxy Full Name (e.g., Sarah Jones)" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -79,7 +79,7 @@
                 </StackPanel>
                 
                 <StackPanel>
-                    <TextBlock Text="Proxy Address" 
+                    <TextBlock Text="Proxy Address (e.g., 45 Market Road, Leeds)" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>
@@ -87,7 +87,7 @@
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Reason for Proxy Vote:" 
+                    <TextBlock Text="Reason for Proxy Vote (e.g., Medical treatment):" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>

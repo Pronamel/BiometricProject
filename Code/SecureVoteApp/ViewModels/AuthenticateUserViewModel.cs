@@ -162,8 +162,9 @@ public partial class AuthenticateUserViewModel : ViewModelBase
 
             Console.WriteLine($"[AuthenticateUserViewModel] Encoded fingerprint size: {scannedImagePng.Length} bytes (PNG)");
 
-            // Get the current voter's ID from the API service
-            string? voterId = _apiService.CurrentVoterId;
+            // Prefer voter ID from lookup initialization for this auth flow.
+            // Fallback to API session voter ID only if needed.
+            string? voterId = _currentVoterId?.ToString() ?? _apiService.CurrentVoterId;
             if (string.IsNullOrEmpty(voterId))
             {
                 Console.WriteLine("[AuthenticateUserViewModel] ❌ No voter ID available for fingerprint verification");
@@ -391,11 +392,11 @@ public partial class AuthenticateUserViewModel : ViewModelBase
                 }
                 else if (args.QualityScore < QUALITY_THRESHOLD)
                 {
-                    statusMessage = $"Quality: {args.QualityScore}% - Building quality, keep steady...";
+                    statusMessage = "Hold steady while scanner improves capture...";
                 }
                 else
                 {
-                    statusMessage = $"✓ Excellent! Quality: {args.QualityScore}% - Fingerprint accepted";
+                    statusMessage = "Fingerprint accepted";
                 }
                 
                 CaptureStatusMessage = statusMessage;
@@ -438,7 +439,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             {
                 if (args.IsSuccess)
                 {
-                    CaptureStatusMessage = $"Fingerprint captured! Quality: {args.QualityScore}% - Comparing...";
+                    CaptureStatusMessage = "Fingerprint captured. Comparing...";
                     Console.WriteLine("[AuthenticateUserViewModel] ✓ Fingerprint data saved - starting comparison");
                     
                     // Start fingerprint comparison asynchronously
@@ -460,6 +461,9 @@ public partial class AuthenticateUserViewModel : ViewModelBase
                             Console.WriteLine("[AuthenticateUserViewModel] ❌ ERROR: NavigationService is null");
                             CleanupCapture();
                         }
+
+                        // Keep scan data in memory only for the shortest possible time.
+                        _capturedFingerprintData = null;
                     });
                 }
                 else

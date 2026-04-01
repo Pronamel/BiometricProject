@@ -11,7 +11,6 @@ public interface IServerHandler
     Task<bool> TestConnectionAsync();
     
     // Voter Authentication & Session Management
-    Task<VoterSessionResponse?> CreateVoterSessionAsync(string voterId, string county, string? stationId = null);
     bool IsAuthenticated { get; }
     string? CurrentVoterId { get; }
     string? AssignedStationId { get; }

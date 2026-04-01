@@ -92,25 +92,30 @@
                                       VerticalAlignment="Top"/>
                         </ScrollViewer>
                         
-                        <!-- Bottom 40% - TextBox and Button -->
-                        <Grid Grid.Row="1">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="6*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="4*"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <TextBox Grid.Column="0" 
-                                    Text="{Binding CommandInput}" 
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,5,0"/>
-                            
-                            <Button Grid.Column="2" 
-                                   Content="Execute" 
-                                   Command="{Binding ExecuteCommand}"
-                                   VerticalAlignment="Center"
-                                   Margin="5,0,0,0"/>
-                        </Grid>
+                        <!-- Bottom 40% - Input Label, TextBox and Button -->
+                        <StackPanel Grid.Row="1" Spacing="6">
+                            <TextBlock Text="Command Input (e.g., refresh-status)"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="6*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="4*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox Grid.Column="0" 
+                                        Text="{Binding CommandInput}" 
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,5,0"/>
+
+                                <Button Grid.Column="2" 
+                                       Content="Execute" 
+                                       Command="{Binding ExecuteCommand}"
+                                       VerticalAlignment="Center"
+                                       Margin="5,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
                     </Grid>
                 </Border>
                 

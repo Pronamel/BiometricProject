@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Server.Data;
 using Server.Models.Entities;
 
@@ -303,22 +304,24 @@ public class DatabaseService
         }
     }
 
-    public async Task<Voter?> GetVoterByNINAsync(string nin, string county, string constituency)
+    public async Task<Voter?> GetVoterByNINAsync(string nin)
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by NIN: {nin} in {county}/{constituency}");
+            var normalizedNin = nin.Trim().ToUpperInvariant().Replace(" ", string.Empty);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by NIN: {nin}");
             
             var voter = await _dbContext.Voters
                 .Include(v => v.Constituency)
                 .FirstOrDefaultAsync(v => 
-                    v.NationalId == nin.Trim() && 
-                    v.County == county &&
-                    v.Constituency != null && v.Constituency.Name == constituency);
+                    v.NationalId
+                        .Trim()
+                        .ToUpper()
+                        .Replace(" ", string.Empty) == normalizedNin);
 
             if (voter == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with NIN '{nin}' in {county}/{constituency}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with NIN '{nin}'");
                 return null;
             }
 
@@ -334,32 +337,38 @@ public class DatabaseService
     }
 
     public async Task<Voter?> GetVoterByNameAndDateAsync(
-        string firstName, string lastName, DateTime dateOfBirth, 
-        string county, string constituency)
+        string firstName, string lastName, DateTime dateOfBirth)
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by Name+DOB: {firstName} {lastName} ({dateOfBirth:yyyy-MM-dd}) in {county}/{constituency}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by Name+DOB: {firstName} {lastName} ({dateOfBirth:yyyy-MM-dd})");
             
-            // Normalize search values: trim whitespace and uppercase for case-insensitive matching
-            var firstNameUpper = firstName.Trim().ToUpper();
-            var lastNameUpper = lastName.Trim().ToUpper();
-            
-            // Extract just the date part, ignoring time
+            var firstNameUpper = firstName.Trim().ToUpperInvariant();
+            var lastNameUpper = lastName.Trim().ToUpperInvariant();
             var dobDate = dateOfBirth.Date;
-            
+
+            // Use SQL date casting to avoid timezone shifts in timestamptz DOB values.
+            var firstNameParam = new NpgsqlParameter<string>("firstName", firstNameUpper);
+            var lastNameParam = new NpgsqlParameter<string>("lastName", lastNameUpper);
+            var dobParam = new NpgsqlParameter<DateTime>("dob", dobDate);
+
             var voter = await _dbContext.Voters
+                .FromSqlRaw(
+                    @"SELECT v.*
+                      FROM public.""Voters"" v
+                      WHERE UPPER(TRIM(v.""FirstName"")) = @firstName
+                        AND UPPER(TRIM(v.""LastName"")) = @lastName
+                        AND (v.""DateOfBirth"" AT TIME ZONE 'UTC')::date = @dob::date
+                      LIMIT 1",
+                    firstNameParam,
+                    lastNameParam,
+                    dobParam)
                 .Include(v => v.Constituency)
-                .FirstOrDefaultAsync(v => 
-                    v.FirstName.ToUpper() == firstNameUpper &&
-                    v.LastName.ToUpper() == lastNameUpper &&
-                    v.DateOfBirth.Date == dobDate &&
-                    v.County == county &&
-                    v.Constituency != null && v.Constituency.Name == constituency);
+                .FirstOrDefaultAsync();
 
             if (voter == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with Name '{firstName} {lastName}' DOB '{dateOfBirth:yyyy-MM-dd}' in {county}/{constituency}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with Name '{firstName} {lastName}' DOB '{dateOfBirth:yyyy-MM-dd}'");
                 return null;
             }
 

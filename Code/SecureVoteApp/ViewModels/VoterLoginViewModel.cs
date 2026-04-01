@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -43,10 +44,14 @@ public partial class VoterLoginViewModel : ViewModelBase
     private string connectedStationId = "";
 
     // County options for selection
-    public List<string> CountyOptions => UKCounties.Counties;
+    public List<string> CountyOptions => UKCounties.Counties
+        .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
 
     // Constituency options for selection
-    public List<string> ConstituencyOptions => UKConstituencies.Constituencies;
+    public List<string> ConstituencyOptions => UKConstituencies.Constituencies
+        .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
 
     // ==========================================
     // PRIVATE READONLY FIELDS
@@ -65,9 +70,6 @@ public partial class VoterLoginViewModel : ViewModelBase
         _navigationService = navigationService;
         _countyService = countyService;
         _apiService = apiService;
-        
-        // Populate with TestVoter data
-        SelectedCounty = "Bedfordshire";
     }
 
     // ==========================================

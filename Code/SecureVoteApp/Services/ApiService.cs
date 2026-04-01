@@ -63,59 +63,6 @@ public class ApiService : IApiService
     // JWT Authentication Methods
     //--------------------------------------------
 
-    public async Task<VoterSessionResponse?> CreateSessionAsync(string voterId, string county, string constituency, string? stationId = null)
-    {
-        try
-        {
-            var sessionRequest = new VoterSessionRequest
-            {
-                VoterId = voterId,
-                County = county,
-                Constituency = constituency,
-                StationId = stationId
-            };
-
-            var jsonContent = JsonSerializer.Serialize(sessionRequest, _jsonOptions);
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Creating voter session:");
-            Console.WriteLine($"  Voter ID: '{voterId}'");
-            Console.WriteLine($"  County: '{county}'");
-            Console.WriteLine($"  Station ID: '{stationId ?? "Not assigned"}'");
-
-            var response = await _httpClient.PostAsync($"{_baseUrl}/auth/voter-session", content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Response Status: {response.StatusCode}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Response Body: {responseContent}");
-
-            if (response.IsSuccessStatusCode)
-            {
-                var sessionResponse = JsonSerializer.Deserialize<VoterSessionResponse>(responseContent, _jsonOptions);
-
-                if (sessionResponse?.Success == true && !string.IsNullOrEmpty(sessionResponse.Token))
-                {
-                    // Store authentication state
-                    _jwtToken = sessionResponse.Token;
-                    _tokenExpiry = sessionResponse.ExpiresAt;
-                    _currentVoterId = sessionResponse.VoterId;
-                    _currentSessionId = sessionResponse.SessionId;
-                    _assignedStationId = stationId;
-
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter {voterId} session created successfully");
-                    return sessionResponse;
-                }
-            }
-
-            return null;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Session creation error: {ex.Message}");
-            return null;
-        }
-    }
-
     private string HashPollingStationCode(string code)
     {
         using (var sha256 = SHA256.Create())
@@ -250,6 +197,11 @@ public class ApiService : IApiService
                 {
                     if (lookupResponse.Success)
                     {
+                        if (lookupResponse.VoterId.HasValue)
+                        {
+                            _currentVoterId = lookupResponse.VoterId.Value.ToString();
+                        }
+
                         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found: {lookupResponse.FullName} (Matched by: {lookupResponse.MatchedBy})");
                     }
                     else
@@ -410,17 +362,39 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task LogoutAsync()
+    {
+        try
+        {
+            if (IsAuthenticated)
+            {
+                var response = await SendAuthenticatedPostAsync("/auth/voter-logout", new StringContent("{}", Encoding.UTF8, "application/json"));
+                var body = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter logout response: {response.StatusCode} {body}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error calling voter logout endpoint: {ex.Message}");
+        }
+        finally
+        {
+            _jwtToken = null;
+            _tokenExpiry = DateTime.MinValue;
+            _currentVoterId = null;
+            _currentSessionId = null;
+            _assignedStationId = null;
+            _assignedVoterId = 0;
+            _selectedCounty = string.Empty;
+            _pollingStationCode = string.Empty;
+            _selectedConstituency = string.Empty;
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter logged out");
+        }
+    }
+
     public void Logout()
     {
-        _jwtToken = null;
-        _tokenExpiry = DateTime.MinValue;
-        _currentVoterId = null;
-        _currentSessionId = null;
-        _assignedStationId = null;
-        _assignedVoterId = 0;
-        _selectedCounty = string.Empty;
-        _pollingStationCode = string.Empty;
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter logged out");
+        LogoutAsync().GetAwaiter().GetResult();
     }
 
     private void AddAuthorizationHeader(HttpRequestMessage request)
@@ -649,25 +623,19 @@ public class ApiService : IApiService
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📥 Fingerprint verification response status: {response.StatusCode}");
 
-            if (response.IsSuccessStatusCode)
+            var verifyResponse = JsonSerializer.Deserialize<FingerprintVerificationResponse>(responseContent, _jsonOptions);
+
+            if (verifyResponse != null)
             {
-                var verifyResponse = JsonSerializer.Deserialize<FingerprintVerificationResponse>(responseContent, _jsonOptions);
-                
-                if (verifyResponse != null)
-                {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Fingerprint verification result:");
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Match: {verifyResponse.IsMatch}");
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Score: {verifyResponse.Score}");
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Threshold: {verifyResponse.Threshold}");
-                }
-                
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {(response.IsSuccessStatusCode ? "✅" : "⚠️")} Fingerprint verification result:");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Match: {verifyResponse.IsMatch}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Score: {verifyResponse.Score}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Threshold: {verifyResponse.Threshold}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Message: {verifyResponse.Message}");
                 return verifyResponse;
             }
-            else
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Fingerprint verification failed: {responseContent}");
-            }
 
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Fingerprint verification response parse failed: {responseContent}");
             return null;
         }
         catch (Exception ex)

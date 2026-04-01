@@ -8,7 +8,6 @@ namespace SecureVoteApp.Services;
 public interface IApiService
 {
     // Authentication & Session Management
-    Task<VoterSessionResponse?> CreateSessionAsync(string voterId, string county, string constituency, string? stationId = null);
     Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
     Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? nin, string? firstName, string? lastName, string? dateOfBirth, string county, string constituency);
     
@@ -22,6 +21,7 @@ public interface IApiService
     int AssignedVoterId { get; }
     string SelectedCounty { get; }
     string PollingStationCode { get; }
+    Task LogoutAsync();
     void Logout();
     
     // Connection Testing

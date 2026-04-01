@@ -86,8 +86,12 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     private readonly IApiService _apiService;
     private readonly IScannerService _scannerService;
 
-    public List<string> CountyOptions => UKCounties.Counties;
-    public List<string> ConstituencyOptions => UKConstituencies.Constituencies;
+    public List<string> CountyOptions => UKCounties.Counties
+        .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
+    public List<string> ConstituencyOptions => UKConstituencies.Constituencies
+        .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
     
     // Polling stations - store full objects internally
     private List<PollingStationOption> _allPollingStations = new List<PollingStationOption>();
@@ -111,32 +115,6 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         _apiService = apiService;
         _scannerService = scannerService;
         CheckScannerConnectivity();
-        
-        // Pre-fill form with test data for fingerprint scanning
-        PopulateTestData();
-    }
-
-    private void PopulateTestData()
-    {
-        // Fixed test data for consistent database testing
-        FirstName = "TestVoter";
-        LastName = "BiometricTest";
-        NationalInsuranceNumber = "AB123456C";
-        DateOfBirth = "15/05/1985";
-        AddressLine1 = "123 Test Street";
-        AddressLine2 = "Flat 5";
-        PostCode = "SW1A 1AA";
-        
-        // Select first available county and constituency if available
-        if (UKCounties.Counties.Count > 0)
-        {
-            SelectedCounty = UKCounties.Counties[0];
-        }
-        
-        if (UKConstituencies.Constituencies.Count > 0)
-        {
-            SelectedConstituency = UKConstituencies.Constituencies[0];
-        }
     }
 
     private async Task LoadPollingStations()
@@ -421,12 +399,6 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void RefreshScannerStatus()
-    {
-        CheckScannerConnectivity();
-    }
-
-    [RelayCommand]
     private void StartScanning()
     {
         Console.WriteLine("[OfficialAddVoterViewModel] Start scanning command triggered");
@@ -496,11 +468,11 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 }
                 else if (args.QualityScore < QUALITY_THRESHOLD)
                 {
-                    statusMessage = $"Quality: {args.QualityScore}% - Building quality, keep steady...";
+                    statusMessage = "Hold steady while scanner improves capture...";
                 }
                 else
                 {
-                    statusMessage = $"✓ Excellent! Quality: {args.QualityScore}% - Fingerprint accepted";
+                    statusMessage = "Fingerprint accepted";
                 }
                 
                 CaptureStatusMessage = statusMessage;
@@ -535,7 +507,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             {
                 if (args.IsSuccess)
                 {
-                    CaptureStatusMessage = $"✓ Fingerprint captured! Quality: {args.QualityScore}%";
+                    CaptureStatusMessage = "Fingerprint captured";
                     Console.WriteLine("[OfficialAddVoterViewModel] ✓ Fingerprint data saved");
                 }
                 else
@@ -716,36 +688,4 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         }
     }
 
-
-
-    [RelayCommand]
-    private void TestPreviewImage()
-    {
-        int testWidth = 256;
-        int testHeight = 256;
-        byte[] testImageData = new byte[testWidth * testHeight];
-        
-        for (int y = 0; y < testHeight; y++)
-        {
-            for (int x = 0; x < testWidth; x++)
-            {
-                int dx = x - testWidth / 2;
-                int dy = y - testHeight / 2;
-                float distance = (float)Math.Sqrt(dx * dx + dy * dy);
-                byte value = (byte)(Math.Sin(distance / 10) * 127 + 128);
-                testImageData[y * testWidth + x] = value;
-            }
-        }
-        
-        _capturedFingerprintData = testImageData;
-        QualityScore = 75;
-        CaptureStatusMessage = "Test image loaded";
-        Console.WriteLine("[OfficialAddVoterViewModel] Generating test preview image...");
-        
-        Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            PreviewImage = ConvertBytesToBitmap(testImageData, (uint)testWidth, (uint)testHeight);
-            Console.WriteLine($"[OfficialAddVoterViewModel] ✓ Test image displayed");
-        }, DispatcherPriority.Input);
-    }
 }

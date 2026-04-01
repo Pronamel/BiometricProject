@@ -67,14 +67,15 @@ public class ApiService : IApiService
     {
         try
         {
-            var loginRequest = new { Username = username, Password = password };
+            var hashedPassword = HashPassword(password);
+            var loginRequest = new { Username = username, Password = hashedPassword };
 
             var jsonContent = JsonSerializer.Serialize(loginRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending login request:");
             Console.WriteLine($"  Username: '{username}'");
-            Console.WriteLine($"  Password: '{password}'");
+            Console.WriteLine("  Password: '[SHA256 hashed]'");
             Console.WriteLine($"  JSON: {jsonContent}");
 
             var response = await _httpClient.PostAsync($"{_baseUrl}/auth/official-login", content);
@@ -155,6 +156,15 @@ public class ApiService : IApiService
     //--------------------------------------------
     // Access Code Management Methods
     //--------------------------------------------
+
+    private string HashPassword(string plaintext)
+    {
+        using (var sha256 = SHA256.Create())
+        {
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(plaintext));
+            return Convert.ToBase64String(hashedBytes);
+        }
+    }
 
     private string HashAccessCode(string plaintext)
     {
@@ -547,7 +557,7 @@ public class ApiService : IApiService
             { 
                 userType = "official",  // Identifier indicating this is an official
                 username = username,
-                password = password,
+                password = HashPassword(password),
                 voterId = (string?)null,  // Not applicable for officials
                 scannedFingerprint = scannedFingerprintBase64
             };
@@ -610,7 +620,7 @@ public class ApiService : IApiService
             var uploadRequest = new
             {
                 username = username,
-                password = password,
+                password = HashPassword(password),
                 fingerPrintScan = fingerprintBase64
             };
 

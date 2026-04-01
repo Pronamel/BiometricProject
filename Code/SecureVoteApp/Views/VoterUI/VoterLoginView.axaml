@@ -66,7 +66,7 @@
 
             <!-- Polling Station Code Section -->
             <StackPanel Spacing="8">
-                <TextBlock Text="Polling Station Code" 
+                <TextBlock Text="Polling Station Code (e.g., STN-042)" 
                            FontSize="16" 
                            FontWeight="SemiBold"
                            Foreground="DarkSlateGray"/>
@@ -78,8 +78,7 @@
                          CornerRadius="5"
                          Padding="10"
                          FontSize="14"
-                         Height="40"
-                         Watermark="Enter station code"/>
+                         Height="40"/>
             </StackPanel>
 
             <!-- Status Messages Section -->

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Text.Json;
 using System.Net.Http;
+using System.Globalization;
 using System.Reflection;
 using SecureVoteApp.Views.VoterUI;
 using SecureVoteApp.Services;
@@ -42,9 +43,10 @@ public partial class NINEntryViewModel : ViewModelBase
     private string nationalInsuranceNumber = string.Empty;
 
     [ObservableProperty]
-    private string blueTextHave = "I don't have a National Insurance Number";
+    private string blueTextHave = "I cannot remember or do not have my National insurance number";
     
-    //I do have a National Insurance Number
+    [ObservableProperty]
+    private bool showNinOnly = true;
 
     [ObservableProperty]
     private bool dateOfBirthVisible = false;
@@ -70,12 +72,6 @@ public partial class NINEntryViewModel : ViewModelBase
         _navigationService = navigationService;
         _apiService = apiService;
         _countyService = countyService;
-        
-        // Populate with TestVoter data
-        FirstName = "TestVoter";
-        LastName = "BiometricTest";
-        DateOfBirth = "1985-11-23 00:00:00+00";
-        NationalInsuranceNumber = "AB123456C";
     }
 
 
@@ -107,12 +103,24 @@ public partial class NINEntryViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {_countyService.SelectedCounty}");
 
             var selectedConstituency = "Unknown"; // TODO: Add constituency selection to UI if needed
+
+            string? normalizedDob = null;
+            if (DateOfBirthVisible)
+            {
+                if (string.IsNullOrWhiteSpace(DateOfBirth) || !TryNormalizeDateOfBirth(DateOfBirth, out var parsedDob))
+                {
+                    StatusMessage = "❌ Enter Date of Birth as yyyy-MM-dd (example: 1985-11-23).";
+                    return;
+                }
+
+                normalizedDob = parsedDob;
+            }
             
             var lookup = await _apiService.LookupVoterForAuthAsync(
                 nin: string.IsNullOrWhiteSpace(NationalInsuranceNumber) ? null : NationalInsuranceNumber,
                 firstName: string.IsNullOrWhiteSpace(FirstName) ? null : FirstName,
                 lastName: string.IsNullOrWhiteSpace(LastName) ? null : LastName,
-                dateOfBirth: DateOfBirthVisible && !string.IsNullOrWhiteSpace(DateOfBirth) ? DateOfBirth : null,
+                dateOfBirth: normalizedDob,
                 county: _countyService.SelectedCounty,
                 constituency: selectedConstituency);
 
@@ -144,17 +152,36 @@ public partial class NINEntryViewModel : ViewModelBase
     [RelayCommand]
     private void BlueTextPress()
     {
-        if(DateOfBirthVisible == false)
+        if(ShowNinOnly == true)
         {
+            ShowNinOnly = false;
             DateOfBirthVisible = true;
-            TextBoxEnabled = false;
             BlueTextHave = "I do have a National Insurance Number";
         }
         else
         {
+            ShowNinOnly = true;
             DateOfBirthVisible = false;
-            TextBoxEnabled = true;
-            BlueTextHave = "I don't have a National Insurance Number";
+            BlueTextHave = "I cannot remember or do not have my National insurance number";
         }
+    }
+
+    private static bool TryNormalizeDateOfBirth(string input, out string normalizedDate)
+    {
+        var supportedFormats = new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy" };
+
+        if (DateTime.TryParseExact(
+                input.Trim(),
+                supportedFormats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsedDate))
+        {
+            normalizedDate = parsedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        normalizedDate = string.Empty;
+        return false;
     }
 }

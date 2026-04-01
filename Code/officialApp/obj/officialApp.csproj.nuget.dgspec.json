@@ -1,27 +1,25 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj": {}
+    "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\officialApp\\officialApp.csproj": {}
   },
   "projects": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj": {
+    "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\officialApp\\officialApp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
+        "projectUniqueName": "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
         "projectName": "officialApp",
-        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
+        "projectPath": "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
         "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\obj\\",
+        "outputPath": "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\officialApp\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -40,7 +38,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net8.0": {
@@ -121,7 +119,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.104/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

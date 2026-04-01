@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "eAybxQUqS1M=",
+  "dgSpecHash": "htNeWma6oU0=",
   "success": true,
-  "projectFilePath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj",
+  "projectFilePath": "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\Server\\Server.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\alexa\\.nuget\\packages\\awssdk.core\\3.7.300\\awssdk.core.3.7.300.nupkg.sha512",
+    "C:\\Users\\alexa\\.nuget\\packages\\awssdk.core\\4.0.3.25\\awssdk.core.4.0.3.25.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\awssdk.extensions.netcore.setup\\3.7.7\\awssdk.extensions.netcore.setup.3.7.7.nupkg.sha512",
-    "C:\\Users\\alexa\\.nuget\\packages\\awssdk.secretsmanager\\3.7.300\\awssdk.secretsmanager.3.7.300.nupkg.sha512",
+    "C:\\Users\\alexa\\.nuget\\packages\\awssdk.secretsmanager\\4.0.4.13\\awssdk.secretsmanager.4.0.4.13.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\8.0.0\\microsoft.aspnetcore.authentication.jwtbearer.8.0.0.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\6.0.0\\microsoft.bcl.asyncinterfaces.6.0.0.nupkg.sha512",
@@ -61,10 +61,10 @@
     "C:\\Users\\alexa\\.nuget\\packages\\system.text.encodings.web\\8.0.0\\system.text.encodings.web.8.0.0.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\system.text.json\\8.0.0\\system.text.json.8.0.0.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\system.threading.channels\\6.0.0\\system.threading.channels.6.0.0.nupkg.sha512",
-    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.25\\microsoft.netcore.app.ref.8.0.25.nupkg.sha512",
-    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.25\\microsoft.windowsdesktop.app.ref.8.0.25.nupkg.sha512",
     "C:\\Users\\alexa\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.25\\microsoft.aspnetcore.app.ref.8.0.25.nupkg.sha512",
-    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.25\\microsoft.netcore.app.host.win-x64.8.0.25.nupkg.sha512"
+    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.25\\microsoft.netcore.app.host.win-x64.8.0.25.nupkg.sha512",
+    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.25\\microsoft.netcore.app.ref.8.0.25.nupkg.sha512",
+    "C:\\Users\\alexa\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.25\\microsoft.windowsdesktop.app.ref.8.0.25.nupkg.sha512"
   ],
   "logs": []
 }
