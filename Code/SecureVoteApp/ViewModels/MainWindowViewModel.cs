@@ -61,7 +61,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _authenticateUserView = new AuthenticateUserView { DataContext = authenticateUserViewModel };
         _ballotPaperView = new BallotPaperView { DataContext = ballotPaperViewModel };
         
-        // Initialize navigation service with all view factories
+        // Initialize navigation service with all view factories and ViewModels
         ((NavigationService)_navigationService).Initialize(
             () => _voterLoginView,
             () => _ninEntryView,

@@ -21,6 +21,7 @@ public interface IApiService
     int AssignedVoterId { get; }
     string SelectedCounty { get; }
     string PollingStationCode { get; }
+    string CurrentDeviceStatus { get; set; }
     Task LogoutAsync();
     void Logout();
     
@@ -35,6 +36,9 @@ public interface IApiService
     Task<bool> SubmitCodeForVerificationAsync(string accessCode);
     Task<VoterCommandResponse?> ListenForCommandsAsync();
     Task<bool> SendStatusUpdateAsync(string status, string? additionalData = null);
+    
+    // Device Status Tracking
+    Task<bool> SendDeviceStatusAsync(string status);
     
     // Fingerprint Verification
     Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint);

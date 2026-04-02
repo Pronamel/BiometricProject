@@ -153,6 +153,34 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task<DeviceStatusResponse?> GetDeviceStatusesAsync()
+    {
+        try
+        {
+            if (!IsAuthenticated)
+            {
+                Console.WriteLine("Not authenticated for device status checking");
+                return null;
+            }
+
+            var response = await SendAuthenticatedGetAsync("/api/official/wait-for-device-statuses");
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var deviceStatusResponse = JsonSerializer.Deserialize<DeviceStatusResponse>(responseContent, _jsonOptions);
+                return deviceStatusResponse;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Device status checking error: {ex.Message}");
+            return null;
+        }
+    }
+
     //--------------------------------------------
     // Access Code Management Methods
     //--------------------------------------------

@@ -74,9 +74,6 @@ public partial class NINEntryViewModel : ViewModelBase
         _countyService = countyService;
     }
 
-
-
-
     // ==========================================
     // COMMANDS
     // ==========================================
@@ -130,7 +127,7 @@ public partial class NINEntryViewModel : ViewModelBase
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter lookup successful: {lookup.FullName}");
                 
                 // Navigate to authenticate user view, passing the lookup data
-                _navigationService.NavigateToAuthenticateUser(lookup);
+                await _navigationService.NavigateToAuthenticateUser(lookup);
             }
             else
             {

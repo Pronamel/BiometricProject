@@ -11,7 +11,6 @@ public partial class PersonalOrProxyViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
-
     // ==========================================
     // CONSTRUCTOR
     // ==========================================
@@ -28,8 +27,8 @@ public partial class PersonalOrProxyViewModel : ViewModelBase
     [RelayCommand]
     private void OpenNINEntry()
     {
-        // Navigate to NIN entry screen
-        _navigationService.NavigateToNINEntry();
+        // Navigate to NIN entry screen (fire and forget)
+        _ = _navigationService.NavigateToNINEntry();
     }
     
     [RelayCommand]

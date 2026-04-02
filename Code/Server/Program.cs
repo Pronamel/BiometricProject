@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Server.Services;
 using Server.Data;
+using Server.Models;
 using Server.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -122,6 +123,9 @@ var countyActiveConnections = new ConcurrentDictionary<string, ConcurrentDiction
 // County+Constituency-based vote notifications: County -> Constituency -> List of vote notifications for officials
 var countyVoteChannels = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>>();
 
+// County+Constituency-based device status notifications: County -> Constituency -> (OfficialId -> List of device statuses)
+var countyDeviceStatuses = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>>>();
+
 // Global storage (still shared across all counties)
 var activeVotingSessions = new ConcurrentDictionary<string, DateTime>(); // SessionId -> Expiry
 var tokenCounter = new TokenCounter(); // Global unique token counter
@@ -139,6 +143,7 @@ builder.Services.AddSingleton(countyChannels);
 builder.Services.AddSingleton(countyVoterCodes);
 builder.Services.AddSingleton(countyActiveConnections);
 builder.Services.AddSingleton(countyVoteChannels);
+builder.Services.AddSingleton(countyDeviceStatuses);
 builder.Services.AddSingleton(activeVotingSessions);
 builder.Services.AddSingleton(activeOfficials);
 builder.Services.AddSingleton(officialPollingStationHashes);
@@ -1205,6 +1210,127 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
 .RequireAuthorization(policy => policy.RequireRole("voter"))
 .WithName("CastVote");
 
+//===========================================
+// DEVICE STATUS ENDPOINT
+//===========================================
+app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
+    ClaimsPrincipal user,
+    ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>>> countyDeviceStatuses) =>
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status update - Voter ID: {request.VoterId}, Device ID: {request.DeviceId}, Status: {request.Status}");
+
+    // Validate device status against voter token claims
+    var tokenVoterId = user.FindFirst("voterId")?.Value;
+    var tokenCounty = user.FindFirst("county")?.Value;
+    var tokenConstituency = user.FindFirst("constituency")?.Value;
+    var tokenStationId = user.FindFirst("stationId")?.Value;
+    var tokenOfficialId = user.FindFirst("officialId")?.Value;
+
+    if (!int.TryParse(tokenVoterId, out var parsedTokenVoterId) || parsedTokenVoterId != request.VoterId)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status rejected - request voter ID {request.VoterId} does not match token voter ID {tokenVoterId}");
+        return Results.BadRequest(new { 
+            success = false, 
+            message = "Device status failed: invalid voter token context" 
+        });
+    }
+
+    if (string.IsNullOrEmpty(tokenCounty) || string.IsNullOrEmpty(tokenConstituency))
+    {
+        return Results.BadRequest(new { 
+            success = false, 
+            message = "County or constituency not found in authentication token" 
+        });
+    }
+
+    // Find officials with this voter connected (same logic as cast-vote)
+    var allOfficials = activeOfficials.ToList();
+    var officialsWithVoter = allOfficials
+        .Where(o => o.Value.ConnectedVoters.Contains(request.VoterId))
+        .ToList();
+    
+    var officialsInConstituency = officialsWithVoter
+        .Where(o => o.Value.Constituency == tokenConstituency)
+        .ToList();
+    
+    // Fallback: recover from token claims
+    if (officialsInConstituency.Count == 0)
+    {
+        var fallbackOfficials = allOfficials.Where(o =>
+            o.Value.Constituency == tokenConstituency &&
+            (
+                (!string.IsNullOrEmpty(tokenOfficialId) && o.Value.OfficialId == tokenOfficialId) ||
+                (!string.IsNullOrEmpty(tokenStationId) && o.Value.StationId == tokenStationId)
+            ))
+            .ToList();
+
+        if (fallbackOfficials.Count > 0)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Recovered voter-official link from token claims for device status");
+            foreach (var kvp in fallbackOfficials)
+            {
+                if (!kvp.Value.ConnectedVoters.Contains(request.VoterId))
+                {
+                    var healed = kvp.Value with { ConnectedVoters = new List<int>(kvp.Value.ConnectedVoters) { request.VoterId } };
+                    activeOfficials[kvp.Key] = healed;
+                }
+            }
+            officialsInConstituency = fallbackOfficials;
+        }
+    }
+
+    if (officialsInConstituency.Count > 0)
+    {
+        var deviceNotification = new DeviceStatusNotification(
+            request.VoterId,
+            request.DeviceId,
+            request.Status,
+            DateTime.UtcNow,
+            "",
+            "",
+            tokenCounty,
+            tokenConstituency
+        );
+        
+        var constituencyStatuses = countyDeviceStatuses
+            .GetOrAdd(tokenCounty, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>>())
+            .GetOrAdd(tokenConstituency, _ => new ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>());
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Broadcasting device status to {officialsInConstituency.Count} officials");
+        
+        foreach (var kvp in officialsInConstituency)
+        {
+            var officialId = kvp.Value.OfficialId;
+            var stationId = kvp.Value.StationId;
+            
+            var individualNotification = deviceNotification with 
+            { 
+                OfficialId = officialId, 
+                StationId = stationId 
+            };
+            
+            var officialQueue = constituencyStatuses.GetOrAdd(officialId, _ => new ConcurrentBag<DeviceStatusNotification>());
+            officialQueue.Add(individualNotification);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Added device status to official {officialId}");
+        }
+        
+        return Results.Ok(new { 
+            success = true, 
+            message = "Device status sent successfully",
+            timestamp = DateTime.UtcNow 
+        });
+    }
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status failed - Voter {request.VoterId} not linked to any official");
+    return Results.BadRequest(new { 
+        success = false, 
+        message = "Device status failed: Voter not properly linked to official system" 
+    });
+})
+.RequireAuthorization(policy => policy.RequireRole("voter"))
+.WithName("VoterSendDeviceStatus");
+
 
 
 
@@ -1280,7 +1406,49 @@ app.MapGet("/api/official/wait-for-votes", async (ClaimsPrincipal user,
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialWaitForVotes");
 
-
+app.MapGet("/api/official/wait-for-device-statuses", async (ClaimsPrincipal user,
+    [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>>> countyDeviceStatuses) =>
+{
+    var county = user.FindFirst("county")?.Value;
+    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
+    
+    if (string.IsNullOrEmpty(county))
+    {
+        return Results.BadRequest(new { success = false, message = "County not found in authentication token" });
+    }
+    
+    var statuses = new List<object>();
+    
+    if (countyDeviceStatuses.TryGetValue(county, out var constituencyDict))
+    {
+        foreach (var constituencyKvp in constituencyDict)
+        {
+            if (constituencyKvp.Value.TryGetValue(officialId, out var myQueue))
+            {
+                while (myQueue.TryTake(out var status))
+                {
+                    statuses.Add(new {
+                        voterId = status.VoterId,
+                        deviceId = status.DeviceId,
+                        status = status.Status,
+                        timestamp = status.Timestamp,
+                        county = status.County,
+                        constituency = status.Constituency
+                    });
+                }
+            }
+        }
+    }
+    
+    if (statuses.Count > 0)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Delivering {statuses.Count} device statuses to official {officialId}");
+    }
+    
+    return Results.Ok(new { success = true, statuses = statuses, count = statuses.Count });
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialWaitForDeviceStatuses");
 
 
 app.MapGet("/api/official/wait-for-requests", async (OfficialService officialService, ClaimsPrincipal user) =>
@@ -1306,6 +1474,7 @@ app.MapGet("/api/official/wait-for-requests", async (OfficialService officialSer
 })
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialWaitForRequests");
+
 
 app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, OfficialService officialService, ClaimsPrincipal user) =>
 {
@@ -1859,10 +2028,28 @@ record CastVoteResponse(
     DateTime Timestamp
 );
 
+// Device status tracking models
+record SendDeviceStatusRequest(
+    int VoterId,
+    string DeviceId,
+    string Status
+);
+
 record VoteNotification(
     int VoterId,
     string CandidateName,
     string PartyName,
+    DateTime Timestamp,
+    string OfficialId,
+    string StationId,
+    string County,
+    string Constituency
+);
+
+record DeviceStatusNotification(
+    int VoterId,
+    string DeviceId,
+    string Status,
     DateTime Timestamp,
     string OfficialId,
     string StationId,

@@ -7,7 +7,9 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 using SecureVoteApp.Models;
 
 namespace SecureVoteApp.Services;
@@ -30,6 +32,13 @@ public class ApiService : IApiService
     private string _selectedCounty = string.Empty;
     private string _pollingStationCode = string.Empty;
     private string _selectedConstituency = string.Empty;
+    private string _deviceId = string.Empty;
+    
+    // Device heartbeat loop for continuous status updates
+    private CancellationTokenSource? _deviceHeartbeatCancellation;
+    
+    // Current device status - can be updated by any part of the app
+    public string CurrentDeviceStatus { get; set; } = "Device initializing";
     
     // Authentication properties
     public bool IsAuthenticated => 
@@ -41,6 +50,7 @@ public class ApiService : IApiService
     public string SelectedCounty => _selectedCounty;
     public string PollingStationCode => _pollingStationCode;
     public string SelectedConstituency => _selectedConstituency;
+    public string DeviceId => _deviceId;
 
     public ApiService(HttpClient httpClient)
     {
@@ -57,6 +67,68 @@ public class ApiService : IApiService
             PropertyNameCaseInsensitive = true,
             WriteIndented = true
         };
+    }
+
+    //--------------------------------------------
+    // Device ID Methods
+    //--------------------------------------------
+
+    /// <summary>
+    /// Retrieves the Windows Machine GUID from the registry.
+    /// This is a unique identifier for the Windows installation on this computer.
+    /// </summary>
+    private string GetMachineGuid()
+    {
+        try
+        {
+            using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\Microsoft\Cryptography"))
+            {
+                var guid = key?.GetValue("MachineGuid")?.ToString();
+                if (!string.IsNullOrEmpty(guid))
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Machine GUID retrieved: {guid}");
+                    return guid;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Error retrieving Machine GUID: {ex.Message}");
+        }
+        
+        return "Unknown";
+    }
+
+    /// <summary>
+    /// Hashes the Machine GUID to a 32-character hex string using SHA256.
+    /// This provides a clean, consistent device identifier for transmission.
+    /// </summary>
+    private string GetHashedDeviceId()
+    {
+        try
+        {
+            string machineGuid = GetMachineGuid();
+            
+            if (machineGuid == "Unknown")
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Machine GUID is unknown, cannot hash");
+                return "Unknown";
+            }
+
+            using (var sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(machineGuid));
+                string hashedDeviceId = Convert.ToHexString(hash).Substring(0, 32);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Device ID hashed: {hashedDeviceId}");
+                return hashedDeviceId;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Error hashing device ID: {ex.Message}");
+            return "Unknown";
+        }
     }
 
     //--------------------------------------------
@@ -110,12 +182,19 @@ public class ApiService : IApiService
                     _pollingStationCode = pollingStationCode;
                     _selectedConstituency = constituency;
                     
+                    // Retrieve and store device ID (Machine GUID hashed to 32 characters)
+                    _deviceId = GetHashedDeviceId();
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device ID set: {_deviceId}");
+                    
                     // Store JWT token from link response
                     if (!string.IsNullOrEmpty(linkResponse.Token))
                     {
                         _jwtToken = linkResponse.Token;
                         _tokenExpiry = DateTime.UtcNow.AddHours(8);
                         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter JWT token stored, expires in 8 hours");
+                        
+                        // Start device heartbeat loop to send continuous status updates
+                        StartDeviceHeartbeatAsync();
                     }
                     
                     return linkResponse;
@@ -305,6 +384,67 @@ public class ApiService : IApiService
     }
 
     //--------------------------------------------
+    // Device Status Reporting
+    //--------------------------------------------
+
+    public async Task<bool> SendDeviceStatusAsync(string status)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📤 SendDeviceStatusAsync called with status: '{status}'");
+            
+            if (_assignedVoterId == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Cannot send device status - not linked to any official system");
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(_deviceId))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Cannot send device status - device ID not available");
+                return false;
+            }
+
+            var sendStatusRequest = new
+            {
+                voterId = _assignedVoterId,
+                deviceId = _deviceId,
+                status = status
+            };
+
+            var jsonContent = JsonSerializer.Serialize(sendStatusRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending device status:");
+            Console.WriteLine($"  Voter ID: {_assignedVoterId}");
+            Console.WriteLine($"  Device ID: {_deviceId}");
+            Console.WriteLine($"  Status: {status}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Using JWT Token: {(!string.IsNullOrEmpty(_jwtToken) ? "Yes" : "No")}");
+
+            var response = await SendAuthenticatedPostAsync("/api/voter/send-device-status", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device Status Response Status: {response.StatusCode}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device Status Response: {responseContent}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var statusResponse = JsonSerializer.Deserialize<dynamic>(responseContent, _jsonOptions);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Device status sent successfully");
+                return true;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to send device status");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status error: {ex.Message}");
+            return false;
+        }
+    }
+
+    //--------------------------------------------
     // Access Code Management Methods
     //--------------------------------------------
 
@@ -379,6 +519,7 @@ public class ApiService : IApiService
         }
         finally
         {
+            StopDeviceHeartbeat();
             _jwtToken = null;
             _tokenExpiry = DateTime.MinValue;
             _currentVoterId = null;
@@ -388,10 +529,66 @@ public class ApiService : IApiService
             _selectedCounty = string.Empty;
             _pollingStationCode = string.Empty;
             _selectedConstituency = string.Empty;
+            _deviceId = string.Empty;
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter logged out");
         }
     }
-
+    //--------------------------------------------
+    // Device Heartbeat Loop
+    //--------------------------------------------
+    
+    /// <summary>
+    /// Starts a background loop that sends device status updates every 10 seconds.
+    /// This allows the official to continuously monitor the voter device.
+    /// Only activates after JWT token has been acquired.
+    /// </summary>
+    public async void StartDeviceHeartbeatAsync()
+    {
+        if (_deviceHeartbeatCancellation != null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Device heartbeat already running");
+            return;
+        }
+        
+        _deviceHeartbeatCancellation = new CancellationTokenSource();
+        
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 Starting device heartbeat loop (10 second interval)");
+        
+        try
+        {
+            while (!_deviceHeartbeatCancellation.Token.IsCancellationRequested)
+            {
+                await Task.Delay(10000, _deviceHeartbeatCancellation.Token); // 10 seconds
+                
+                if (!_deviceHeartbeatCancellation.Token.IsCancellationRequested && IsAuthenticated)
+                {
+                    await SendDeviceStatusAsync(CurrentDeviceStatus);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🛑 Device heartbeat stopped");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Device heartbeat error: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Stops the device heartbeat loop.
+    /// </summary>
+    private void StopDeviceHeartbeat()
+    {
+        if (_deviceHeartbeatCancellation != null)
+        {
+            _deviceHeartbeatCancellation.Cancel();
+            _deviceHeartbeatCancellation.Dispose();
+            _deviceHeartbeatCancellation = null;
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device heartbeat cancelled");
+        }
+    }
     public void Logout()
     {
         LogoutAsync().GetAwaiter().GetResult();

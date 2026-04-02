@@ -121,14 +121,18 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             SetImageSource("fingerPrintWrong.png");
             SetStatusMessage("You have no attempts left. Please Contact an official.");
             VoterStatusMessage = "❌ Authentication failed after 3 attempts. You may have mistyped your details.";
+            _apiService.CurrentDeviceStatus = "Authentication failed after 3 attempts";
+            await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
         }
         else if (scanResult == true)
         {
             SetImageSource("fingerPrintCorrect.png");
             SetStatusMessage("Authentication successful. You may proceed to vote.");
             VoterStatusMessage = "✅ Voter Found"; // Show green success message
+            _apiService.CurrentDeviceStatus = "Authentication successful";
+            await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
             await Task.Delay(750);
-            _navigationService.NavigateToBallot();
+            await _navigationService.NavigateToBallot();
         }
     }
 
@@ -319,7 +323,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     // ==========================================
 
     [RelayCommand]
-    private void StartScanning()
+    private async Task StartScanning()
     {
         Console.WriteLine("[AuthenticateUserViewModel] Start scanning command triggered");
         
@@ -336,6 +340,8 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             {
                 CaptureStatusMessage = "Failed to open scanner device";
                 Console.WriteLine("[AuthenticateUserViewModel] ❌ Failed to open device");
+                _apiService.CurrentDeviceStatus = "Scanner not connected";
+                await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
                 return;
             }
 
@@ -351,6 +357,8 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             {
                 CaptureStatusMessage = "Failed to start capture";
                 Console.WriteLine("[AuthenticateUserViewModel] ❌ Failed to start capture");
+                _apiService.CurrentDeviceStatus = "Scanner capture failed";
+                await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
                 CleanupCapture();
                 return;
             }
@@ -491,6 +499,12 @@ public partial class AuthenticateUserViewModel : ViewModelBase
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             CaptureStatusMessage = $"Error: {errorMessage}";
+            if (errorMessage.Contains("not connected", StringComparison.OrdinalIgnoreCase) ||
+                errorMessage.Contains("device", StringComparison.OrdinalIgnoreCase))
+            {
+                _apiService.CurrentDeviceStatus = "Scanner not connected";
+                _ = _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+            }
             CleanupCapture();
         }, DispatcherPriority.Input);
     }

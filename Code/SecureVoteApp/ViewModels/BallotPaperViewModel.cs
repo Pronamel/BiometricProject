@@ -97,9 +97,6 @@ public partial class BallotPaperViewModel : ViewModelBase
         SelectionChanged += UpdateReadingCandidateName;
     }
 
-
-
-
     // ==========================================
     // PRIVATE METHODS
     // ==========================================
@@ -143,6 +140,11 @@ public partial class BallotPaperViewModel : ViewModelBase
             {
                 VoteStatus = "✅ Vote successfully cast!";
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast successfully: {response.Message}");
+                
+                // Update device status for heartbeat loop to send continuously
+                _apiService.CurrentDeviceStatus = $"Status 5: Vote cast for {SelectedCandidateName}";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status updated: {_apiService.CurrentDeviceStatus}");
+                await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
                 
                 // Keep showing success message instead of navigating
                 await Task.Delay(3000); // Show success message for longer

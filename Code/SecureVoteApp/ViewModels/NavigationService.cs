@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using SecureVoteApp.Models;
 
@@ -11,18 +12,18 @@ namespace SecureVoteApp.ViewModels;
 // Interface defining navigation methods
 public interface INavigationService
 {
-    void NavigateToVoterLogin();
-    void NavigateToMain();
-    void NavigateToNINEntry();
-    void NavigateToPersonalOrProxy();
-    void NavigateToProxyVoteDetails();
-    void NavigateToAuthenticateUser();
-    void NavigateToAuthenticateUser(VoterAuthLookupResponse lookup);
-    void NavigateToBallot();
-    void NavigateToConfirmation();
-    void NavigateToResults();
-    void NavigateToSettings();
-    void NavigateToView(UserControl view);
+    Task NavigateToVoterLogin();
+    Task NavigateToMain();
+    Task NavigateToNINEntry();
+    Task NavigateToPersonalOrProxy();
+    Task NavigateToProxyVoteDetails();
+    Task NavigateToAuthenticateUser();
+    Task NavigateToAuthenticateUser(VoterAuthLookupResponse lookup);
+    Task NavigateToBallot();
+    Task NavigateToConfirmation();
+    Task NavigateToResults();
+    Task NavigateToSettings();
+    Task NavigateToView(UserControl view);
     
     // Property to pass data between view models
     VoterAuthLookupResponse? PendingVoterLookup { get; set; }
@@ -79,6 +80,16 @@ public class NavigationService : INavigationService
 
 
     // ==========================================
+
+    // ==========================================
+    // PRIVATE FIELDS - VIEWMODEL STORAGE
+    // ==========================================
+    
+
+
+
+
+    // ==========================================
     // PRIVATE FIELDS - VIEW FACTORY FUNCTIONS
     // ==========================================
     
@@ -100,7 +111,7 @@ public class NavigationService : INavigationService
     // INITIALIZATION METHODS
     // ==========================================
     
-    // Initialize with view factory methods
+    // Initialize with view factory methods and ViewModels
     public void Initialize(
         Func<UserControl> getVoterLoginView,
         Func<UserControl> getNINEntryView, 
@@ -130,57 +141,75 @@ public class NavigationService : INavigationService
     // NAVIGATION METHODS
     // ==========================================
     
-    public void NavigateToVoterLogin()
+    public Task NavigateToVoterLogin()
     {
         if (_voterLoginView == null && _getVoterLoginView != null)
             _voterLoginView = _getVoterLoginView();
             
         if (_voterLoginView != null)
             NavigationRequested?.Invoke(_voterLoginView);
+
+        return Task.CompletedTask;
     }
     
-    public void NavigateToMain()
+    public Task NavigateToMain()
     {
-        NavigateToPersonalOrProxy();
+        return NavigateToPersonalOrProxy();
     }
     
-    public void NavigateToNINEntry()
+    public Task NavigateToNINEntry()
     {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 NavigationService: NavigateToNINEntry called");
         if (_ninEntryView == null && _getNINEntryView != null)
             _ninEntryView = _getNINEntryView();
             
         if (_ninEntryView != null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 NavigationService: Calling OnNavigatedTo for NINEntry");
             NavigationRequested?.Invoke(_ninEntryView);
+        }
+
+        return Task.CompletedTask;
     }
     
-    public void NavigateToPersonalOrProxy()
+    public Task NavigateToPersonalOrProxy()
     {
         if (_personalOrProxyView == null && _getPersonalOrProxyView != null)
             _personalOrProxyView = _getPersonalOrProxyView();
             
         if (_personalOrProxyView != null)
             NavigationRequested?.Invoke(_personalOrProxyView);
+
+        return Task.CompletedTask;
     }
     
-    public void NavigateToProxyVoteDetails()
+    public Task NavigateToProxyVoteDetails()
     {
         if (_proxyVoteDetailsView == null && _getProxyVoteDetailsView != null)
             _proxyVoteDetailsView = _getProxyVoteDetailsView();
             
         if (_proxyVoteDetailsView != null)
             NavigationRequested?.Invoke(_proxyVoteDetailsView);
+
+        return Task.CompletedTask;
     }
 
-    public void NavigateToAuthenticateUser()
+    public Task NavigateToAuthenticateUser()
     {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 NavigationService: NavigateToAuthenticateUser() called");
         if (_authenticateUserView == null && _getAuthenticateUserView != null)
             _authenticateUserView = _getAuthenticateUserView();
 
         if (_authenticateUserView != null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 NavigationService: Calling OnNavigatedTo for Authenticate");
             NavigationRequested?.Invoke(_authenticateUserView);
+        }
+
+        return Task.CompletedTask;
     }
 
-    public void NavigateToAuthenticateUser(VoterAuthLookupResponse lookup)
+    public Task NavigateToAuthenticateUser(VoterAuthLookupResponse lookup)
     {
         // Store the lookup data for the ViewModel to retrieve
         PendingVoterLookup = lookup;
@@ -190,47 +219,59 @@ public class NavigationService : INavigationService
 
         if (_authenticateUserView != null)
             NavigationRequested?.Invoke(_authenticateUserView);
+
+        return Task.CompletedTask;
     }
     
-    public void NavigateToBallot()
+    public Task NavigateToBallot()
     {
         if (_ballotView == null && _getBallotView != null)
             _ballotView = _getBallotView();
             
         if (_ballotView != null)
             NavigationRequested?.Invoke(_ballotView);
+
+        return Task.CompletedTask;
     }
     
-    public void NavigateToConfirmation()
+    public Task NavigateToConfirmation()
     {
         if (_confirmationView == null && _getConfirmationView != null)
             _confirmationView = _getConfirmationView();
             
         if (_confirmationView != null)
             NavigationRequested?.Invoke(_confirmationView);
+
+        return Task.CompletedTask;
     }
     
-    public void NavigateToResults()
+    public Task NavigateToResults()
     {
         if (_resultsView == null && _getResultsView != null)
             _resultsView = _getResultsView();
             
         if (_resultsView != null)
             NavigationRequested?.Invoke(_resultsView);
+
+        return Task.CompletedTask;
     }
     
-    public void NavigateToSettings()
+    public Task NavigateToSettings()
     {
         if (_settingsView == null && _getSettingsView != null)
             _settingsView = _getSettingsView();
             
         if (_settingsView != null)
             NavigationRequested?.Invoke(_settingsView);
+
+        return Task.CompletedTask;
     }
     
-    public void NavigateToView(UserControl view)
+    public Task NavigateToView(UserControl view)
     {
         NavigationRequested?.Invoke(view);
+
+        return Task.CompletedTask;
     }
 }
 

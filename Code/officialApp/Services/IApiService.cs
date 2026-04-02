@@ -26,6 +26,9 @@ public interface IApiService
     // Vote Management
     Task<VoteNotificationResponse?> CheckForVotesAsync();
     
+    // Device Status Management
+    Task<DeviceStatusResponse?> GetDeviceStatusesAsync();
+    
     // Database Queries
     Task<List<dynamic>?> GetAllVotersAsync();
     

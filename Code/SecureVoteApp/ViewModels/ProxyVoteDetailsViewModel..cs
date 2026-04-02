@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Net.Http;
 using System.Reflection;
 using SecureVoteApp.Views.VoterUI;
+using SecureVoteApp.Services;
 using Avalonia.Controls;
 
 namespace SecureVoteApp.ViewModels;
@@ -17,7 +18,6 @@ public partial class ProxyVoteDetailsViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
-
 
 
 
@@ -63,9 +63,9 @@ public partial class ProxyVoteDetailsViewModel : ViewModelBase
     }
     
     [RelayCommand]
-    private void Authenticate()
+    private async Task Authenticate()
     {
-        _navigationService.NavigateToAuthenticateUser();
+        await _navigationService.NavigateToAuthenticateUser();
     }
 
     [RelayCommand]
@@ -84,4 +84,5 @@ public partial class ProxyVoteDetailsViewModel : ViewModelBase
             BlueTextHave = "I don't have a National Insurance Number";
         }
     }
+
 }

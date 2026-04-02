@@ -62,60 +62,84 @@
                     <Ellipse Width="20" Height="20" Fill="{Binding SystemHealthColor}" Stroke="Black" StrokeThickness="1"/>
                 </StackPanel>
                 
-                <!-- Half Vertical Space Box -->
+                <!-- Half Vertical Space Box - Connected Devices -->
                 <Border Background="LightGray" 
                         BorderBrush="Black" 
                         BorderThickness="1" 
                         Height="200" 
-                        Margin="0,0,0,20">
-                    <TextBlock Text="{Binding HealthStatusText}" 
-                              HorizontalAlignment="Center" 
-                              VerticalAlignment="Center" 
-                              TextWrapping="Wrap"
-                              Margin="10"/>
+                        Margin="0,0,0,20"
+                        Padding="10">
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding ConnectedDevices}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="DarkGray" 
+                                            BorderThickness="1" 
+                                            Background="White" 
+                                            Padding="10" 
+                                            Margin="0,0,0,5"
+                                            CornerRadius="3">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- Device Identifier (GUID) -->
+                                            <StackPanel Grid.Column="0" Spacing="3">
+                                                <TextBlock Text="Device ID" FontSize="11" FontWeight="Bold" Foreground="Gray"/>
+                                                <TextBlock Text="{Binding DeviceIdentifier}" FontSize="14" FontWeight="Bold" Foreground="Blue"/>
+                                            </StackPanel>
+                                            
+                                            <!-- Status -->
+                                            <StackPanel Grid.Column="1" Margin="15,0,0,0" Spacing="3">
+                                                <TextBlock Text="Status" FontSize="11" FontWeight="Bold" Foreground="Gray"/>
+                                                <TextBlock Text="{Binding Status}" FontSize="13" FontWeight="Bold" Foreground="Green"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </Border>
                 
-                <!-- Grid with Black Border -->
-                <Border BorderBrush="Black" 
-                        BorderThickness="2" 
-                        Background="White">
-                    <Grid Margin="10">
+                <!-- Connected Voter Devices Section -->
+                <TextBlock Text="Connected Voter Devices" FontSize="14" FontWeight="Bold" Margin="0,20,0,10"/>
+                
+                <!-- Command Input Area -->
+                <Border Background="White" 
+                        BorderBrush="Black" 
+                        BorderThickness="1" 
+                        Padding="10"
+                        Height="80">
+                    <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="3*"/>
-                            <RowDefinition Height="2*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         
-                        <!-- Top 60% - Text Area -->
-                        <ScrollViewer Grid.Row="0" Margin="0,0,0,10">
-                            <TextBlock Text="{Binding StatusMessages}" 
-                                      TextWrapping="Wrap" 
-                                      VerticalAlignment="Top"/>
-                        </ScrollViewer>
+                        <TextBlock Grid.Row="0" Text="Command Input (e.g., refresh-status)" FontSize="12" Margin="0,0,0,5"/>
                         
-                        <!-- Bottom 40% - Input Label, TextBox and Button -->
-                        <StackPanel Grid.Row="1" Spacing="6">
-                            <TextBlock Text="Command Input (e.g., refresh-status)"
-                                       FontSize="12"
-                                       VerticalAlignment="Center"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="6*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="4*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <TextBox Grid.Column="0" 
-                                        Text="{Binding CommandInput}" 
-                                        VerticalAlignment="Center"
-                                        Margin="0,0,5,0"/>
-
-                                <Button Grid.Column="2" 
-                                       Content="Execute" 
-                                       Command="{Binding ExecuteCommand}"
-                                       VerticalAlignment="Center"
-                                       Margin="5,0,0,0"/>
-                            </Grid>
-                        </StackPanel>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBox Grid.Column="0" 
+                                     Padding="8" 
+                                     VerticalAlignment="Top"
+                                     Foreground="Black"/>
+                            
+                            <Button Grid.Column="1" 
+                                    Content="Execute" 
+                                    Padding="15,5" 
+                                    Margin="10,0,0,0"
+                                    Background="#CCCCCC"
+                                    Foreground="Black"
+                                    VerticalAlignment="Top"/>
+                        </Grid>
                     </Grid>
                 </Border>
                 

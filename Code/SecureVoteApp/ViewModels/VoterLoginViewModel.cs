@@ -160,8 +160,13 @@ public partial class VoterLoginViewModel : ViewModelBase
                 
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter linked successfully: ID={AssignedVoterId}, Official={ConnectedOfficialId}");
                 
+                // Update device status for heartbeat loop to send continuously
+                _apiService.CurrentDeviceStatus = $"Device linked - Ready to vote (Voter {AssignedVoterId})";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status updated: {_apiService.CurrentDeviceStatus}");
+                await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+                
                 // Navigate to the personal or proxy selection
-                _navigationService.NavigateToPersonalOrProxy();
+                await _navigationService.NavigateToPersonalOrProxy();
             }
             else
             {
