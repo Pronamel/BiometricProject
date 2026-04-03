@@ -1,5 +1,5 @@
 // This service handles communication with the server for voter authentication and real-time communication.
-// It provides methods for voter session creation, access code verification, and long polling for official commands.
+// It provides methods for voter session creation, access code verification, and device heartbeat updates.
 
 using System;
 using System.Collections.Generic;
@@ -33,7 +33,7 @@ public class ApiService : IApiService
     private string _pollingStationCode = string.Empty;
     private string _selectedConstituency = string.Empty;
     private string _deviceId = string.Empty;
-    
+
     // Device heartbeat loop for continuous status updates
     private CancellationTokenSource? _deviceHeartbeatCancellation;
     
@@ -51,6 +51,18 @@ public class ApiService : IApiService
     public string PollingStationCode => _pollingStationCode;
     public string SelectedConstituency => _selectedConstituency;
     public string DeviceId => _deviceId;
+
+    public string? GetAuthToken()
+    {
+        if (!IsAuthenticated)
+        {
+            return null;
+        }
+
+        return _jwtToken;
+    }
+
+    public string GetRealtimeHubUrl() => $"{_baseUrl}/hubs/voting";
 
     public ApiService(HttpClient httpClient)
     {
@@ -178,6 +190,7 @@ public class ApiService : IApiService
                 {                    
                     // Store linking information for vote casting
                     _assignedVoterId = linkResponse.AssignedVoterId;
+                    _currentVoterId = linkResponse.AssignedVoterId.ToString();
                     _selectedCounty = county;
                     _pollingStationCode = pollingStationCode;
                     _selectedConstituency = constituency;
@@ -240,17 +253,17 @@ public class ApiService : IApiService
     }
 
     public async Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(
-        string? nin, string? firstName, string? lastName, string? dateOfBirth, 
+        string? firstName, string? lastName, string? dateOfBirth, string? postCode,
         string county, string constituency)
     {
         try
         {
             var lookupRequest = new VoterAuthLookupRequest
             {
-                NationalInsuranceNumber = nin,
                 FirstName = firstName,
                 LastName = lastName,
                 DateOfBirth = dateOfBirth,
+                PostCode = postCode,
                 County = county,
                 Constituency = constituency
             };
@@ -258,9 +271,9 @@ public class ApiService : IApiService
             var jsonContent = JsonSerializer.Serialize(lookupRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking up voter for authentication:");
-            Console.WriteLine($"  NIN: {(string.IsNullOrEmpty(nin) ? "Not provided" : "***")}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking up voter for authentication (SDI):");
             Console.WriteLine($"  Name: {(string.IsNullOrEmpty(firstName) ? "Not provided" : $"{firstName} {lastName}")}");
+            Console.WriteLine($"  PostCode: {(string.IsNullOrEmpty(postCode) ? "Not provided" : postCode)}");
             Console.WriteLine($"  County: {county}");
             Console.WriteLine($"  Constituency: {constituency}");
 
@@ -519,7 +532,6 @@ public class ApiService : IApiService
         }
         finally
         {
-            StopDeviceHeartbeat();
             _jwtToken = null;
             _tokenExpiry = DateTime.MinValue;
             _currentVoterId = null;
@@ -533,6 +545,7 @@ public class ApiService : IApiService
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter logged out");
         }
     }
+
     //--------------------------------------------
     // Device Heartbeat Loop
     //--------------------------------------------
@@ -670,32 +683,6 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<CodeWaitResponse?> WaitForAccessCodeAsync()
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(_currentVoterId))
-            {
-                return null;
-            }
-
-            var response = await SendAuthenticatedGetAsync($"/api/voter/wait-for-code/{_currentVoterId}");
-            
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonString = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<CodeWaitResponse>(jsonString, _jsonOptions);
-            }
-            
-            return null;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Code wait error: {ex.Message}");
-            return null;
-        }
-    }
-
     //--------------------------------------------
     // Real-time Communication (Distributed Validation)
     //--------------------------------------------
@@ -721,32 +708,6 @@ public class ApiService : IApiService
         {
             Console.WriteLine($"Code verification submission error: {ex.Message}");
             return false;
-        }
-    }
-
-    public async Task<VoterCommandResponse?> ListenForCommandsAsync()
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(_currentVoterId))
-            {
-                return null;
-            }
-
-            var response = await SendAuthenticatedGetAsync($"/api/voter/listen/{_currentVoterId}");
-            
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonString = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<VoterCommandResponse>(jsonString, _jsonOptions);
-            }
-            
-            return null;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Command listening error: {ex.Message}");
-            return null;
         }
     }
 

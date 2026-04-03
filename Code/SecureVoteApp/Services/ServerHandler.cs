@@ -9,8 +9,10 @@ namespace SecureVoteApp.Services;
 public class ServerHandler : IServerHandler
 {
     private readonly IApiService _apiService;
+    private readonly IVoterRealtimeService _realtimeService;
     private CancellationTokenSource? _listeningCancellation;
     private bool _isListening;
+    private Action<VoterCommandResponse>? _externalCommandHandler;
     
     // Events for real-time updates
     public event Action<string>? AccessCodeReceived;
@@ -23,10 +25,37 @@ public class ServerHandler : IServerHandler
     public bool IsAuthenticated => _apiService.IsAuthenticated;
     public string? CurrentVoterId => _apiService.CurrentVoterId;
     public string? AssignedStationId => _apiService.AssignedStationId;
+    public string CurrentDeviceStatus
+    {
+        get => _apiService.CurrentDeviceStatus;
+        set => _apiService.CurrentDeviceStatus = value;
+    }
     
-    public ServerHandler(IApiService apiService)
+    public ServerHandler(IApiService apiService, IVoterRealtimeService realtimeService)
     {
         _apiService = apiService;
+        _realtimeService = realtimeService;
+
+        _realtimeService.CommandReceived += command =>
+        {
+            OfficialCommandReceived?.Invoke(command);
+            _externalCommandHandler?.Invoke(command);
+        };
+
+        _realtimeService.AccessCodeReceived += response =>
+        {
+            if (response?.Success == true && !string.IsNullOrWhiteSpace(response.Code))
+            {
+                AccessCodeReceived?.Invoke(response.Code);
+                StatusMessageReceived?.Invoke($"Access code received: {response.Code}");
+            }
+        };
+
+        _realtimeService.ConnectionStateChanged += state =>
+        {
+            ConnectionStatusChanged?.Invoke(state.Equals("Connected", StringComparison.OrdinalIgnoreCase));
+            StatusMessageReceived?.Invoke($"Realtime state: {state}");
+        };
     }
 
     // ==========================================
@@ -59,6 +88,18 @@ public class ServerHandler : IServerHandler
             return false;
         }
     }
+
+    public Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency)
+        => _apiService.LinkToOfficialAsync(pollingStationCode, county, constituency);
+
+    public Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency)
+        => _apiService.LookupVoterForAuthAsync(firstName, lastName, dateOfBirth, postCode, county, constituency);
+
+    public Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName)
+        => _apiService.CastVoteAsync(candidateName, partyName);
+
+    public Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint)
+        => _apiService.VerifyFingerprintAsync(voterId, scannedFingerprint);
     
     // ==========================================
     // VOTER AUTHENTICATION & SESSION MANAGEMENT
@@ -103,38 +144,6 @@ public class ServerHandler : IServerHandler
         }
     }
     
-    public async Task<string?> WaitForAccessCodeFromOfficialAsync()
-    {
-        try
-        {
-            ThrowIfNotAuthenticated();
-            
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Waiting for access code from official...");
-            var response = await _apiService.WaitForAccessCodeAsync();
-            
-            if (response?.Success == true && !string.IsNullOrEmpty(response.Code))
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Access code received: {response.Code}");
-                AccessCodeReceived?.Invoke(response.Code);
-                StatusMessageReceived?.Invoke($"Access code received: {response.Code}");
-                return response.Code;
-            }
-            else
-            {
-                var message = response?.Message ?? "No access code received";
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
-                StatusMessageReceived?.Invoke(message);
-                return null;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Code waiting error: {ex.Message}");
-            StatusMessageReceived?.Invoke($"Code waiting failed: {ex.Message}");
-            return null;
-        }
-    }
-    
     // ==========================================
     // DISTRIBUTED CODE VERIFICATION
     // ==========================================
@@ -171,91 +180,40 @@ public class ServerHandler : IServerHandler
     // REAL-TIME COMMUNICATION
     // ==========================================
     
-    public async Task<VoterCommandResponse?> ListenForOfficialCommandsAsync()
-    {
-        try
-        {
-            ThrowIfNotAuthenticated();
-            
-            var command = await _apiService.ListenForCommandsAsync();
-            
-            if (command?.Success == true)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received command: {command.CommandType}");
-                OfficialCommandReceived?.Invoke(command);
-                
-                // Handle specific command types
-                switch (command.CommandType?.ToLower())
-                {
-                    case "verification_result":
-                        var result = command.Data?.ToString() ?? "Unknown result";
-                        VerificationResultReceived?.Invoke(result);
-                        break;
-                    case "official_linked":
-                        StatusMessageReceived?.Invoke($"Linked to official: {command.OfficialId}");
-                        break;
-                    case "voting_instructions":
-                        StatusMessageReceived?.Invoke("Voting instructions received");
-                        break;
-                    default:
-                        StatusMessageReceived?.Invoke($"Command received: {command.CommandType}");
-                        break;
-                }
-                
-                return command;
-            }
-            
-            return null;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Command listening error: {ex.Message}");
-            return null;
-        }
-    }
-    
     public async Task<bool> StartContinuousListeningAsync(Action<VoterCommandResponse> onCommandReceived)
     {
         if (_isListening)
         {
             return false; // Already listening
         }
-        
+
         _listeningCancellation = new CancellationTokenSource();
         _isListening = true;
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Starting continuous listening for official commands...");
-        StatusMessageReceived?.Invoke("Starting continuous communication with official...");
-        
-        // Start listening loop in background
-        _ = Task.Run(async () =>
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Starting realtime listening for official commands...");
+        StatusMessageReceived?.Invoke("Starting realtime communication with official...");
+
+        _externalCommandHandler = onCommandReceived;
+
+        try
         {
-            while (!_listeningCancellation.Token.IsCancellationRequested)
+            var connected = await _realtimeService.ConnectAsync(_apiService.DeviceId, _listeningCancellation.Token);
+            if (!connected)
             {
-                try
-                {
-                    var command = await ListenForOfficialCommandsAsync();
-                    if (command != null)
-                    {
-                        onCommandReceived(command);
-                    }
-                    
-                    // Brief pause before next request to prevent overwhelming the server
-                    await Task.Delay(100, _listeningCancellation.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    break; // Expected when cancellation is requested
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Listening loop error: {ex.Message}");
-                    await Task.Delay(1000, _listeningCancellation.Token); // Wait longer on error
-                }
+                _isListening = false;
+                StatusMessageReceived?.Invoke("Failed to start realtime communication");
+                return false;
             }
-        }, _listeningCancellation.Token);
-        
-        return true;
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Start realtime listening error: {ex.Message}");
+            _isListening = false;
+            StatusMessageReceived?.Invoke($"Realtime start failed: {ex.Message}");
+            return false;
+        }
     }
     
     public void StopContinuousListening()
@@ -263,6 +221,8 @@ public class ServerHandler : IServerHandler
         if (_isListening)
         {
             _listeningCancellation?.Cancel();
+            _ = _realtimeService.DisconnectAsync();
+            _externalCommandHandler = null;
             _isListening = false;
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stopped continuous listening");
             StatusMessageReceived?.Invoke("Stopped communication with official");
@@ -295,4 +255,7 @@ public class ServerHandler : IServerHandler
             return false;
         }
     }
+
+    public Task<bool> SendDeviceStatusAsync(string status)
+        => _apiService.SendDeviceStatusAsync(status);
 }

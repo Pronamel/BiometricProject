@@ -9,13 +9,37 @@ public interface IServerHandler
 {
     // Basic Server Communication
     Task<bool> TestConnectionAsync();
+    bool IsAuthenticated { get; }
+
+    Task<OfficialLoginResponse?> LoginAsync(string username, string password);
+    Task<bool> LogoutAsync();
     
     // Device Management
     Task<DeviceManagementInfo?> GetDeviceManagementInfoAsync();
     Task<bool> UpdateDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo);
+    Task<List<dynamic>?> GetAllVotersAsync();
+    Task<List<PollingStationOption>?> GetAllPollingStationsAsync();
+    Task<bool> CreateVoterWithFingerprintAsync(
+        string nin,
+        string firstName,
+        string lastName,
+        string dateOfBirth,
+        string addressLine1,
+        string addressLine2,
+        string postCode,
+        string county,
+        string constituency,
+        byte[] fingerprintData);
+    Task<bool> CreateOfficialWithFingerprintAsync(
+        string username,
+        string password,
+        string pollingStationId,
+        string county,
+        byte[] fingerprintData);
+    Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint);
+    Task<bool> SetAccessCodeAsync(string accessCode);
+    Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request);
     
-    // Long Polling - Official Side
-    Task<List<string>?> WaitForVoterRequestsAsync();
     Task<bool> GenerateAccessCodeForVoterAsync(string voterId);
     
     // Legacy Device Management (placeholder)
@@ -27,6 +51,5 @@ public interface IServerHandler
     event Action<DeviceManagementInfo>? DeviceConnected;
     event Action<DeviceManagementInfo>? DeviceDisconnected;
     event Action<DeviceManagementInfo>? DeviceInfoUpdated;
-    event Action<List<string>>? VoterRequestsReceived;
     event Action<string>? AccessCodeGenerated;
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -71,11 +70,17 @@ public class DatabaseService
             var official = await _dbContext.Officials
                 .Include(o => o.AssignedPollingStation)
                 .ThenInclude(ps => ps!.Constituency)
-                .FirstOrDefaultAsync(o => o.Username == username && o.PasswordHash == password);
+                .FirstOrDefaultAsync(o => o.Username == username);
 
             if (official == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No official found with username '{username}' and password '{password}'");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No official found with username '{username}'");
+                return null;
+            }
+
+            if (!PasswordHasher.VerifyPassword(official.PasswordHash, password))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Invalid password for username '{username}'");
                 return null;
             }
 
@@ -108,16 +113,15 @@ public class DatabaseService
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 [DatabaseService] UpdateOfficialFingerprintAsync called");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Username: '{username}'");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Password: '{password}'");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Fingerprint data size: {fingerprintData.Length} bytes");
             
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Querying Officials table...");
             var official = await _dbContext.Officials
-                .FirstOrDefaultAsync(o => o.Username == username && o.PasswordHash == password);
+                .FirstOrDefaultAsync(o => o.Username == username);
 
             if (official == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ [DatabaseService] No official found with username '{username}' and provided password");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ [DatabaseService] No official found with username '{username}'");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Attempting to debug - checking all officials:");
                 
                 var allOfficials = await _dbContext.Officials.ToListAsync();
@@ -125,9 +129,15 @@ public class DatabaseService
                 
                 foreach (var off in allOfficials)
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService]   - Username: '{off.Username}' | PasswordHash: '{off.PasswordHash}' | Match: {off.Username == username && off.PasswordHash == password}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService]   - Username: '{off.Username}' | UsernameMatch: {off.Username == username}");
                 }
                 
+                return false;
+            }
+
+            if (!PasswordHasher.VerifyPassword(official.PasswordHash, password))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ [DatabaseService] Invalid password for username '{username}'");
                 return false;
             }
 
@@ -191,6 +201,7 @@ public class DatabaseService
         string postCode,
         string county,
         string constituencyName,
+        string sdi,
         byte[] fingerprintData)
     {
         try
@@ -200,6 +211,7 @@ public class DatabaseService
                 string.IsNullOrWhiteSpace(addressLine1) ||
                 string.IsNullOrWhiteSpace(county) ||
                 string.IsNullOrWhiteSpace(constituencyName) ||
+                string.IsNullOrWhiteSpace(sdi) ||
                 fingerprintData == null ||
                 fingerprintData.Length == 0)
             {
@@ -217,6 +229,7 @@ public class DatabaseService
             var voter = new Voter
             {
                 NationalId = nationalInsuranceNumber.Trim(),
+                Sdi = sdi,
                 ConstituencyId = constituency.ConstituencyId,
                 FirstName = firstName.Trim(),
                 LastName = lastName.Trim(),
@@ -245,18 +258,23 @@ public class DatabaseService
 
     public async Task<(bool Success, string Message, Guid? OfficialId)> CreateOfficialAsync(
         string username,
-        string plainTextPassword,
+        string passwordHash,
         Guid pollingStationId,
         byte[] fingerprintData)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(username) ||
-                string.IsNullOrWhiteSpace(plainTextPassword) ||
+                string.IsNullOrWhiteSpace(passwordHash) ||
                 fingerprintData == null ||
                 fingerprintData.Length == 0)
             {
                 return (false, "Missing required fields", null);
+            }
+
+            if (!passwordHash.StartsWith("$argon2", StringComparison.Ordinal))
+            {
+                return (false, "Password must be an Argon2 hash", null);
             }
 
             // Verify polling station exists
@@ -268,33 +286,26 @@ public class DatabaseService
                 return (false, "Polling station not found", null);
             }
 
-            // Hash the password using SHA256
-            using (var sha256 = System.Security.Cryptography.SHA256.Create())
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔐 Using client-provided Argon2 password hash for official: {username}");
+
+            var official = new Official
             {
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(plainTextPassword));
-                var passwordHash = Convert.ToBase64String(hashedBytes);
+                OfficialId = Guid.NewGuid(),
+                Username = username.Trim(),
+                PasswordHash = passwordHash,
+                LastLogin = null,
+                AssignedPollingStationId = pollingStationId,
+                FingerPrintScan = fingerprintData
+            };
 
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔐 Password hashed with SHA256 for official: {username}");
+            _dbContext.Officials.Add(official);
+            await _dbContext.SaveChangesAsync();
 
-                var official = new Official
-                {
-                    OfficialId = Guid.NewGuid(),
-                    Username = username.Trim(),
-                    PasswordHash = passwordHash,
-                    LastLogin = null,
-                    AssignedPollingStationId = pollingStationId,
-                    FingerPrintScan = fingerprintData
-                };
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official created successfully: {username}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Official ID: {official.OfficialId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Polling Station: {pollingStation.PollingStationCode} ({pollingStation.County})");
 
-                _dbContext.Officials.Add(official);
-                await _dbContext.SaveChangesAsync();
-
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official created successfully: {username}");
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Official ID: {official.OfficialId}");
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Polling Station: {pollingStation.PollingStationCode} ({pollingStation.County})");
-
-                return (true, "Official created successfully", official.OfficialId);
-            }
+            return (true, "Official created successfully", official.OfficialId);
         }
         catch (Exception ex)
         {
@@ -378,6 +389,42 @@ public class DatabaseService
         catch (Exception ex)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by Name+DOB: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return null;
+        }
+    }
+
+    public async Task<Voter?> GetVoterBySdiAsync(string sdi)
+    {
+        try
+        {
+            var normalizedSdi = sdi.Trim().ToLowerInvariant();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by SDI");
+
+            var matches = await _dbContext.Voters
+                .Include(v => v.Constituency)
+                .Where(v => v.Sdi != null && v.Sdi == normalizedSdi)
+                .Take(2)
+                .ToListAsync();
+
+            if (matches.Count == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with provided SDI");
+                return null;
+            }
+
+            if (matches.Count > 1)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Multiple voters matched same SDI; using first match for now");
+            }
+
+            var voter = matches[0];
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by SDI: {voter.FirstName} {voter.LastName} (ID: {voter.VoterId})");
+            return voter;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by SDI: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return null;
         }

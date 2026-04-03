@@ -16,8 +16,9 @@ public class ServerHandler : IServerHandler
     public event Action<DeviceManagementInfo>? DeviceConnected;
     public event Action<DeviceManagementInfo>? DeviceDisconnected;
     public event Action<DeviceManagementInfo>? DeviceInfoUpdated;
-    public event Action<List<string>>? VoterRequestsReceived;
     public event Action<string>? AccessCodeGenerated;
+
+    public bool IsAuthenticated => _apiService.IsAuthenticated;
     
     public ServerHandler(IApiService apiService)
     {
@@ -28,14 +29,9 @@ public class ServerHandler : IServerHandler
     // AUTHENTICATION HELPER
     // ==========================================
     
-    private bool IsAuthenticated()
-    {
-        return _apiService.IsAuthenticated;
-    }
-    
     private void ThrowIfNotAuthenticated()
     {
-        if (!IsAuthenticated())
+        if (!IsAuthenticated)
         {
             throw new InvalidOperationException("Not authenticated. Please login first.");
         }
@@ -56,6 +52,12 @@ public class ServerHandler : IServerHandler
             return false;
         }
     }
+
+    public Task<OfficialLoginResponse?> LoginAsync(string username, string password)
+        => _apiService.LoginAsync(username, password);
+
+    public Task<bool> LogoutAsync()
+        => _apiService.LogoutAsync();
     
     // ==========================================
     // DEVICE MANAGEMENT (with data processing)
@@ -83,6 +85,52 @@ public class ServerHandler : IServerHandler
             return null;
         }
     }
+
+    public Task<List<dynamic>?> GetAllVotersAsync()
+        => _apiService.GetAllVotersAsync();
+
+    public Task<List<PollingStationOption>?> GetAllPollingStationsAsync()
+        => _apiService.GetAllPollingStationsAsync();
+
+    public Task<bool> CreateVoterWithFingerprintAsync(
+        string nin,
+        string firstName,
+        string lastName,
+        string dateOfBirth,
+        string addressLine1,
+        string addressLine2,
+        string postCode,
+        string county,
+        string constituency,
+        byte[] fingerprintData)
+        => _apiService.CreateVoterWithFingerprintAsync(
+            nin,
+            firstName,
+            lastName,
+            dateOfBirth,
+            addressLine1,
+            addressLine2,
+            postCode,
+            county,
+            constituency,
+            fingerprintData);
+
+    public Task<bool> CreateOfficialWithFingerprintAsync(
+        string username,
+        string password,
+        string pollingStationId,
+        string county,
+        byte[] fingerprintData)
+        => _apiService.CreateOfficialWithFingerprintAsync(username, password, pollingStationId, county, fingerprintData);
+
+    public Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint)
+        => _apiService.VerifyFingerprintAsync(username, password, scannedFingerprint);
+
+    public Task<bool> SetAccessCodeAsync(string accessCode)
+        => _apiService.SetAccessCodeAsync(accessCode);
+
+    public Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request)
+        => _apiService.SendDeviceCommandAsync(request);
     
     public async Task<bool> UpdateDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo)
     {
@@ -198,32 +246,6 @@ public class ServerHandler : IServerHandler
                !string.IsNullOrWhiteSpace(pollingStationId);
     }
     
-    // ==========================================
-    // LONG POLLING METHODS  
-    // ==========================================
-    
-    public async Task<List<string>?> WaitForVoterRequestsAsync()
-    {
-        try
-        {
-            ThrowIfNotAuthenticated();
-            
-            var response = await _apiService.WaitForVoterRequestsAsync();
-            if (response?.Requests?.Any() == true)
-            {
-                // Trigger event for UI updates
-                VoterRequestsReceived?.Invoke(response.Requests);
-                return response.Requests;
-            }
-            return null;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error waiting for voter requests: {ex.Message}");
-            return null;
-        }
-    }
-
     public async Task<bool> GenerateAccessCodeForVoterAsync(string voterNIN)
     {
         try

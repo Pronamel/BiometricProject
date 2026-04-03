@@ -18,12 +18,12 @@ public partial class OfficialGenerateAccessCodeViewModel : ViewModelBase
     private string accessCode = string.Empty;
 
     private readonly INavigationService _navigationService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
 
-    public OfficialGenerateAccessCodeViewModel(IApiService apiService, INavigationService navigationService)
+    public OfficialGenerateAccessCodeViewModel(IServerHandler serverHandler, INavigationService navigationService)
     {
         _navigationService = navigationService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
     }
 
     [RelayCommand]
@@ -41,8 +41,8 @@ public partial class OfficialGenerateAccessCodeViewModel : ViewModelBase
             StatusMessage = "Setting access code...";
             StatusColor = "#3498db";
 
-            // Call ApiService to hash and send the code
-            var success = await _apiService.SetAccessCodeAsync(AccessCode);
+            // Call ServerHandler to hash and send the code
+            var success = await _serverHandler.SetAccessCodeAsync(AccessCode);
 
             if (success)
             {

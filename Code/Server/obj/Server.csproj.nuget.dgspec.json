@@ -1,25 +1,27 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\Server\\Server.csproj": {}
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\Server\\Server.csproj": {}
   },
   "projects": {
-    "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\Server\\Server.csproj": {
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\Server\\Server.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\Server\\Server.csproj",
+        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\Server\\Server.csproj",
         "projectName": "Server",
-        "projectPath": "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\Server\\Server.csproj",
+        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\Server\\Server.csproj",
         "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\alexa\\Desktop\\biometricProject\\BiometricProject\\Code\\Server\\obj\\",
+        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\Server\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -38,7 +40,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.200"
+        "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
         "net8.0": {
@@ -51,6 +53,10 @@
             "AWSSDK.SecretsManager": {
               "target": "Package",
               "version": "[4.0.4.13, )"
+            },
+            "Isopoh.Cryptography.Argon2": {
+              "target": "Package",
+              "version": "[2.0.0, )"
             },
             "Microsoft.AspNetCore.Authentication.JwtBearer": {
               "target": "Package",
@@ -110,7 +116,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.104/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

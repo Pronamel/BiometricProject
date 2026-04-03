@@ -23,7 +23,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     
     private readonly INavigationService _navigationService;
     private readonly IScannerService _scannerService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
     
     // Voter authentication fields
     private byte[]? _storedFingerprintBytes;
@@ -121,16 +121,16 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             SetImageSource("fingerPrintWrong.png");
             SetStatusMessage("You have no attempts left. Please Contact an official.");
             VoterStatusMessage = "❌ Authentication failed after 3 attempts. You may have mistyped your details.";
-            _apiService.CurrentDeviceStatus = "Authentication failed after 3 attempts";
-            await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+            _serverHandler.CurrentDeviceStatus = "Authentication failed after 3 attempts";
+            await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
         }
         else if (scanResult == true)
         {
             SetImageSource("fingerPrintCorrect.png");
             SetStatusMessage("Authentication successful. You may proceed to vote.");
             VoterStatusMessage = "✅ Voter Found"; // Show green success message
-            _apiService.CurrentDeviceStatus = "Authentication successful";
-            await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+            _serverHandler.CurrentDeviceStatus = "Authentication successful";
+            await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
             await Task.Delay(750);
             await _navigationService.NavigateToBallot();
         }
@@ -168,7 +168,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
 
             // Prefer voter ID from lookup initialization for this auth flow.
             // Fallback to API session voter ID only if needed.
-            string? voterId = _currentVoterId?.ToString() ?? _apiService.CurrentVoterId;
+            string? voterId = _currentVoterId?.ToString() ?? _serverHandler.CurrentVoterId;
             if (string.IsNullOrEmpty(voterId))
             {
                 Console.WriteLine("[AuthenticateUserViewModel] ❌ No voter ID available for fingerprint verification");
@@ -181,7 +181,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             // The server will fetch the stored fingerprint from the database and compare
             Console.WriteLine("[AuthenticateUserViewModel] Calling /api/verify-prints endpoint...");
             Console.WriteLine($"[AuthenticateUserViewModel] VoterId: {voterId}");
-            var verificationResult = await _apiService.VerifyFingerprintAsync(voterId, scannedImagePng);
+            var verificationResult = await _serverHandler.VerifyFingerprintAsync(voterId, scannedImagePng);
 
             if (verificationResult == null || !verificationResult.Success)
             {
@@ -276,11 +276,11 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public AuthenticateUserViewModel(INavigationService navigationService, IScannerService scannerService, IApiService apiService)
+    public AuthenticateUserViewModel(INavigationService navigationService, IScannerService scannerService, IServerHandler serverHandler)
     {
         _navigationService = navigationService;
         _scannerService = scannerService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
         
         // Initialize with default fingerprint image
         ImageSource = LoadImage("fingerPrint.png");
@@ -340,8 +340,8 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             {
                 CaptureStatusMessage = "Failed to open scanner device";
                 Console.WriteLine("[AuthenticateUserViewModel] ❌ Failed to open device");
-                _apiService.CurrentDeviceStatus = "Scanner not connected";
-                await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+                _serverHandler.CurrentDeviceStatus = "Scanner not connected";
+                await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
                 return;
             }
 
@@ -357,8 +357,8 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             {
                 CaptureStatusMessage = "Failed to start capture";
                 Console.WriteLine("[AuthenticateUserViewModel] ❌ Failed to start capture");
-                _apiService.CurrentDeviceStatus = "Scanner capture failed";
-                await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+                _serverHandler.CurrentDeviceStatus = "Scanner capture failed";
+                await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
                 CleanupCapture();
                 return;
             }
@@ -502,8 +502,8 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             if (errorMessage.Contains("not connected", StringComparison.OrdinalIgnoreCase) ||
                 errorMessage.Contains("device", StringComparison.OrdinalIgnoreCase))
             {
-                _apiService.CurrentDeviceStatus = "Scanner not connected";
-                _ = _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+                _serverHandler.CurrentDeviceStatus = "Scanner not connected";
+                _ = _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
             }
             CleanupCapture();
         }, DispatcherPriority.Input);
@@ -625,7 +625,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     [RelayCommand]
     private void SignOut()
     {
-        _apiService.Logout();
+        _serverHandler.Logout();
         _navigationService.NavigateToMain();
     }
 }

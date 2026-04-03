@@ -8,6 +8,7 @@ using officialApp.Models;
 using System.Threading;
 using System.Collections.ObjectModel;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace officialApp.ViewModels;
 
@@ -18,9 +19,11 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
+    private readonly IRealtimeService _realtimeService;
     private CancellationTokenSource? _voteListeningCancellation;
     private CancellationTokenSource? _deviceStatusListeningCancellation;
+    private bool _realtimeSubscriptionsRegistered;
 
     // ==========================================
     // OBSERVABLE PROPERTIES
@@ -82,15 +85,19 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public OfficialVotingPollingManagerViewModel(IApiService apiService, INavigationService navigationService)
+    public OfficialVotingPollingManagerViewModel(IServerHandler serverHandler, INavigationService navigationService, IRealtimeService realtimeService)
     {
         _navigationService = navigationService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
+        _realtimeService = realtimeService;
         InitializeSystemStatus();
-        
-        // Start listening for votes when this view model is created
-        _ = StartVoteListening();
-        _ = StartDeviceStatusListening();
+
+        RegisterRealtimeSubscriptions();
+    }
+
+    public async Task ActivateAsync()
+    {
+        await StartVoteListening();
     }
 
     // ==========================================
@@ -100,60 +107,51 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     [RelayCommand]
     private async Task StartVoteListening()
     {
-        if (IsListeningForVotes) return;
+        if (IsListeningForVotes)
+        {
+            return;
+        }
+
+        if (_realtimeService.IsConnected)
+        {
+            IsListeningForVotes = true;
+            if (_deviceStatusListeningCancellation == null)
+            {
+                _ = StartDeviceStatusListening();
+            }
+            return;
+        }
         
         IsListeningForVotes = true;
         _voteListeningCancellation = new CancellationTokenSource();
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official starting to listen for voter requests, votes, and device statuses...");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official connecting to realtime channel for voter requests, votes, and device statuses...");
         
         try
         {
-            while (IsListeningForVotes && !_voteListeningCancellation.Token.IsCancellationRequested)
+            var connected = await _realtimeService.ConnectAsync(_voteListeningCancellation.Token);
+            if (!connected)
             {
-                // First, check for voter link requests
-                var voterRequests = await _apiService.WaitForVoterRequestsAsync();
-                
-                if (voterRequests?.Requests.Count > 0)
-                {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received {voterRequests.Requests.Count} voter link requests");
-                    
-                    // Process each voter request
-                    foreach (var request in voterRequests.Requests)
-                    {
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] New voter link request: {request}");
-                    }
-                }
-                
-                // Then check for new votes through API
-                var voteResponse = await _apiService.CheckForVotesAsync();
-                
-                if (voteResponse?.Success == true && voteResponse.Count > 0)
-                {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received {voteResponse.Count} new votes");
-                    
-                    // Process each vote
-                    foreach (var vote in voteResponse.Votes)
-                    {
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Processing vote from Voter {vote.VoterId}: {vote.CandidateName} - {vote.PartyName}");
-                        OnVoteReceived(vote.CandidateName, vote.PartyName, vote.VoterId);
-                    }
-                }
-                
-                // Wait 2 seconds before checking again
-                await Task.Delay(2000, _voteListeningCancellation.Token);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Realtime connection could not be established");
+                IsListeningForVotes = false;
+                return;
             }
+
+            if (_deviceStatusListeningCancellation == null)
+            {
+                _ = StartDeviceStatusListening();
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official realtime connection established");
         }
         catch (OperationCanceledException)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote listening was cancelled");
+            IsListeningForVotes = false;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote listening error: {ex.Message}");
-        }
-        finally
-        {
             IsListeningForVotes = false;
         }
     }
@@ -173,22 +171,9 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         {
             while (!_deviceStatusListeningCancellation.Token.IsCancellationRequested)
             {
-                var deviceStatusResponse = await _apiService.GetDeviceStatusesAsync();
-
-                if (deviceStatusResponse?.Success == true && deviceStatusResponse.Count > 0)
-                {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received {deviceStatusResponse.Count} device status updates");
-
-                    foreach (var deviceStatus in deviceStatusResponse.Statuses)
-                    {
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status update from Voter {deviceStatus.VoterId}: {deviceStatus.Status} (Device: {deviceStatus.DeviceId})");
-                        OnDeviceStatusReceived(deviceStatus.VoterId, deviceStatus.DeviceId, deviceStatus.Status);
-                    }
-                }
-
                 CleanupInactiveDevices();
 
-                await Task.Delay(1000, _deviceStatusListeningCancellation.Token);
+                await Task.Delay(3000, _deviceStatusListeningCancellation.Token);
             }
         }
         catch (OperationCanceledException)
@@ -198,6 +183,10 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         catch (Exception ex)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status listening error: {ex.Message}");
+        }
+        finally
+        {
+            _deviceStatusListeningCancellation = null;
         }
     }
     
@@ -222,12 +211,17 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     // Method to handle device status updates from voters
     public void OnDeviceStatusReceived(int voterId, string deviceId, string status)
     {
+        var normalizedStatus = status.Trim().ToLowerInvariant();
+        var isLocked = normalizedStatus == "locked by official" || normalizedStatus == "device locked by official";
+
         // Check if device already exists
         var existingDevice = ConnectedDevices.FirstOrDefault(d => d.DeviceIdentifier == deviceId);
         
         if (existingDevice != null)
         {
             // Update existing device status and timestamp
+            existingDevice.VoterId = voterId;
+            existingDevice.IsLockedByOfficial = isLocked;
             existingDevice.Status = status;
             existingDevice.LastStatusTime = DateTime.Now; // Record when status was received
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Updated Device #{existingDevice.DeviceNumber} (Voter {voterId}) status to: {status}");
@@ -237,7 +231,9 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
             // Add new device
             var device = new ConnectedVoterDevice
             {
+                VoterId = voterId,
                 DeviceNumber = _nextDeviceNumber++,
+                IsLockedByOfficial = isLocked,
                 Status = status,
                 ConnectedAtTime = DateTime.Now,
                 LastStatusTime = DateTime.Now, // Track when device first sent status
@@ -254,8 +250,6 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     {
         var now = DateTime.Now;
         var inactiveThreshold = TimeSpan.FromSeconds(15); // Remove devices inactive for 15+ seconds
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Cleanup check: {ConnectedDevices.Count} devices, threshold: {inactiveThreshold.TotalSeconds}s");
         
         var devicesToRemove = ConnectedDevices
             .Where(d => (now - d.LastStatusTime) > inactiveThreshold)
@@ -299,6 +293,64 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         }
     }
 
+    [RelayCommand]
+    private async Task LockDeviceAsync(ConnectedVoterDevice? device)
+    {
+        if (device == null || device.VoterId <= 0 || string.IsNullOrWhiteSpace(device.DeviceIdentifier))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Cannot lock device: invalid template data");
+            return;
+        }
+
+        var previousStatus = device.Status;
+        device.Status = "Lock command sent";
+
+        var success = await _serverHandler.SendDeviceCommandAsync(new SendDeviceCommandRequest
+        {
+            VoterId = device.VoterId,
+            DeviceId = device.DeviceIdentifier,
+            CommandType = "lock_device"
+        });
+
+        if (success)
+        {
+            device.IsLockedByOfficial = true;
+            device.Status = "Locked by official";
+            return;
+        }
+
+        device.Status = previousStatus;
+    }
+
+    [RelayCommand]
+    private async Task UnlockDeviceAsync(ConnectedVoterDevice? device)
+    {
+        if (device == null || device.VoterId <= 0 || string.IsNullOrWhiteSpace(device.DeviceIdentifier))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Cannot unlock device: invalid template data");
+            return;
+        }
+
+        var previousStatus = device.Status;
+        device.Status = "Unlock command sent";
+
+        var success = await _serverHandler.SendDeviceCommandAsync(new SendDeviceCommandRequest
+        {
+            VoterId = device.VoterId,
+            DeviceId = device.DeviceIdentifier,
+            CommandType = "unlock_device"
+        });
+
+        if (success)
+        {
+            device.IsLockedByOfficial = false;
+            device.Status = "Unlocked";
+            return;
+        }
+
+        device.Status = previousStatus;
+    }
+
     // Method to remove a disconnected device
     public void OnVoterDeviceDisconnected(int deviceNumber)
     {
@@ -316,6 +368,8 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         IsListeningForVotes = false;
         _voteListeningCancellation?.Cancel();
         _deviceStatusListeningCancellation?.Cancel();
+        _deviceStatusListeningCancellation = null;
+        _ = _realtimeService.DisconnectAsync();
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official stopped listening for votes");
     }
 
@@ -370,5 +424,53 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
             double turnout = (double)total / registered * 100;
             TurnoutRate = $"{turnout:F1}%";
         }
+    }
+
+    private void RegisterRealtimeSubscriptions()
+    {
+        if (_realtimeSubscriptionsRegistered)
+        {
+            return;
+        }
+
+        _realtimeService.VoterRequestsReceived += requests =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received {requests.Count} realtime voter link requests");
+                foreach (var request in requests)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] New voter link request: {request}");
+                }
+            });
+        };
+
+        _realtimeService.VoteReceived += vote =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Realtime vote from Voter {vote.VoterId}: {vote.CandidateName} - {vote.PartyName}");
+                OnVoteReceived(vote.CandidateName, vote.PartyName, vote.VoterId);
+            });
+        };
+
+        _realtimeService.DeviceStatusReceived += deviceStatus =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Realtime device status from Voter {deviceStatus.VoterId}: {deviceStatus.Status} (Device: {deviceStatus.DeviceId})");
+                OnDeviceStatusReceived(deviceStatus.VoterId, deviceStatus.DeviceId, deviceStatus.Status);
+            });
+        };
+
+        _realtimeService.ConnectionStateChanged += state =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                SystemStatus = state;
+            });
+        };
+
+        _realtimeSubscriptionsRegistered = true;
     }
 }

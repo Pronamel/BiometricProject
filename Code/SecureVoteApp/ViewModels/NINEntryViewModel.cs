@@ -20,7 +20,7 @@ public partial class NINEntryViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
     private readonly CountyService _countyService;
 
 
@@ -40,16 +40,19 @@ public partial class NINEntryViewModel : ViewModelBase
     private string dateOfBirth = string.Empty;
 
     [ObservableProperty]
+    private string postCode = string.Empty;
+
+    [ObservableProperty]
     private string nationalInsuranceNumber = string.Empty;
 
     [ObservableProperty]
     private string blueTextHave = "I cannot remember or do not have my National insurance number";
     
     [ObservableProperty]
-    private bool showNinOnly = true;
+    private bool showNinOnly = false;
 
     [ObservableProperty]
-    private bool dateOfBirthVisible = false;
+    private bool dateOfBirthVisible = true;
 
     [ObservableProperty]
     private bool textBoxEnabled = true;
@@ -67,10 +70,10 @@ public partial class NINEntryViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public NINEntryViewModel(INavigationService navigationService, IApiService apiService, CountyService countyService)
+    public NINEntryViewModel(INavigationService navigationService, IServerHandler serverHandler, CountyService countyService)
     {
         _navigationService = navigationService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
         _countyService = countyService;
     }
 
@@ -97,9 +100,18 @@ public partial class NINEntryViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] NINEntry Continue - Starting voter lookup");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   FirstName: {FirstName}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   LastName: {LastName}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   PostCode: {PostCode}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {_countyService.SelectedCounty}");
 
             var selectedConstituency = "Unknown"; // TODO: Add constituency selection to UI if needed
+
+            if (string.IsNullOrWhiteSpace(FirstName) ||
+                string.IsNullOrWhiteSpace(LastName) ||
+                string.IsNullOrWhiteSpace(PostCode))
+            {
+                StatusMessage = "❌ Enter First Name, Last Name, and Post Code.";
+                return;
+            }
 
             string? normalizedDob = null;
             if (DateOfBirthVisible)
@@ -113,11 +125,11 @@ public partial class NINEntryViewModel : ViewModelBase
                 normalizedDob = parsedDob;
             }
             
-            var lookup = await _apiService.LookupVoterForAuthAsync(
-                nin: string.IsNullOrWhiteSpace(NationalInsuranceNumber) ? null : NationalInsuranceNumber,
+            var lookup = await _serverHandler.LookupVoterForAuthAsync(
                 firstName: string.IsNullOrWhiteSpace(FirstName) ? null : FirstName,
                 lastName: string.IsNullOrWhiteSpace(LastName) ? null : LastName,
                 dateOfBirth: normalizedDob,
+                            postCode: string.IsNullOrWhiteSpace(PostCode) ? null : PostCode,
                 county: _countyService.SelectedCounty,
                 constituency: selectedConstituency);
 
@@ -149,18 +161,7 @@ public partial class NINEntryViewModel : ViewModelBase
     [RelayCommand]
     private void BlueTextPress()
     {
-        if(ShowNinOnly == true)
-        {
-            ShowNinOnly = false;
-            DateOfBirthVisible = true;
-            BlueTextHave = "I do have a National Insurance Number";
-        }
-        else
-        {
-            ShowNinOnly = true;
-            DateOfBirthVisible = false;
-            BlueTextHave = "I cannot remember or do not have my National insurance number";
-        }
+        // Deprecated: lookup now always uses FirstName + LastName + DateOfBirth + PostCode.
     }
 
     private static bool TryNormalizeDateOfBirth(string input, out string normalizedDate)

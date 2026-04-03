@@ -9,7 +9,7 @@ public interface IApiService
 {
     // Authentication & Session Management
     Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
-    Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? nin, string? firstName, string? lastName, string? dateOfBirth, string county, string constituency);
+    Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency);
     
     // Vote Casting
     Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName);
@@ -21,7 +21,10 @@ public interface IApiService
     int AssignedVoterId { get; }
     string SelectedCounty { get; }
     string PollingStationCode { get; }
+    string DeviceId { get; }
     string CurrentDeviceStatus { get; set; }
+    string? GetAuthToken();
+    string GetRealtimeHubUrl();
     Task LogoutAsync();
     void Logout();
     
@@ -30,11 +33,9 @@ public interface IApiService
     
     // Voter Access Management
     Task<bool> RequestAccessAsync(string? deviceName = null);
-    Task<CodeWaitResponse?> WaitForAccessCodeAsync();
     
     // Real-time Communication (Distributed Validation)
     Task<bool> SubmitCodeForVerificationAsync(string accessCode);
-    Task<VoterCommandResponse?> ListenForCommandsAsync();
     Task<bool> SendStatusUpdateAsync(string status, string? additionalData = null);
     
     // Device Status Tracking

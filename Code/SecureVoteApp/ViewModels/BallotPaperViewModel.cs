@@ -14,7 +14,7 @@ public partial class BallotPaperViewModel : ViewModelBase
     // ==========================================
     
     private readonly INavigationService _navigationService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
     
     [ObservableProperty]
     private bool isCastingVote = false;
@@ -88,10 +88,10 @@ public partial class BallotPaperViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public BallotPaperViewModel(INavigationService navigationService, IApiService apiService)
+    public BallotPaperViewModel(INavigationService navigationService, IServerHandler serverHandler)
     {
         _navigationService = navigationService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
         
         // Subscribe to selection changes to update the readable text
         SelectionChanged += UpdateReadingCandidateName;
@@ -134,17 +134,17 @@ public partial class BallotPaperViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Attempting to cast vote for: {SelectedCandidateName} - {SelectedParty}");
             
             // Cast the vote through the API
-            var response = await _apiService.CastVoteAsync(SelectedCandidateName!, SelectedParty!);
+            var response = await _serverHandler.CastVoteAsync(SelectedCandidateName!, SelectedParty!);
             
             if (response.Success)
             {
                 VoteStatus = "✅ Vote successfully cast!";
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast successfully: {response.Message}");
                 
-                // Update device status for heartbeat loop to send continuously
-                _apiService.CurrentDeviceStatus = $"Status 5: Vote cast for {SelectedCandidateName}";
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status updated: {_apiService.CurrentDeviceStatus}");
-                await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+                // Update device status so officials see the completed vote immediately
+                _serverHandler.CurrentDeviceStatus = $"Status 5: Vote cast for {SelectedCandidateName}";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status updated: {_serverHandler.CurrentDeviceStatus}");
+                await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
                 
                 // Keep showing success message instead of navigating
                 await Task.Delay(3000); // Show success message for longer

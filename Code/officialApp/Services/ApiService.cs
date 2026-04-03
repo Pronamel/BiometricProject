@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Isopoh.Cryptography.Argon2;
 using officialApp.Models;
 
 namespace officialApp.Services;
@@ -42,6 +43,18 @@ public class ApiService : IApiService
     public string? CurrentSystemCode => _currentSystemCode;
     public long CurrentTokenId => _currentTokenId;
 
+    public string? GetAuthToken()
+    {
+        if (!IsAuthenticated)
+        {
+            return null;
+        }
+
+        return _jwtToken;
+    }
+
+    public string GetRealtimeHubUrl() => $"{_baseUrl}/hubs/voting";
+
     public ApiService(HttpClient httpClient)
     {
         _httpClient = httpClient;
@@ -67,15 +80,14 @@ public class ApiService : IApiService
     {
         try
         {
-            var hashedPassword = HashPassword(password);
-            var loginRequest = new { Username = username, Password = hashedPassword };
+            var loginRequest = new { Username = username, Password = password };
 
             var jsonContent = JsonSerializer.Serialize(loginRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending login request:");
             Console.WriteLine($"  Username: '{username}'");
-            Console.WriteLine("  Password: '[SHA256 hashed]'");
+            Console.WriteLine("  Password: '[plaintext over HTTPS]'");
             Console.WriteLine($"  JSON: {jsonContent}");
 
             var response = await _httpClient.PostAsync($"{_baseUrl}/auth/official-login", content);
@@ -125,74 +137,40 @@ public class ApiService : IApiService
             return null;
         }
     }
-    public async Task<VoteNotificationResponse?> CheckForVotesAsync()
+    public async Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request)
     {
         try
         {
             if (!IsAuthenticated)
             {
-                Console.WriteLine("Not authenticated for vote checking");
-                return null;
+                Console.WriteLine("Not authenticated for sending device command");
+                return false;
             }
 
-            var response = await SendAuthenticatedGetAsync("/api/official/wait-for-votes");
-            var responseContent = await response.Content.ReadAsStringAsync();
+            var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
+            var response = await SendAuthenticatedPostAsync("/api/official/send-device-command", content);
             if (response.IsSuccessStatusCode)
             {
-                var voteResponse = JsonSerializer.Deserialize<VoteNotificationResponse>(responseContent, _jsonOptions);
-                return voteResponse;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Sent command '{request.CommandType}' for voter {request.VoterId}, device {request.DeviceId}");
+                return true;
             }
 
-            return null;
+            var errorBody = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to send device command: {response.StatusCode} {errorBody}");
+            return false;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Vote checking error: {ex.Message}");
-            return null;
-        }
-    }
-
-    public async Task<DeviceStatusResponse?> GetDeviceStatusesAsync()
-    {
-        try
-        {
-            if (!IsAuthenticated)
-            {
-                Console.WriteLine("Not authenticated for device status checking");
-                return null;
-            }
-
-            var response = await SendAuthenticatedGetAsync("/api/official/wait-for-device-statuses");
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
-            {
-                var deviceStatusResponse = JsonSerializer.Deserialize<DeviceStatusResponse>(responseContent, _jsonOptions);
-                return deviceStatusResponse;
-            }
-
-            return null;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Device status checking error: {ex.Message}");
-            return null;
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device command error: {ex.Message}");
+            return false;
         }
     }
 
     //--------------------------------------------
     // Access Code Management Methods
     //--------------------------------------------
-
-    private string HashPassword(string plaintext)
-    {
-        using (var sha256 = SHA256.Create())
-        {
-            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(plaintext));
-            return Convert.ToBase64String(hashedBytes);
-        }
-    }
 
     private string HashAccessCode(string plaintext)
     {
@@ -201,6 +179,16 @@ public class ApiService : IApiService
             var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(plaintext));
             return Convert.ToBase64String(hashedBytes);
         }
+    }
+
+    private string HashOfficialPasswordForCreate(string plaintext)
+    {
+        if (string.IsNullOrWhiteSpace(plaintext))
+        {
+            throw new ArgumentException("Password cannot be empty", nameof(plaintext));
+        }
+
+        return Argon2.Hash(plaintext);
     }
 
     private string ConvertDateToIso8601(string dateString)
@@ -390,30 +378,6 @@ public class ApiService : IApiService
         return null;
     }
 
-    //--------------------------------------------
-    // Long Polling Methods  
-    //--------------------------------------------
-
-    public async Task<OfficialRequestsResponse?> WaitForVoterRequestsAsync()
-    {
-        try
-        {
-            var response = await SendAuthenticatedGetAsync("/api/official/wait-for-requests");
-            
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonString = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<OfficialRequestsResponse>(jsonString, _jsonOptions);
-            }
-            
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     public async Task<bool> GenerateAccessCodeAsync(string voterId)
     {
         try
@@ -585,7 +549,7 @@ public class ApiService : IApiService
             { 
                 userType = "official",  // Identifier indicating this is an official
                 username = username,
-                password = HashPassword(password),
+                password = password,
                 voterId = (string?)null,  // Not applicable for officials
                 scannedFingerprint = scannedFingerprintBase64
             };
@@ -648,7 +612,7 @@ public class ApiService : IApiService
             var uploadRequest = new
             {
                 username = username,
-                password = HashPassword(password),
+                password = password,
                 fingerPrintScan = fingerprintBase64
             };
 
@@ -700,11 +664,12 @@ public class ApiService : IApiService
                 return false;
             }
 
+            string passwordHash = HashOfficialPasswordForCreate(password);
             string fingerprintBase64 = Convert.ToBase64String(fingerprintData);
             var request = new
             {
                 username,
-                password,
+                password = passwordHash,
                 assignedPollingStationId,
                 fingerPrintScan = fingerprintBase64
             };
@@ -714,6 +679,7 @@ public class ApiService : IApiService
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📤 Creating official: {username}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Polling Station ID: {assignedPollingStationId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Password: [Argon2 hashed on client]");
 
             var response = await _httpClient.PostAsync($"{_baseUrl}/api/official/create-official", content);
             var responseBody = await response.Content.ReadAsStringAsync();
@@ -767,8 +733,7 @@ public class ApiService : IApiService
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {_currentCounty}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {_currentConstituency}");
             
-            if (string.IsNullOrWhiteSpace(nationalInsuranceNumber) ||
-                string.IsNullOrWhiteSpace(firstName) ||
+            if (string.IsNullOrWhiteSpace(firstName) ||
                 string.IsNullOrWhiteSpace(lastName) ||
                 string.IsNullOrWhiteSpace(dateOfBirth) ||
                 string.IsNullOrWhiteSpace(addressLine1) ||
@@ -779,7 +744,7 @@ public class ApiService : IApiService
                 fingerprintData.Length == 0)
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ VALIDATION ERROR: Missing required voter fields");
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   NI: {(string.IsNullOrWhiteSpace(nationalInsuranceNumber) ? "MISSING" : "OK")}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   NI: {(string.IsNullOrWhiteSpace(nationalInsuranceNumber) ? "NOT PROVIDED (optional)" : "OK")}");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   FirstName: {(string.IsNullOrWhiteSpace(firstName) ? "MISSING" : "OK")}");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   LastName: {(string.IsNullOrWhiteSpace(lastName) ? "MISSING" : "OK")}");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   DateOfBirth: {(string.IsNullOrWhiteSpace(dateOfBirth) ? "MISSING" : "OK")}");

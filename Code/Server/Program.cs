@@ -5,10 +5,8 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.AspNetCore.Http.Json;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -19,8 +17,10 @@ using Server.Data;
 using Server.Models;
 using Server.Models.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Server.Hubs;
 using SourceAFIS;
 using System.Globalization;
 
@@ -51,6 +51,7 @@ Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Configured to listen on http://loc
 // Add basic services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR();
 
 //===========================================
 // JSON SERIALIZATION CONFIGURATION
@@ -66,6 +67,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =
 //===========================================
 var jwtSecret = SecretsHelper.GetJWTSecret().GetAwaiter().GetResult();
 var jwtKey = Encoding.ASCII.GetBytes(jwtSecret);
+var sdiHmacSecret = SecretsHelper.GetSdiHmacSecret().GetAwaiter().GetResult();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -80,6 +82,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = "VotingClients",
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
+        };
+
+        // Allow JWT in query string for SignalR websocket connections.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrWhiteSpace(accessToken) && path.StartsWithSegments("/hubs/voting"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -111,20 +130,17 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // IN-MEMORY STORAGE SETUP - COUNTY-BASED CHANNELS
 //===========================================
 
-// County+Constituency-based request channels: County -> Constituency -> List of voter requests
-var countyChannels = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>>();
-
 // County+Constituency-based access codes: County -> Constituency -> (VoterId -> Code)
 var countyVoterCodes = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>>();
-
-// County+Constituency-based active waiting connections: County -> Constituency -> (OfficialId -> TaskCompletionSource)
-var countyActiveConnections = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>>();
 
 // County+Constituency-based vote notifications: County -> Constituency -> List of vote notifications for officials
 var countyVoteChannels = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>>();
 
 // County+Constituency-based device status notifications: County -> Constituency -> (OfficialId -> List of device statuses)
 var countyDeviceStatuses = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>>>();
+
+// County+Constituency-based device command notifications: County -> Constituency -> ("{voterId}:{deviceId}" -> List of commands)
+var countyDeviceCommands = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceCommandNotification>>>>();
 
 // Global storage (still shared across all counties)
 var activeVotingSessions = new ConcurrentDictionary<string, DateTime>(); // SessionId -> Expiry
@@ -139,15 +155,15 @@ var officialPollingStationHashes = new ConcurrentDictionary<string, (string Coun
 //===========================================
 // SERVICE REGISTRATION
 //===========================================
-builder.Services.AddSingleton(countyChannels);
 builder.Services.AddSingleton(countyVoterCodes);
-builder.Services.AddSingleton(countyActiveConnections);
 builder.Services.AddSingleton(countyVoteChannels);
 builder.Services.AddSingleton(countyDeviceStatuses);
+builder.Services.AddSingleton(countyDeviceCommands);
 builder.Services.AddSingleton(activeVotingSessions);
 builder.Services.AddSingleton(activeOfficials);
 builder.Services.AddSingleton(officialPollingStationHashes);
 builder.Services.AddSingleton(tokenCounter);
+builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddScoped<VoterService>();
 builder.Services.AddScoped<OfficialService>();
 builder.Services.AddScoped<DatabaseService>();
@@ -289,14 +305,10 @@ app.Use(async (context, next) =>
     var method = context.Request.Method;
     var path = context.Request.Path;
     
-    // Skip logging for long-polling GET requests to reduce console clutter
-    if (!(method == "GET" && path.StartsWithSegments("/api/official/wait-for-requests")))
-    {
-        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        var clientIP = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-        
-        Console.WriteLine($"[{timestamp}] {method} {path} from {clientIP}");
-    }
+    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+    var clientIP = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+
+    Console.WriteLine($"[{timestamp}] {method} {path} from {clientIP}");
     
     await next();
 });
@@ -344,6 +356,32 @@ string GenerateJwtToken(string userId, string role, Dictionary<string, object>? 
     return tokenHandler.WriteToken(token);
 }
 
+static string NormalizeNameForSdi(string value)
+{
+    return value.Trim().ToUpperInvariant();
+}
+
+static string NormalizePostcodeForSdi(string value)
+{
+    return value.Trim().ToUpperInvariant().Replace(" ", string.Empty);
+}
+
+static string BuildIdentityCanonicalString(string firstName, string lastName, DateTime dateOfBirth, string postCode)
+{
+    return string.Join("|",
+        NormalizeNameForSdi(firstName),
+        NormalizeNameForSdi(lastName),
+        dateOfBirth.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        NormalizePostcodeForSdi(postCode));
+}
+
+static string ComputeSdiHmacSha256(string canonicalIdentity, string secret)
+{
+    using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+    var hashBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(canonicalIdentity));
+    return Convert.ToHexString(hashBytes).ToLowerInvariant();
+}
+
 
 
 
@@ -351,10 +389,6 @@ string GenerateJwtToken(string userId, string role, Dictionary<string, object>? 
 //===========================================
 // DATA INITIALIZATION
 //===========================================
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
 
 
 
@@ -454,7 +488,6 @@ app.MapPost("/auth/official-login", async (OfficialLoginRequest request, Databas
 app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
     ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes,
-    ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> countyActiveConnections,
     ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>> countyVoteChannels) =>
 {
     var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
@@ -502,30 +535,7 @@ app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Polling station hash not found for official {officialId}");
     }
     
-    // 3. Remove from countyActiveConnections (if they're currently waiting for requests)
-    var connRemoved = false;
-    if (!string.IsNullOrEmpty(county) && !string.IsNullOrEmpty(constituency))
-    {
-        if (countyActiveConnections.TryGetValue(county, out var constituencyDict))
-        {
-            if (constituencyDict.TryGetValue(constituency, out var officialConnections))
-            {
-                connRemoved = officialConnections.TryRemove(officialId, out _);
-            }
-        }
-    }
-    removalSummary["activeConnections"] = connRemoved;
-    
-    if (connRemoved)
-    {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Removed official {officialId} from active connections in {county}/{constituency}");
-    }
-    else
-    {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Official {officialId} not in active connections");
-    }
-    
-    // 4. Clear their personal vote queue
+    // 3. Clear their personal vote queue
     var queueRemoved = false;
     if (!string.IsNullOrEmpty(county))
     {
@@ -559,7 +569,7 @@ app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
 // Voter logout endpoint - revokes active voter session created during authentication
 app.MapPost("/auth/voter-logout", (ClaimsPrincipal user, VoterService voterService) =>
 {
-    var voterId = user.FindFirst("nin")?.Value;
+    var voterId = user.FindFirst("voterId")?.Value;
 
     if (string.IsNullOrWhiteSpace(voterId))
     {
@@ -630,6 +640,13 @@ app.MapPost("/api/official/create-voter", async (CreateVoterRequest request, Dat
         });
     }
 
+    var canonicalIdentity = BuildIdentityCanonicalString(
+        request.FirstName,
+        request.LastName,
+        parsedDateOfBirth,
+        request.PostCode);
+    var sdi = ComputeSdiHmacSha256(canonicalIdentity, sdiHmacSecret!);
+
     byte[] fingerprintData;
     try
     {
@@ -654,6 +671,7 @@ app.MapPost("/api/official/create-voter", async (CreateVoterRequest request, Dat
         request.PostCode,
         request.County,
         request.Constituency,
+        sdi,
         fingerprintData);
 
     if (!result.Success)
@@ -860,7 +878,7 @@ app.MapPost("/api/voter/verify-access-code", async (VerifyAccessCodeRequest requ
 //===========================================
 // API ENDPOINTS - VOTER AUTHENTICATION LOOKUP
 //===========================================
-// Flexible voter lookup: by NIN (primary) or by FirstName + LastName + DateOfBirth (secondary)
+// SDI-based voter lookup using FirstName + LastName + DateOfBirth + PostCode.
 app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request, DatabaseService dbService) =>
 {
     Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ===== VOTER AUTH LOOKUP ATTEMPT =====");
@@ -868,62 +886,69 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
     Voter? voter = null;
     string? matchedBy = null;
 
-    // Primary lookup: by NIN
-    if (!string.IsNullOrWhiteSpace(request.NationalInsuranceNumber))
+    if (string.IsNullOrWhiteSpace(request.FirstName) ||
+        string.IsNullOrWhiteSpace(request.LastName) ||
+        string.IsNullOrWhiteSpace(request.DateOfBirth) ||
+        string.IsNullOrWhiteSpace(request.PostCode))
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting NIN lookup: {request.NationalInsuranceNumber}");
-        voter = await dbService.GetVoterByNINAsync(
-            request.NationalInsuranceNumber);
-        
-        if (voter is not null)
-        {
-            matchedBy = "NIN";
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by NIN");
-        }
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Missing required identity fields for SDI lookup");
+        return Results.BadRequest(new VoterAuthLookupResponse(
+            false,
+            "FirstName, LastName, DateOfBirth, and PostCode are required.",
+            null,
+            null,
+            null,
+            null
+        ));
     }
 
-    // Fallback: by FirstName + LastName + DateOfBirth
-    if (voter is null && 
-        !string.IsNullOrWhiteSpace(request.FirstName) && 
-        !string.IsNullOrWhiteSpace(request.LastName) && 
-        !string.IsNullOrWhiteSpace(request.DateOfBirth))
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting SDI lookup for {request.FirstName} {request.LastName} ({request.DateOfBirth}) {request.PostCode}");
+
+    var dobInput = request.DateOfBirth!.Trim();
+    DateTime parsedDob;
+
+    if (DateTime.TryParseExact(
+            dobInput,
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var dateOnlyDob))
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting Name+DOB lookup: {request.FirstName} {request.LastName} ({request.DateOfBirth})");
-        
-        // Parse DOB as date-only to avoid timezone-driven day shifts.
-        var dobInput = request.DateOfBirth!.Trim();
-        DateTime parsedDob;
+        parsedDob = DateTime.SpecifyKind(dateOnlyDob.Date, DateTimeKind.Unspecified);
+    }
+    else if (DateTime.TryParse(
+                 dobInput,
+                 CultureInfo.InvariantCulture,
+                 DateTimeStyles.AllowWhiteSpaces,
+                 out var parsedDobWithTime))
+    {
+        parsedDob = DateTime.SpecifyKind(parsedDobWithTime.Date, DateTimeKind.Unspecified);
+    }
+    else
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Invalid DateOfBirth format: {request.DateOfBirth}");
+        return Results.BadRequest(new VoterAuthLookupResponse(
+            false,
+            "DateOfBirth is invalid. Use yyyy-MM-dd.",
+            null,
+            null,
+            null,
+            null
+        ));
+    }
 
-        if (DateTime.TryParseExact(
-                dobInput,
-                "yyyy-MM-dd",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var dateOnlyDob))
-        {
-            parsedDob = DateTime.SpecifyKind(dateOnlyDob.Date, DateTimeKind.Unspecified);
-            voter = await dbService.GetVoterByNameAndDateAsync(
-                request.FirstName ?? string.Empty,
-                request.LastName ?? string.Empty,
-                parsedDob);
-        }
-        else if (DateTime.TryParse(
-                     dobInput,
-                     CultureInfo.InvariantCulture,
-                     DateTimeStyles.AllowWhiteSpaces,
-                     out var parsedDobWithTime))
-        {
-            parsedDob = DateTime.SpecifyKind(parsedDobWithTime.Date, DateTimeKind.Unspecified);
+    var canonicalIdentity = BuildIdentityCanonicalString(
+        request.FirstName,
+        request.LastName,
+        parsedDob,
+        request.PostCode);
+    var sdi = ComputeSdiHmacSha256(canonicalIdentity, sdiHmacSecret);
 
-            voter = await dbService.GetVoterByNameAndDateAsync(
-                request.FirstName ?? string.Empty,
-                request.LastName ?? string.Empty,
-                parsedDob);
-        }
-        else
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Invalid DateOfBirth format: {request.DateOfBirth}");
-        }
+    voter = await dbService.GetVoterBySdiAsync(sdi);
+    if (voter is not null)
+    {
+        matchedBy = "SDI";
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by SDI");
     }
 
     // Return result
@@ -1070,6 +1095,7 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
 app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
     ClaimsPrincipal user,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    IHubContext<VotingHub> hubContext,
     [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>> countyVoteChannels) =>
 {
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast attempt - Voter ID: {request.VoterId}, County: {request.County}, Constituency: {request.Constituency}, Station: {request.PollingStationCode}");
@@ -1188,6 +1214,15 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
             
             var officialQueue = officialQueues.GetOrAdd(thisOfficialId, _ => new ConcurrentBag<VoteNotification>());
             officialQueue.Add(individualNotification);
+            _ = hubContext.Clients.Group(RealtimeGroups.Official(thisOfficialId)).SendAsync("official.v1.voteReceived", new
+            {
+                voterId = individualNotification.VoterId,
+                candidateName = individualNotification.CandidateName,
+                partyName = individualNotification.PartyName,
+                timestamp = individualNotification.Timestamp,
+                officialId = individualNotification.OfficialId,
+                stationId = individualNotification.StationId
+            });
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Added vote to official {thisOfficialId} in constituency {request.Constituency}");
         }
         
@@ -1216,10 +1251,9 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
 app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
     ClaimsPrincipal user,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    IHubContext<VotingHub> hubContext,
     [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>>> countyDeviceStatuses) =>
 {
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status update - Voter ID: {request.VoterId}, Device ID: {request.DeviceId}, Status: {request.Status}");
-
     // Validate device status against voter token claims
     var tokenVoterId = user.FindFirst("voterId")?.Value;
     var tokenCounty = user.FindFirst("county")?.Value;
@@ -1229,7 +1263,6 @@ app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
 
     if (!int.TryParse(tokenVoterId, out var parsedTokenVoterId) || parsedTokenVoterId != request.VoterId)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status rejected - request voter ID {request.VoterId} does not match token voter ID {tokenVoterId}");
         return Results.BadRequest(new { 
             success = false, 
             message = "Device status failed: invalid voter token context" 
@@ -1267,7 +1300,6 @@ app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
 
         if (fallbackOfficials.Count > 0)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Recovered voter-official link from token claims for device status");
             foreach (var kvp in fallbackOfficials)
             {
                 if (!kvp.Value.ConnectedVoters.Contains(request.VoterId))
@@ -1297,8 +1329,6 @@ app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
             .GetOrAdd(tokenCounty, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>>())
             .GetOrAdd(tokenConstituency, _ => new ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>());
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Broadcasting device status to {officialsInConstituency.Count} officials");
-        
         foreach (var kvp in officialsInConstituency)
         {
             var officialId = kvp.Value.OfficialId;
@@ -1312,7 +1342,15 @@ app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
             
             var officialQueue = constituencyStatuses.GetOrAdd(officialId, _ => new ConcurrentBag<DeviceStatusNotification>());
             officialQueue.Add(individualNotification);
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Added device status to official {officialId}");
+            _ = hubContext.Clients.Group(RealtimeGroups.Official(officialId)).SendAsync("official.v1.deviceStatusReceived", new
+            {
+                voterId = individualNotification.VoterId,
+                deviceId = individualNotification.DeviceId,
+                status = individualNotification.Status,
+                timestamp = individualNotification.Timestamp,
+                county = individualNotification.County,
+                constituency = individualNotification.Constituency
+            });
         }
         
         return Results.Ok(new { 
@@ -1322,7 +1360,6 @@ app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
         });
     }
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status failed - Voter {request.VoterId} not linked to any official");
     return Results.BadRequest(new { 
         success = false, 
         message = "Device status failed: Voter not properly linked to official system" 
@@ -1336,147 +1373,97 @@ app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
 
 
 
-//===========================================
-// API ENDPOINTS - LONG POLLING
-//===========================================
-app.MapGet("/api/voter/wait-for-code/{voterId}", async (string voterId, VoterService voterService, ClaimsPrincipal user) =>
+app.MapPost("/api/official/send-device-command", (SendDeviceCommandRequest request,
+    ClaimsPrincipal user,
+    ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    IHubContext<VotingHub> hubContext,
+    [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceCommandNotification>>>> countyDeviceCommands) =>
 {
     var county = user.FindFirst("county")?.Value;
     var constituency = user.FindFirst("constituency")?.Value;
-    if (string.IsNullOrEmpty(county) || string.IsNullOrEmpty(constituency))
+    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
+
+    if (string.IsNullOrWhiteSpace(county) || string.IsNullOrWhiteSpace(constituency))
     {
         return Results.BadRequest(new { success = false, message = "County or constituency not found in authentication token" });
     }
 
-    var timeout = TimeSpan.FromSeconds(20);
-    var (success, code) = await voterService.WaitForAccessCode(voterId, county, constituency, timeout);
-
-    if (success)
+    if (request.VoterId <= 0 || string.IsNullOrWhiteSpace(request.DeviceId) || string.IsNullOrWhiteSpace(request.CommandType))
     {
-        return Results.Ok(new { success = true, code = code });
+        return Results.BadRequest(new { success = false, message = "VoterId, DeviceId, and CommandType are required" });
     }
 
-    return Results.Ok(new { success = false, message = "Timeout - no code available" });
-})
-.RequireAuthorization(policy => policy.RequireRole("voter"))
-.WithName("VoterWaitForCode");
-
-
-
-app.MapGet("/api/official/wait-for-votes", async (ClaimsPrincipal user,
-    [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>> countyVoteChannels) =>
-{
-    var county = user.FindFirst("county")?.Value;
-    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
-    
-    if (string.IsNullOrEmpty(county))
+    var normalizedCommand = request.CommandType.Trim().ToLowerInvariant();
+    if (normalizedCommand != "lock_device" && normalizedCommand != "unlock_device")
     {
-        return Results.BadRequest(new { success = false, message = "County not found in authentication token" });
+        return Results.BadRequest(new { success = false, message = "Unsupported command type" });
     }
-    
-    // Get THIS OFFICIAL'S personal vote queue
-    var votes = new List<object>();
-    
-    if (countyVoteChannels.TryGetValue(county, out var officialQueues))
+
+    var linkedOfficial = activeOfficials
+        .Where(kvp =>
+            kvp.Key.StartsWith($"{county}_", StringComparison.Ordinal) &&
+            kvp.Value.OfficialId == officialId &&
+            kvp.Value.Constituency == constituency)
+        .Select(kvp => kvp.Value)
+        .FirstOrDefault();
+
+    if (string.IsNullOrWhiteSpace(linkedOfficial.OfficialId) || !linkedOfficial.ConnectedVoters.Contains(request.VoterId))
     {
-        if (officialQueues.TryGetValue(officialId, out var myQueue))
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Rejecting device command from official {officialId}: voter {request.VoterId} not linked");
+        return Results.BadRequest(new { success = false, message = "Target voter is not linked to this official" });
+    }
+
+    var targetKey = $"{request.VoterId}:{request.DeviceId}";
+    var queueByCounty = countyDeviceCommands.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceCommandNotification>>>());
+    var queueByConstituency = queueByCounty.GetOrAdd(constituency, _ => new ConcurrentDictionary<string, ConcurrentBag<DeviceCommandNotification>>());
+    var targetQueue = queueByConstituency.GetOrAdd(targetKey, _ => new ConcurrentBag<DeviceCommandNotification>());
+
+    var command = new DeviceCommandNotification(
+        request.VoterId,
+        request.DeviceId,
+        normalizedCommand,
+        DateTime.UtcNow,
+        county,
+        constituency,
+        officialId,
+        normalizedCommand == "lock_device" ? "Device locked by official" : "Device unlocked by official"
+    );
+
+    targetQueue.Add(command);
+
+    _ = hubContext.Clients.Groups(
+        RealtimeGroups.Voter(request.VoterId.ToString()),
+        RealtimeGroups.VoterDevice(request.VoterId.ToString(), request.DeviceId)
+    ).SendAsync("voter.v1.deviceCommandReceived", new
+    {
+        success = true,
+        commandType = command.CommandType,
+        officialId = command.OfficialId,
+        message = command.Message,
+        data = new
         {
-            // Drain ONLY this official's queue
-            while (myQueue.TryTake(out var vote))
-            {
-                votes.Add(new {
-                    voterId = vote.VoterId,
-                    candidateName = vote.CandidateName,
-                    partyName = vote.PartyName,
-                    timestamp = vote.Timestamp,
-                    officialId = vote.OfficialId,
-                    stationId = vote.StationId
-                });
-            }
-            
-            if (votes.Count > 0)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Delivering {votes.Count} votes to official {officialId} from their personal queue in {county}");
-            }
+            command.Timestamp,
+            command.DeviceId
         }
-    }
-    
-    return Results.Ok(new { success = true, votes = votes, count = votes.Count });
+    });
+
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Queued command '{normalizedCommand}' for voter {request.VoterId}, device {request.DeviceId} from official {officialId}");
+
+    return Results.Ok(new
+    {
+        success = true,
+        message = "Command queued",
+        commandType = normalizedCommand,
+        voterId = request.VoterId,
+        deviceId = request.DeviceId,
+        timestamp = command.Timestamp
+    });
 })
 .RequireAuthorization(policy => policy.RequireRole("official"))
-.WithName("OfficialWaitForVotes");
-
-app.MapGet("/api/official/wait-for-device-statuses", async (ClaimsPrincipal user,
-    [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceStatusNotification>>>> countyDeviceStatuses) =>
-{
-    var county = user.FindFirst("county")?.Value;
-    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
-    
-    if (string.IsNullOrEmpty(county))
-    {
-        return Results.BadRequest(new { success = false, message = "County not found in authentication token" });
-    }
-    
-    var statuses = new List<object>();
-    
-    if (countyDeviceStatuses.TryGetValue(county, out var constituencyDict))
-    {
-        foreach (var constituencyKvp in constituencyDict)
-        {
-            if (constituencyKvp.Value.TryGetValue(officialId, out var myQueue))
-            {
-                while (myQueue.TryTake(out var status))
-                {
-                    statuses.Add(new {
-                        voterId = status.VoterId,
-                        deviceId = status.DeviceId,
-                        status = status.Status,
-                        timestamp = status.Timestamp,
-                        county = status.County,
-                        constituency = status.Constituency
-                    });
-                }
-            }
-        }
-    }
-    
-    if (statuses.Count > 0)
-    {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Delivering {statuses.Count} device statuses to official {officialId}");
-    }
-    
-    return Results.Ok(new { success = true, statuses = statuses, count = statuses.Count });
-})
-.RequireAuthorization(policy => policy.RequireRole("official"))
-.WithName("OfficialWaitForDeviceStatuses");
+.WithName("OfficialSendDeviceCommand");
 
 
-app.MapGet("/api/official/wait-for-requests", async (OfficialService officialService, ClaimsPrincipal user) =>
-{
-    var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
-    var stationId = user.FindFirst("station")?.Value ?? "Unknown";
-    var county = user.FindFirst("county")?.Value;
-    var constituency = user.FindFirst("constituency")?.Value;
-    
-    if (string.IsNullOrEmpty(county) || string.IsNullOrEmpty(constituency))
-    {
-        return Results.BadRequest(new { success = false, message = "County or constituency not found in authentication token" });
-    }
-    
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} (Station: {stationId}) waiting for voter requests in {county}/{constituency}");
-    
-    var timeout = TimeSpan.FromSeconds(30);
-    var (success, requests) = await officialService.WaitForVoterRequests(county, constituency, officialId, timeout);
-    
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} received {(success ? requests.Count : 0)} voter requests from {county}/{constituency}");
-    
-    return Results.Ok(new { success = success, requests = requests });
-})
-.RequireAuthorization(policy => policy.RequireRole("official"))
-.WithName("OfficialWaitForRequests");
-
-
-app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, OfficialService officialService, ClaimsPrincipal user) =>
+app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, OfficialService officialService, ClaimsPrincipal user, IHubContext<VotingHub> hubContext) =>
 {
     var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
     var stationId = user.FindFirst("station")?.Value ?? "Unknown";
@@ -1494,6 +1481,13 @@ app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, Officia
     
     if (success)
     {
+        _ = hubContext.Clients.Group(RealtimeGroups.Voter(request.VoterId)).SendAsync("voter.v1.accessCodeGenerated", new
+        {
+            success = true,
+            code,
+            message = "Access code available"
+        });
+
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} successfully generated code {code} for voter {request.VoterId} in {county}/{constituency}");
         return Results.Ok(new { success = true, code = code, voterId = request.VoterId });
     }
@@ -1504,7 +1498,9 @@ app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, Officia
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialGenerateCode");
 
-app.MapPost("/api/voter/request-access", async (VoterAccessRequest request, VoterService voterService, ClaimsPrincipal user) =>
+app.MapPost("/api/voter/request-access", async (VoterAccessRequest request, VoterService voterService, ClaimsPrincipal user,
+    ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    IHubContext<VotingHub> hubContext) =>
 {
     var county = user.FindFirst("county")?.Value;
     var constituency = user.FindFirst("constituency")?.Value;
@@ -1517,6 +1513,26 @@ app.MapPost("/api/voter/request-access", async (VoterAccessRequest request, Vote
     
     if (success)
     {
+        var requestMessage = $"Voter {request.VoterId} requesting access from {request.DeviceName}";
+        var targetOfficials = activeOfficials
+            .Where(o => o.Key.StartsWith($"{county}_", StringComparison.Ordinal) && o.Value.Constituency == constituency)
+            .Select(o => o.Value.OfficialId)
+            .Distinct()
+            .ToList();
+
+        foreach (var targetOfficialId in targetOfficials)
+        {
+            await hubContext.Clients.Group(RealtimeGroups.Official(targetOfficialId)).SendAsync("official.v1.voterRequestReceived", new
+            {
+                request = requestMessage,
+                voterId = request.VoterId,
+                deviceName = request.DeviceName,
+                county,
+                constituency,
+                timestamp = DateTime.UtcNow
+            });
+        }
+
         return Results.Ok(new { success = true, message = "Access request sent to official" });
     }
     
@@ -1933,6 +1949,8 @@ app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, Data
 })
 .WithName("VerifyFingerprints");
 
+app.MapHub<VotingHub>("/hubs/voting");
+
 //===========================================
 // START APPLICATION
 //===========================================
@@ -2035,6 +2053,12 @@ record SendDeviceStatusRequest(
     string Status
 );
 
+record SendDeviceCommandRequest(
+    int VoterId,
+    string DeviceId,
+    string CommandType
+);
+
 record VoteNotification(
     int VoterId,
     string CandidateName,
@@ -2057,6 +2081,17 @@ record DeviceStatusNotification(
     string Constituency
 );
 
+record DeviceCommandNotification(
+    int VoterId,
+    string DeviceId,
+    string CommandType,
+    DateTime Timestamp,
+    string County,
+    string Constituency,
+    string OfficialId,
+    string Message
+);
+
 // Fingerprint verification models
 record VerifyFingerprintsRequest(
     string UserType,              // "official" or "voter" - identifies the type of user
@@ -2068,10 +2103,12 @@ record VerifyFingerprintsRequest(
 
 // Voter authentication lookup models (flexible identification)
 record VoterAuthLookupRequest(
-    string? NationalInsuranceNumber,
     string? FirstName,
     string? LastName,
-    string? DateOfBirth
+    string? DateOfBirth,
+    string? PostCode,
+    string? County,
+    string? Constituency
 );
 
 record VoterAuthLookupResponse(

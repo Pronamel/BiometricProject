@@ -14,22 +14,26 @@ public interface IServerHandler
     bool IsAuthenticated { get; }
     string? CurrentVoterId { get; }
     string? AssignedStationId { get; }
+    string CurrentDeviceStatus { get; set; }
+    Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
+    Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency);
+    Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName);
+    Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint);
     void Logout();
     
     // Voter Access Management
     Task<bool> RequestAccessFromOfficialAsync(string? deviceName = null);
-    Task<string?> WaitForAccessCodeFromOfficialAsync();
     
     // Distributed Code Verification
     Task<bool> SubmitCodeForVerificationAsync(string accessCode);
     
     // Real-time Communication Loop
-    Task<VoterCommandResponse?> ListenForOfficialCommandsAsync();
     Task<bool> StartContinuousListeningAsync(Action<VoterCommandResponse> onCommandReceived);
     void StopContinuousListening();
     
     // Status Updates to Official
     Task<bool> NotifyOfficialAsync(string status, string? additionalData = null);
+    Task<bool> SendDeviceStatusAsync(string status);
     
     // Events for real-time updates
     event Action<string>? AccessCodeReceived;

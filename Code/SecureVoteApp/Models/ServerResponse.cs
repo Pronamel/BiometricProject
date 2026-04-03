@@ -152,9 +152,6 @@ public class VoterLinkResponse
 // Voter Authentication Lookup Models
 public class VoterAuthLookupRequest
 {
-    [JsonPropertyName("nationalInsuranceNumber")]
-    public string? NationalInsuranceNumber { get; set; }
-    
     [JsonPropertyName("firstName")]
     public string? FirstName { get; set; }
     
@@ -163,6 +160,9 @@ public class VoterAuthLookupRequest
     
     [JsonPropertyName("dateOfBirth")]
     public string? DateOfBirth { get; set; }
+
+    [JsonPropertyName("postCode")]
+    public string? PostCode { get; set; }
     
     [JsonPropertyName("county")]
     public string County { get; set; } = string.Empty;

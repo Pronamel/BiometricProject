@@ -10,6 +10,15 @@ namespace Server.Data
         {
         }
 
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Voter>()
+                .Property(v => v.Sdi)
+                .HasColumnName("sdi");
+        }
+
         public DbSet<Candidate> Candidates { get; set; }
         public DbSet<Constituency> Constituencies { get; set; }
         public DbSet<ConstituencyResult> ConstituencyResults { get; set; }

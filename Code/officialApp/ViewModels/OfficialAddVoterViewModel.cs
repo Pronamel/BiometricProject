@@ -83,7 +83,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     private string captureStatusMessage = "Ready to scan";
 
     private readonly INavigationService _navigationService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
     private readonly IScannerService _scannerService;
 
     public List<string> CountyOptions => UKCounties.Counties
@@ -109,10 +109,10 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     private uint _capturedFingerprintHeight = 0;
     private const int QUALITY_THRESHOLD = 10;
 
-    public OfficialAddVoterViewModel(IApiService apiService, INavigationService navigationService, IScannerService scannerService)
+    public OfficialAddVoterViewModel(IServerHandler serverHandler, INavigationService navigationService, IScannerService scannerService)
     {
         _navigationService = navigationService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
         _scannerService = scannerService;
         CheckScannerConnectivity();
     }
@@ -125,7 +125,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             StatusMessage = "Loading polling stations...";
             StatusColor = "black";
             
-            var pollingStations = await _apiService.GetAllPollingStationsAsync();
+            var pollingStations = await _serverHandler.GetAllPollingStationsAsync();
             
             if (pollingStations != null && pollingStations.Count > 0)
             {
@@ -201,7 +201,6 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         {
             if (string.IsNullOrWhiteSpace(FirstName) ||
                 string.IsNullOrWhiteSpace(LastName) ||
-                string.IsNullOrWhiteSpace(NationalInsuranceNumber) ||
                 string.IsNullOrWhiteSpace(DateOfBirth) ||
                 string.IsNullOrWhiteSpace(AddressLine1) ||
                 string.IsNullOrWhiteSpace(PostCode) ||
@@ -240,7 +239,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fingerprint data size (PNG encoded): {pngFingerprintData.Length} bytes");
 
             bool submitSuccess = IsCreateVoterMode
-                ? await _apiService.CreateVoterWithFingerprintAsync(
+                ? await _serverHandler.CreateVoterWithFingerprintAsync(
                     NationalInsuranceNumber,
                     FirstName,
                     LastName,
@@ -317,7 +316,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             }
 
             // Call the API with extracted polling station data
-            bool result = await _apiService.CreateOfficialWithFingerprintAsync(
+            bool result = await _serverHandler.CreateOfficialWithFingerprintAsync(
                 OfficialUsername,
                 Password,
                 selectedStation.PollingStationId.ToString(),

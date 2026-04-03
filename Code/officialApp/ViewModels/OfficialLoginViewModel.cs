@@ -60,16 +60,16 @@ public partial class OfficialLoginViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
 
     // ==========================================
     // CONSTRUCTOR
     // ==========================================
     
-    public OfficialLoginViewModel(IApiService apiService, INavigationService navigationService)
+    public OfficialLoginViewModel(IServerHandler serverHandler, INavigationService navigationService)
     {
         _navigationService = navigationService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
     }
 
     // ==========================================
@@ -88,7 +88,7 @@ public partial class OfficialLoginViewModel : ViewModelBase
 
             // Call the API with username and password
             // Server will validate against database and return all official details
-            var loginResponse = await _apiService.LoginAsync(Username, Password);
+            var loginResponse = await _serverHandler.LoginAsync(Username, Password);
             
             if (loginResponse != null && loginResponse.Success)
             {

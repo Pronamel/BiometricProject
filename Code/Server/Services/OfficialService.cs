@@ -8,24 +8,18 @@ namespace Server.Services;
 
 public class OfficialService
 {
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> _countyChannels;
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _countyVoterCodes;
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> _countyActiveConnections;
     private readonly ConcurrentDictionary<string, DateTime> _activeVotingSessions;
     private readonly ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> _activeOfficials;
     private readonly ApplicationDbContext _dbContext;
 
     public OfficialService(
-        ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<string>>> countyChannels,
         ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> countyVoterCodes,
-        ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>> countyActiveConnections,
         ConcurrentDictionary<string, DateTime> activeVotingSessions,
         ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
         ApplicationDbContext dbContext)
     {
-        _countyChannels = countyChannels;
         _countyVoterCodes = countyVoterCodes;
-        _countyActiveConnections = countyActiveConnections;
         _activeVotingSessions = activeVotingSessions;
         _activeOfficials = activeOfficials;
         _dbContext = dbContext;
@@ -52,7 +46,6 @@ public class OfficialService
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Validating official credentials:");
             Console.WriteLine($"  Username: '{username}'");
-            Console.WriteLine($"  Password: '{password}'");
 
             // Query the database for the official
             var official = await _dbContext.Officials
@@ -64,9 +57,7 @@ public class OfficialService
                 return false;
             }
 
-            // Check password (currently plain text, compare directly)
-            // TODO: In production, use proper password hashing (BCrypt, Argon2, etc.)
-            bool passwordMatch = official.PasswordHash == password;
+            bool passwordMatch = PasswordHasher.VerifyPassword(official.PasswordHash, password);
 
             if (passwordMatch)
             {
@@ -83,61 +74,6 @@ public class OfficialService
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error validating credentials: {ex.Message}");
             return false;
-        }
-    }
-
-    public async Task<(bool Success, List<string> Requests)> WaitForVoterRequests(string county, string constituency, string officialId, TimeSpan timeout)
-    {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {officialId} waiting for voter requests in county: {county}, constituency: {constituency}");
-
-        var countyDict = _countyChannels.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentBag<string>>());
-        var countyRequests = countyDict.GetOrAdd(constituency, _ => new ConcurrentBag<string>());
-
-        var countyConnDict = _countyActiveConnections.GetOrAdd(county, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, TaskCompletionSource<List<string>>>>());
-        var constituencyConnDict = countyConnDict.GetOrAdd(constituency, _ => new ConcurrentDictionary<string, TaskCompletionSource<List<string>>>());
-
-        // Create task completion source for this specific official
-        var tcs = new TaskCompletionSource<List<string>>();
-        constituencyConnDict[officialId] = tcs;
-
-        var startTime = DateTime.Now;
-
-        // First check if there are already pending requests for this county+constituency
-        if (!countyRequests.IsEmpty)
-        {
-            var requests = new List<string>();
-            while (countyRequests.TryTake(out string? request))
-            {
-                if (request != null) requests.Add(request);
-            }
-
-            if (requests.Count > 0)
-            {
-                // ❌ DON'T REMOVE - Let them stay registered
-                // constituencyConnDict.TryRemove(officialId, out _);
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending {requests.Count} pending voter requests to official {officialId} in {county}/{constituency}");
-                return (true, requests);
-            }
-        }
-
-        // Wait for new requests or timeout
-        try
-        {
-            using var cts = new CancellationTokenSource(timeout);
-            var result = await tcs.Task.WaitAsync(cts.Token);
-            
-            // ❌ DON'T REMOVE - Let them stay registered
-            // constituencyConnDict.TryRemove(officialId, out _);
-            
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending {result.Count} new voter requests to official {officialId} in {county}/{constituency}");
-            return (true, result);
-        }
-        catch (OperationCanceledException)
-        {
-            // ✅ ONLY remove on timeout (they stopped listening)
-            constituencyConnDict.TryRemove(officialId, out _);
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Timeout waiting for voter requests in {county}/{constituency} for official {officialId}");
-            return (false, new List<string>());
         }
     }
 

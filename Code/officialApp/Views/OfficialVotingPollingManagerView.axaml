@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
             xmlns:vm="using:officialApp.ViewModels"
+            xmlns:models="using:officialApp.Models"
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
@@ -72,7 +73,7 @@
                     <ScrollViewer>
                         <ItemsControl ItemsSource="{Binding ConnectedDevices}">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ConnectedVoterDevice">
                                     <Border BorderBrush="DarkGray" 
                                             BorderThickness="1" 
                                             Background="White" 
@@ -83,18 +84,46 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="80"/>
                                                 <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             
                                             <!-- Device Identifier (GUID) -->
                                             <StackPanel Grid.Column="0" Spacing="3">
                                                 <TextBlock Text="Device ID" FontSize="11" FontWeight="Bold" Foreground="Gray"/>
                                                 <TextBlock Text="{Binding DeviceIdentifier}" FontSize="14" FontWeight="Bold" Foreground="Blue"/>
+                                                <TextBlock Text="{Binding VoterId, StringFormat=Voter {0}}" FontSize="11" Foreground="Gray"/>
                                             </StackPanel>
                                             
                                             <!-- Status -->
                                             <StackPanel Grid.Column="1" Margin="15,0,0,0" Spacing="3">
                                                 <TextBlock Text="Status" FontSize="11" FontWeight="Bold" Foreground="Gray"/>
                                                 <TextBlock Text="{Binding Status}" FontSize="13" FontWeight="Bold" Foreground="Green"/>
+                                                <Border IsVisible="{Binding IsLockedByOfficial}"
+                                                        Background="#D9534F"
+                                                        CornerRadius="10"
+                                                        Padding="8,2"
+                                                        HorizontalAlignment="Left">
+                                                    <TextBlock Text="LOCKED"
+                                                               FontSize="11"
+                                                               FontWeight="Bold"
+                                                               Foreground="White"/>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Official control -->
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <Button Content="Lock"
+                                                        Background="#D9534F"
+                                                        Foreground="White"
+                                                        Padding="10,4"
+                                                        Command="{Binding $parent[ItemsControl].DataContext.LockDeviceCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Content="Unlock"
+                                                        Background="#5CB85C"
+                                                        Foreground="White"
+                                                        Padding="10,4"
+                                                        Command="{Binding $parent[ItemsControl].DataContext.UnlockDeviceCommand}"
+                                                        CommandParameter="{Binding}"/>
                                             </StackPanel>
                                         </Grid>
                                     </Border>

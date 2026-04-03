@@ -55,11 +55,11 @@ public partial class App : Application
 
                 try
                 {
-                    var apiService = ServiceProvider?.GetService<IApiService>();
-                    if (apiService?.IsAuthenticated == true)
+                    var serverHandler = ServiceProvider?.GetService<IServerHandler>();
+                    if (serverHandler?.IsAuthenticated == true)
                     {
                         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] App is closing - logging out official session...");
-                        await apiService.LogoutAsync();
+                        await serverHandler.LogoutAsync();
                     }
                 }
                 catch (Exception ex)

@@ -47,6 +47,7 @@ class Program
         
         // Register data services
         services.AddSingleton<IApiService, ApiService>();
+        services.AddSingleton<IRealtimeService, RealtimeService>();
         services.AddSingleton<IServerHandler, ServerHandler>();
         services.AddSingleton<IScannerService, ScannerService>();
         

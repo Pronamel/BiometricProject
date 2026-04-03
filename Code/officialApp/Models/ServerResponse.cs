@@ -74,3 +74,15 @@ public class FingerprintComparisonResponse
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
 }
+
+public class SendDeviceCommandRequest
+{
+    [JsonPropertyName("voterId")]
+    public int VoterId { get; set; }
+
+    [JsonPropertyName("deviceId")]
+    public string DeviceId { get; set; } = string.Empty;
+
+    [JsonPropertyName("commandType")]
+    public string CommandType { get; set; } = string.Empty;
+}

@@ -12,6 +12,8 @@ public interface IApiService
     bool IsAuthenticated { get; }
     string? CurrentOfficialId { get; }
     Task<bool> LogoutAsync();
+    string? GetAuthToken();
+    string GetRealtimeHubUrl();
     
     // Connection & Device Management
     Task<bool> TestConnectionAsync();
@@ -19,15 +21,13 @@ public interface IApiService
     Task<DeviceManagementInfo?> GetDeviceManagementInfoAsync();
     
     // Long Polling Methods
-    Task<OfficialRequestsResponse?> WaitForVoterRequestsAsync();
     Task<bool> GenerateAccessCodeAsync(string voterId);
     Task<bool> SetAccessCodeAsync(string accessCode);
     
     // Vote Management
-    Task<VoteNotificationResponse?> CheckForVotesAsync();
     
     // Device Status Management
-    Task<DeviceStatusResponse?> GetDeviceStatusesAsync();
+    Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request);
     
     // Database Queries
     Task<List<dynamic>?> GetAllVotersAsync();

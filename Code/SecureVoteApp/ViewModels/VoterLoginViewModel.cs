@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using SecureVoteApp.Services;
 using SecureVoteApp.Models;
 using System.Net.Http;
+using Avalonia.Threading;
 
 namespace SecureVoteApp.ViewModels;
 
@@ -59,17 +60,24 @@ public partial class VoterLoginViewModel : ViewModelBase
 
     private readonly INavigationService _navigationService;
     private readonly CountyService _countyService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
+    private readonly DeviceLockState _deviceLockState;
+    private bool _commandListenerStarted;
 
     // ==========================================
     // CONSTRUCTOR
     // ==========================================
     
-    public VoterLoginViewModel(IApiService apiService, INavigationService navigationService, CountyService countyService)
+    public VoterLoginViewModel(
+        INavigationService navigationService,
+        CountyService countyService,
+        IServerHandler serverHandler,
+        DeviceLockState deviceLockState)
     {
         _navigationService = navigationService;
         _countyService = countyService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
+        _deviceLockState = deviceLockState;
     }
 
     // ==========================================
@@ -125,6 +133,12 @@ public partial class VoterLoginViewModel : ViewModelBase
     private async Task Continue()
     {
         if (IsConnecting) return;
+
+        if (_deviceLockState.IsLocked)
+        {
+            StatusMessage = "🔒 This device is locked by an official. Ask the official to unlock it.";
+            return;
+        }
         
         try
         {
@@ -147,7 +161,7 @@ public partial class VoterLoginViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Attempting voter link: County={SelectedCounty}, Station={PollingStationCode}");
             
             // Call the voter linking API
-            var linkResponse = await _apiService.LinkToOfficialAsync(PollingStationCode, SelectedCounty, SelectedConstituency);
+            var linkResponse = await _serverHandler.LinkToOfficialAsync(PollingStationCode, SelectedCounty, SelectedConstituency);
             
             if (linkResponse.Success)
             {
@@ -160,10 +174,12 @@ public partial class VoterLoginViewModel : ViewModelBase
                 
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter linked successfully: ID={AssignedVoterId}, Official={ConnectedOfficialId}");
                 
-                // Update device status for heartbeat loop to send continuously
-                _apiService.CurrentDeviceStatus = $"Device linked - Ready to vote (Voter {AssignedVoterId})";
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status updated: {_apiService.CurrentDeviceStatus}");
-                await _apiService.SendDeviceStatusAsync(_apiService.CurrentDeviceStatus);
+                // Update device status so officials see the linked state immediately
+                _serverHandler.CurrentDeviceStatus = $"Device linked - Ready to vote (Voter {AssignedVoterId})";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status updated: {_serverHandler.CurrentDeviceStatus}");
+                await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
+
+                await StartOfficialCommandListenerAsync();
                 
                 // Navigate to the personal or proxy selection
                 await _navigationService.NavigateToPersonalOrProxy();
@@ -182,6 +198,57 @@ public partial class VoterLoginViewModel : ViewModelBase
         finally
         {
             IsConnecting = false;
+        }
+    }
+
+    private async Task StartOfficialCommandListenerAsync()
+    {
+        if (_commandListenerStarted)
+        {
+            return;
+        }
+
+        var started = await _serverHandler.StartContinuousListeningAsync(OnOfficialCommandReceived);
+        _commandListenerStarted = started || _commandListenerStarted;
+    }
+
+    private void OnOfficialCommandReceived(VoterCommandResponse command)
+    {
+        _ = HandleOfficialCommandAsync(command);
+    }
+
+    private async Task HandleOfficialCommandAsync(VoterCommandResponse command)
+    {
+        var commandType = command.CommandType?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(commandType))
+        {
+            return;
+        }
+
+        switch (commandType)
+        {
+            case "lock_device":
+                _deviceLockState.IsLocked = true;
+                _serverHandler.CurrentDeviceStatus = "Locked by official";
+                await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    StatusMessage = "🔒 Device locked by official";
+                    _ = _navigationService.NavigateToVoterLogin();
+                });
+                break;
+
+            case "unlock_device":
+                _deviceLockState.IsLocked = false;
+                _serverHandler.CurrentDeviceStatus = "Unlocked by official";
+                await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    StatusMessage = "✅ Device unlocked by official";
+                });
+                break;
         }
     }
 }

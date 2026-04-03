@@ -6,6 +6,9 @@ namespace officialApp.Models;
 public partial class ConnectedVoterDevice : ObservableObject
 {
     [ObservableProperty]
+    private int voterId;
+
+    [ObservableProperty]
     private int deviceNumber;
 
     [ObservableProperty]
@@ -19,4 +22,7 @@ public partial class ConnectedVoterDevice : ObservableObject
 
     [ObservableProperty]
     private DateTime lastStatusTime; // Track when device last sent status update
+
+    [ObservableProperty]
+    private bool isLockedByOfficial;
 }

@@ -31,7 +31,9 @@ sealed class Program
         
         // Register services
         services.AddSingleton<IApiService, ApiService>();
+        services.AddSingleton<IVoterRealtimeService, VoterRealtimeService>();
         services.AddSingleton<IServerHandler, ServerHandler>();
+        services.AddSingleton<DeviceLockState>();
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<CountyService>();
         services.AddSingleton<IScannerService, ScannerService>();

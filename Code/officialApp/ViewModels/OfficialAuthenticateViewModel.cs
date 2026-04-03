@@ -22,7 +22,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     
     private readonly INavigationService _navigationService;
     private readonly IScannerService _scannerService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
 
     // ==========================================
     // OBSERVABLE PROPERTIES
@@ -249,7 +249,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
             // Call the server verify-prints endpoint with username, password, and scanned fingerprint
             // The server will fetch the stored fingerprint from the database and compare
             Console.WriteLine("[OfficialAuthenticateViewModel] Calling /api/verify-prints endpoint...");
-            var verificationResult = await _apiService.VerifyFingerprintAsync(Username, Password, scannedImagePng);
+            var verificationResult = await _serverHandler.VerifyFingerprintAsync(Username, Password, scannedImagePng);
 
             if (verificationResult == null || !verificationResult.Success)
             {
@@ -288,11 +288,11 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public OfficialAuthenticateViewModel(INavigationService navigationService, IScannerService scannerService, IApiService apiService)
+    public OfficialAuthenticateViewModel(INavigationService navigationService, IScannerService scannerService, IServerHandler serverHandler)
     {
         _navigationService = navigationService;
         _scannerService = scannerService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
         
         // Initialize with default fingerprint image
         ImageSource = LoadImage("fingerPrint.png");
@@ -598,7 +598,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
     [RelayCommand]
     private async Task SignOut()
     {
-        await _apiService.LogoutAsync();
+        await _serverHandler.LogoutAsync();
         _navigationService.NavigateToOfficialLogin();
     }
 

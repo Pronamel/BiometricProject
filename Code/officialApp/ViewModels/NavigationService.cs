@@ -134,6 +134,9 @@ public class NavigationService : INavigationService
         if (_officialVotingPollingManagerView == null && _getOfficialVotingPollingManagerView != null)
             _officialVotingPollingManagerView = _getOfficialVotingPollingManagerView();
 
+        if (_officialVotingPollingManagerView?.DataContext is OfficialVotingPollingManagerViewModel vm)
+            _ = vm.ActivateAsync();
+
         if (_officialVotingPollingManagerView != null)
             NavigationRequested?.Invoke(_officialVotingPollingManagerView);
     }

@@ -70,7 +70,7 @@
                         </StackPanel>
 
                         <StackPanel Spacing="5">
-                            <TextBlock Text="National Insurance Number (e.g., AB123456C)" Foreground="black" FontSize="14"/>
+                            <TextBlock Text="National Insurance Number (optional, e.g., AB123456C)" Foreground="black" FontSize="14"/>
                             <TextBox Text="{Binding NationalInsuranceNumber}" Height="40" FontSize="14" Padding="10"/>
                         </StackPanel>
 

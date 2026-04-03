@@ -5,6 +5,7 @@ namespace Server.Models.Entities
     public class Voter
     {
         public Guid VoterId { get; set; }
+        public string? Sdi { get; set; }
         public string NationalId { get; set; } = string.Empty;
         public Guid ElectoralRollNumber { get; set; }
         public Guid ConstituencyId { get; set; }

@@ -27,16 +27,16 @@ public partial class OfficialMenuViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
-    private readonly IApiService _apiService;
+    private readonly IServerHandler _serverHandler;
 
     // ==========================================
     // CONSTRUCTOR
     // ==========================================
     
-    public OfficialMenuViewModel(IApiService apiService, INavigationService navigationService)
+    public OfficialMenuViewModel(IServerHandler serverHandler, INavigationService navigationService)
     {
         _navigationService = navigationService;
-        _apiService = apiService;
+        _serverHandler = serverHandler;
     }
 
     // ==========================================
@@ -71,7 +71,7 @@ public partial class OfficialMenuViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 Official logout initiated");
 
             // Call server logout endpoint
-            bool success = await _apiService.LogoutAsync();
+            bool success = await _serverHandler.LogoutAsync();
 
             if (success)
             {
@@ -107,7 +107,7 @@ public partial class OfficialMenuViewModel : ViewModelBase
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== FETCHING VOTERS FROM DATABASE =====");
         
-        var voters = await _apiService.GetAllVotersAsync();
+        var voters = await _serverHandler.GetAllVotersAsync();
         
         if (voters != null && voters.Count > 0)
         {
