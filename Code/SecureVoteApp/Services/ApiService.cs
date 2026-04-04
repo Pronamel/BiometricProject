@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
+using System.Runtime.Versioning;
 using SecureVoteApp.Models;
 
 namespace SecureVoteApp.Services;
@@ -24,7 +25,6 @@ public class ApiService : IApiService
     private string? _jwtToken;
     private DateTime _tokenExpiry;
     private string? _currentVoterId;
-    private string? _currentSessionId;
     private string? _assignedStationId;
     
     // Voter linking fields
@@ -33,6 +33,11 @@ public class ApiService : IApiService
     private string _pollingStationCode = string.Empty;
     private string _selectedConstituency = string.Empty;
     private string _deviceId = string.Empty;
+
+    // Cached server public key for hybrid request encryption.
+    private string? _voterEncryptionPublicKeyPem;
+    private string? _voterEncryptionKeyId;
+    private string? _voterEncryptionKeyVersion;
 
     // Device heartbeat loop for continuous status updates
     private CancellationTokenSource? _deviceHeartbeatCancellation;
@@ -89,6 +94,7 @@ public class ApiService : IApiService
     /// Retrieves the Windows Machine GUID from the registry.
     /// This is a unique identifier for the Windows installation on this computer.
     /// </summary>
+    [SupportedOSPlatform("windows")]
     private string GetMachineGuid()
     {
         try
@@ -120,6 +126,12 @@ public class ApiService : IApiService
     {
         try
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Machine GUID lookup is only supported on Windows");
+                return "Unknown";
+            }
+
             string machineGuid = GetMachineGuid();
             
             if (machineGuid == "Unknown")
@@ -153,6 +165,112 @@ public class ApiService : IApiService
         {
             var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(code));
             return Convert.ToBase64String(hashedBytes);
+        }
+    }
+
+    private static byte[] EncryptWithAesGcm(byte[] plaintext, byte[] dek)
+    {
+        byte[] nonce = RandomNumberGenerator.GetBytes(12);
+        byte[] ciphertext = new byte[plaintext.Length];
+        byte[] tag = new byte[16];
+
+        using var aes = new AesGcm(dek, tagSizeInBytes: 16);
+        aes.Encrypt(nonce, plaintext, ciphertext, tag);
+
+        byte[] payload = new byte[nonce.Length + tag.Length + ciphertext.Length];
+        Buffer.BlockCopy(nonce, 0, payload, 0, nonce.Length);
+        Buffer.BlockCopy(tag, 0, payload, nonce.Length, tag.Length);
+        Buffer.BlockCopy(ciphertext, 0, payload, nonce.Length + tag.Length, ciphertext.Length);
+        return payload;
+    }
+
+    private static string EncryptStringToBase64(string plaintext, byte[] dek)
+    {
+        var bytes = Encoding.UTF8.GetBytes(plaintext);
+        return Convert.ToBase64String(EncryptWithAesGcm(bytes, dek));
+    }
+
+    private static string EncryptBytesToBase64(byte[] plaintext, byte[] dek)
+    {
+        return Convert.ToBase64String(EncryptWithAesGcm(plaintext, dek));
+    }
+
+    private static string WrapDekWithRsaPublicKey(byte[] dek, string publicKeyPem)
+    {
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(publicKeyPem);
+        var wrappedDek = rsa.Encrypt(dek, RSAEncryptionPadding.OaepSHA256);
+        return Convert.ToBase64String(wrappedDek);
+    }
+
+    private sealed class VoterPublicKeyResponse
+    {
+        public bool Success { get; set; }
+        public string? KeyId { get; set; }
+        public string? KeyVersion { get; set; }
+        public string? PublicKeyPem { get; set; }
+    }
+
+    private async Task<bool> LoadVoterEncryptionPublicKeyAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_voterEncryptionPublicKeyPem))
+        {
+            return true;
+        }
+
+        try
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/crypto/voter-public-key");
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Failed to fetch voter encryption public key: {response.StatusCode}");
+                return false;
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            var keyResponse = JsonSerializer.Deserialize<VoterPublicKeyResponse>(responseBody, _jsonOptions);
+
+            if (keyResponse == null || string.IsNullOrWhiteSpace(keyResponse.PublicKeyPem))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter encryption public key response missing PEM");
+                return false;
+            }
+
+            _voterEncryptionPublicKeyPem = keyResponse.PublicKeyPem;
+            _voterEncryptionKeyId = keyResponse.KeyId;
+            _voterEncryptionKeyVersion = keyResponse.KeyVersion;
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption public key loaded from server");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId: {_voterEncryptionKeyId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyVersion: {_voterEncryptionKeyVersion}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Failed to load voter encryption public key: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task<(bool Success, string WrappedDek, string EncryptedPayload)> BuildEncryptedEnvelopeAsync(object payload)
+    {
+        var publicKeyLoaded = await LoadVoterEncryptionPublicKeyAsync();
+        if (!publicKeyLoaded || string.IsNullOrWhiteSpace(_voterEncryptionPublicKeyPem))
+        {
+            return (false, string.Empty, string.Empty);
+        }
+
+        var payloadJson = JsonSerializer.Serialize(payload, _jsonOptions);
+        byte[] dek = RandomNumberGenerator.GetBytes(32);
+        try
+        {
+            var wrappedDek = WrapDekWithRsaPublicKey(dek, _voterEncryptionPublicKeyPem);
+            var encryptedPayload = EncryptStringToBase64(payloadJson, dek);
+            return (true, wrappedDek, encryptedPayload);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(dek);
         }
     }
 
@@ -258,6 +376,19 @@ public class ApiService : IApiService
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(firstName) ||
+                string.IsNullOrWhiteSpace(lastName) ||
+                string.IsNullOrWhiteSpace(dateOfBirth) ||
+                string.IsNullOrWhiteSpace(postCode))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing required voter identity fields for lookup");
+                return new VoterAuthLookupResponse
+                {
+                    Success = false,
+                    Message = "FirstName, LastName, DateOfBirth, and PostCode are required."
+                };
+            }
+
             var lookupRequest = new VoterAuthLookupRequest
             {
                 FirstName = firstName,
@@ -268,12 +399,25 @@ public class ApiService : IApiService
                 Constituency = constituency
             };
 
-            var jsonContent = JsonSerializer.Serialize(lookupRequest, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(lookupRequest);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Voter lookup encryption key unavailable");
+                return null;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking up voter for authentication (SDI):");
-            Console.WriteLine($"  Name: {(string.IsNullOrEmpty(firstName) ? "Not provided" : $"{firstName} {lastName}")}");
-            Console.WriteLine($"  PostCode: {(string.IsNullOrEmpty(postCode) ? "Not provided" : postCode)}");
+            Console.WriteLine($"  Name: encrypted");
+            Console.WriteLine($"  PostCode: encrypted");
             Console.WriteLine($"  County: {county}");
             Console.WriteLine($"  Constituency: {constituency}");
 
@@ -311,6 +455,48 @@ public class ApiService : IApiService
         {
             Console.WriteLine($"Voter lookup error: {ex.Message}");
             return null;
+        }
+    }
+
+    public async Task<List<Candidate>> FetchCandidatesAsync()
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📥 Fetching candidates...");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] IsAuthenticated: {IsAuthenticated}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Token: {(_jwtToken != null ? _jwtToken.Substring(0, Math.Min(50, _jwtToken.Length)) + "..." : "null")}");
+            
+            var response = await SendAuthenticatedGetAsync("/api/candidates");
+            
+            if (response == null || !response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to fetch candidates - Status: {response?.StatusCode}");
+                if (response != null)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error response: {errorContent}");
+                }
+                return new List<Candidate>();
+            }
+
+            var candidateJson = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Raw candidates JSON: {candidateJson}");
+            
+            var candidates = JsonSerializer.Deserialize<List<Candidate>>(candidateJson, _jsonOptions);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Successfully fetched {candidates?.Count ?? 0} candidates");
+            
+            foreach (var candidate in candidates ?? new List<Candidate>())
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - {candidate.FirstName} {candidate.LastName} ({candidate.Party})");
+            }
+            
+            return candidates ?? new List<Candidate>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching candidates: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
+            return new List<Candidate>();
         }
     }
 
@@ -457,6 +643,43 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task<List<VoterCommandResponse>> GetPendingDeviceCommandsAsync()
+    {
+        var commands = new List<VoterCommandResponse>();
+
+        try
+        {
+            if (!IsAuthenticated || _assignedVoterId == 0 || string.IsNullOrWhiteSpace(_deviceId))
+            {
+                return commands;
+            }
+
+            var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"{_baseUrl}/api/voter/pending-device-commands?deviceId={Uri.EscapeDataString(_deviceId)}");
+            AddAuthorizationHeader(request);
+
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                return commands;
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var parsed = JsonSerializer.Deserialize<PendingDeviceCommandsResponse>(body, _jsonOptions);
+            if (parsed?.Success == true && parsed.Commands != null)
+            {
+                commands.AddRange(parsed.Commands);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Failed to poll pending commands: {ex.Message}");
+        }
+
+        return commands;
+    }
+
     //--------------------------------------------
     // Access Code Management Methods
     //--------------------------------------------
@@ -490,7 +713,20 @@ public class ApiService : IApiService
                 constituency = constituency
             };
 
-            var jsonContent = JsonSerializer.Serialize(verifyRequest, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(verifyRequest);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Access-code verification encryption key unavailable");
+                return false;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Verifying access code for {county}/{constituency}");
@@ -535,7 +771,6 @@ public class ApiService : IApiService
             _jwtToken = null;
             _tokenExpiry = DateTime.MinValue;
             _currentVoterId = null;
-            _currentSessionId = null;
             _assignedStationId = null;
             _assignedVoterId = 0;
             _selectedCounty = string.Empty;
@@ -756,19 +991,29 @@ public class ApiService : IApiService
                 return null;
             }
 
-            // Convert scanned fingerprint to base64
-            string scannedFingerprintBase64 = Convert.ToBase64String(scannedFingerprint);
-
             var verifyRequest = new 
             { 
                 userType = "voter",  // Identifier indicating this is a voter
                 username = (string?)null,  // Not applicable for voters
                 password = (string?)null,  // Not applicable for voters
                 voterId = voterId,
-                scannedFingerprint = scannedFingerprintBase64
+                scannedFingerprint = Convert.ToBase64String(scannedFingerprint)
             };
 
-            var jsonContent = JsonSerializer.Serialize(verifyRequest, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(verifyRequest);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Fingerprint verification encryption key unavailable");
+                return null;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📸 Sending fingerprint verification request to /api/verify-prints");

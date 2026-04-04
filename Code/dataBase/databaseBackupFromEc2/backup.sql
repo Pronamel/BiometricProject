@@ -191,6 +191,8 @@ CREATE VIEW public."VotersClean" AS
     "Voters"."PreviousAddress",
     "Voters"."County",
     "Voters"."Postcode",
+    "Voters"."sdi",
+    "Voters"."Constituency",
         CASE
             WHEN ("Voters"."FingerprintScan" IS NULL) THEN 'No scan'::text
             ELSE (('Image ('::text || length("Voters"."FingerprintScan")) || ' bytes)'::text)

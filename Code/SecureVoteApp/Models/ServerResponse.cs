@@ -100,6 +100,15 @@ public class VoterCommandResponse
     public string? Message { get; set; }
 }
 
+public class PendingDeviceCommandsResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+
+    [JsonPropertyName("commands")]
+    public List<VoterCommandResponse> Commands { get; set; } = new();
+}
+
 public class VoterStatusUpdate
 {
     [JsonPropertyName("voterId")]
@@ -267,4 +276,32 @@ public class FingerprintVerificationResponse
     
     [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
+}
+
+// Candidate Models
+public class Candidate
+{
+    [JsonPropertyName("candidateId")]
+    public Guid CandidateId { get; set; }
+    
+    [JsonPropertyName("firstName")]
+    public string FirstName { get; set; } = string.Empty;
+    
+    [JsonPropertyName("lastName")]
+    public string LastName { get; set; } = string.Empty;
+    
+    [JsonPropertyName("party")]
+    public string Party { get; set; } = string.Empty;
+    
+    [JsonPropertyName("bio")]
+    public string Bio { get; set; } = string.Empty;
+    
+    [JsonPropertyName("constituencyId")]
+    public Guid ConstituencyId { get; set; }
+    
+    [JsonPropertyName("constituencyName")]
+    public string ConstituencyName { get; set; } = string.Empty;
+    
+    // Computed property for display
+    public string FullName => $"{FirstName} {LastName}";
 }

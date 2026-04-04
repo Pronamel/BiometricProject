@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.Http.Connections;
 using SecureVoteApp.Models;
 
 namespace SecureVoteApp.Services;
@@ -49,14 +50,21 @@ public class VoterRealtimeService : IVoterRealtimeService
                 .WithUrl(hubUrl, options =>
                 {
                     options.AccessTokenProvider = () => Task.FromResult(_apiService.GetAuthToken());
+                    // Prefer websocket but allow long-polling fallback for restrictive proxies.
+                    options.Transports = HttpTransportType.WebSockets | HttpTransportType.LongPolling;
                 })
                 .WithAutomaticReconnect()
                 .Build();
 
+            _hubConnection.HandshakeTimeout = TimeSpan.FromSeconds(30);
+            _hubConnection.ServerTimeout = TimeSpan.FromSeconds(60);
+            _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(15);
+
             RegisterHandlers(_hubConnection);
         }
 
-        await _hubConnection.StartAsync(cancellationToken);
+        // Avoid canceling the initial handshake from short-lived UI tokens.
+        await _hubConnection.StartAsync();
         ConnectionStateChanged?.Invoke("Connected");
         return true;
     }

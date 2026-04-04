@@ -16,6 +16,9 @@ public partial class CandidateButtonViewModel : ViewModelBase
     private string partyName = "";
 
     [ObservableProperty]
+    private string bio = "";
+
+    [ObservableProperty]
     private bool isSelected = false;
 
     [ObservableProperty]
@@ -45,11 +48,12 @@ public partial class CandidateButtonViewModel : ViewModelBase
         BallotPaperViewModel.SelectionChanged += OnSelectionChanged;
     }
 
-    public CandidateButtonViewModel(int id, string name, string party)
+    public CandidateButtonViewModel(int id, string name, string party, string bio)
     {
         CandidateId = id;
         CandidateName = name;
         PartyName = party;
+        Bio = bio;
         
         // Subscribe to selection changes from other buttons
         BallotPaperViewModel.SelectionChanged += OnSelectionChanged;

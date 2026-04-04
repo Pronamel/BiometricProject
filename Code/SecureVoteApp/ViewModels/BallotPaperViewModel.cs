@@ -1,4 +1,7 @@
 using System;
+using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -15,6 +18,18 @@ public partial class BallotPaperViewModel : ViewModelBase
     
     private readonly INavigationService _navigationService;
     private readonly IServerHandler _serverHandler;
+    
+    [ObservableProperty]
+    private ObservableCollection<Candidate> candidates = new ObservableCollection<Candidate>();
+
+    [ObservableProperty]
+    private ObservableCollection<CandidateButtonViewModel> leftCandidates = new ObservableCollection<CandidateButtonViewModel>();
+
+    [ObservableProperty]
+    private ObservableCollection<CandidateButtonViewModel> rightCandidates = new ObservableCollection<CandidateButtonViewModel>();
+    
+    [ObservableProperty]
+    private bool isLoadingCandidates = false;
     
     [ObservableProperty]
     private bool isCastingVote = false;
@@ -105,6 +120,83 @@ public partial class BallotPaperViewModel : ViewModelBase
     private void UpdateReadingCandidateName()
     {
         ReadingCandidateName = SelectedCandidateName ?? "No candidate selected";
+    }
+
+    private void PopulateCandidateColumns(IReadOnlyList<Candidate> candidateList)
+    {
+        LeftCandidates.Clear();
+        RightCandidates.Clear();
+
+        var splitIndex = (candidateList.Count + 1) / 2;
+        var leftSideCandidates = candidateList.Take(splitIndex).ToList();
+        var rightSideCandidates = candidateList.Skip(splitIndex).ToList();
+
+        foreach (var candidate in leftSideCandidates)
+        {
+            LeftCandidates.Add(CreateCandidateButtonViewModel(candidate));
+        }
+
+        foreach (var candidate in rightSideCandidates)
+        {
+            RightCandidates.Add(CreateCandidateButtonViewModel(candidate));
+        }
+    }
+
+    private static CandidateButtonViewModel CreateCandidateButtonViewModel(Candidate candidate)
+    {
+        return new CandidateButtonViewModel(
+            candidate.CandidateId.GetHashCode(),
+            $"{candidate.FirstName} {candidate.LastName}",
+            candidate.Party ?? "Independent",
+            candidate.Bio ?? string.Empty);
+    }
+    
+    // Load candidates from the API
+    public async Task LoadCandidatesAsync()
+    {
+        if (IsLoadingCandidates) return;
+        
+        if (!_serverHandler.IsAuthenticated)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Skipping candidate load because authentication is not complete");
+            return;
+        }
+        
+        try
+        {
+            IsLoadingCandidates = true;
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📥 Loading candidates from server...");
+            
+            var candidateList = await _serverHandler.FetchCandidatesAsync();
+            
+            if (candidateList.Count == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ No candidates received from server");
+                VoteStatus = "⚠️ No candidates available";
+                return;
+            }
+            
+            // Clear and populate the candidates collection
+            Candidates.Clear();
+            foreach (var candidate in candidateList)
+            {
+                Candidates.Add(candidate);
+            }
+
+            PopulateCandidateColumns(candidateList);
+            
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Loaded {Candidates.Count} candidates");
+            VoteStatus = $"Candidates loaded ({Candidates.Count} available)";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error loading candidates: {ex.Message}");
+            VoteStatus = $"❌ Error loading candidates: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingCandidates = false;
+        }
     }
 
 

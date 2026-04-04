@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -107,13 +108,34 @@ public class DatabaseService
         }
     }
 
-    public async Task<bool> UpdateOfficialFingerprintAsync(string username, string password, byte[] fingerprintData)
+    public async Task<bool> UpdateOfficialFingerprintAsync(string username, string password, string keyId, string wrappedDekBase64, string encryptedFingerPrintScan)
     {
         try
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 [DatabaseService] UpdateOfficialFingerprintAsync called");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Username: '{username}'");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Fingerprint data size: {fingerprintData.Length} bytes");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Encrypted fingerprint payload received");
+
+            if (string.IsNullOrWhiteSpace(keyId) ||
+                string.IsNullOrWhiteSpace(wrappedDekBase64) ||
+                string.IsNullOrWhiteSpace(encryptedFingerPrintScan))
+            {
+                return false;
+            }
+
+            byte[] wrappedDek;
+            byte[] encryptedFingerprintBytes;
+
+            try
+            {
+                wrappedDek = Convert.FromBase64String(wrappedDekBase64.Trim());
+                encryptedFingerprintBytes = Convert.FromBase64String(encryptedFingerPrintScan.Trim());
+            }
+            catch (FormatException)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ [DatabaseService] Invalid base64 in encrypted fingerprint payload");
+                return false;
+            }
             
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Querying Officials table...");
             var official = await _dbContext.Officials
@@ -142,15 +164,17 @@ public class DatabaseService
             }
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ [DatabaseService] Official found: {official.OfficialId}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Setting FingerPrintScan property...");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Setting encrypted fingerprint properties...");
             
-            official.FingerPrintScan = fingerprintData;
+            official.FingerPrintScan = encryptedFingerprintBytes;
+            official.KeyId = keyId.Trim();
+            official.WrappedDek = wrappedDek;
             _dbContext.Officials.Update(official);
             
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Calling SaveChangesAsync()...");
             await _dbContext.SaveChangesAsync();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ [DatabaseService] Fingerprint updated for official {official.OfficialId} ({username}). Data size: {fingerprintData.Length} bytes");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ [DatabaseService] Encrypted fingerprint updated for official {official.OfficialId} ({username}).");
             return true;
         }
         catch (Exception ex)
@@ -178,8 +202,7 @@ public class DatabaseService
             }
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found: {voter.VoterId}");
-            Console.WriteLine($"    Name: {voter.FirstName} {voter.LastName}");
-            Console.WriteLine($"    Electoral Roll: {voter.ElectoralRollNumber}");
+            Console.WriteLine($"    Encrypted voter record loaded");
 
             return voter;
         }
@@ -192,28 +215,37 @@ public class DatabaseService
     }
 
     public async Task<(bool Success, string Message, Guid? VoterId)> CreateVoterAsync(
-        string nationalInsuranceNumber,
-        string firstName,
-        string lastName,
-        DateTime dateOfBirth,
-        string addressLine1,
-        string? previousAddress,
-        string postCode,
-        string county,
+        string countyHash,
         string constituencyName,
         string sdi,
-        byte[] fingerprintData)
+        string constituencyHash,
+        string keyId,
+        string wrappedDekBase64,
+        string encryptedNationalInsuranceNumber,
+        string encryptedFirstName,
+        string encryptedLastName,
+        string encryptedDateOfBirth,
+        string encryptedAddressLine1,
+        string encryptedAddressLine2,
+        string encryptedPostCode,
+        string encryptedFingerPrintScan)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(firstName) ||
-                string.IsNullOrWhiteSpace(lastName) ||
-                string.IsNullOrWhiteSpace(addressLine1) ||
-                string.IsNullOrWhiteSpace(county) ||
+            if (string.IsNullOrWhiteSpace(countyHash) ||
                 string.IsNullOrWhiteSpace(constituencyName) ||
                 string.IsNullOrWhiteSpace(sdi) ||
-                fingerprintData == null ||
-                fingerprintData.Length == 0)
+                string.IsNullOrWhiteSpace(constituencyHash) ||
+                string.IsNullOrWhiteSpace(keyId) ||
+                string.IsNullOrWhiteSpace(wrappedDekBase64) ||
+                string.IsNullOrWhiteSpace(encryptedNationalInsuranceNumber) ||
+                string.IsNullOrWhiteSpace(encryptedFirstName) ||
+                string.IsNullOrWhiteSpace(encryptedLastName) ||
+                string.IsNullOrWhiteSpace(encryptedDateOfBirth) ||
+                string.IsNullOrWhiteSpace(encryptedAddressLine1) ||
+                string.IsNullOrWhiteSpace(encryptedAddressLine2) ||
+                string.IsNullOrWhiteSpace(encryptedPostCode) ||
+                string.IsNullOrWhiteSpace(encryptedFingerPrintScan))
             {
                 return (false, "Missing required fields", null);
             }
@@ -226,21 +258,52 @@ public class DatabaseService
                 return (false, "Constituency name not found", null);
             }
 
+            byte[] wrappedDek;
+            byte[] encryptedNationalIdBytes;
+            byte[] encryptedFirstNameBytes;
+            byte[] encryptedLastNameBytes;
+            byte[] encryptedDateOfBirthBytes;
+            byte[] encryptedAddressLine1Bytes;
+            byte[] encryptedAddressLine2Bytes;
+            byte[] encryptedPostCodeBytes;
+            byte[] encryptedFingerprintBytes;
+
+            try
+            {
+                wrappedDek = Convert.FromBase64String(wrappedDekBase64.Trim());
+                encryptedNationalIdBytes = Convert.FromBase64String(encryptedNationalInsuranceNumber.Trim());
+                encryptedFirstNameBytes = Convert.FromBase64String(encryptedFirstName.Trim());
+                encryptedLastNameBytes = Convert.FromBase64String(encryptedLastName.Trim());
+                encryptedDateOfBirthBytes = Convert.FromBase64String(encryptedDateOfBirth.Trim());
+                encryptedAddressLine1Bytes = Convert.FromBase64String(encryptedAddressLine1.Trim());
+                encryptedAddressLine2Bytes = Convert.FromBase64String(encryptedAddressLine2.Trim());
+                encryptedPostCodeBytes = Convert.FromBase64String(encryptedPostCode.Trim());
+                encryptedFingerprintBytes = Convert.FromBase64String(encryptedFingerPrintScan.Trim());
+            }
+            catch (FormatException)
+            {
+                return (false, "Encrypted payload contains invalid base64", null);
+            }
+
             var voter = new Voter
             {
-                NationalId = nationalInsuranceNumber.Trim(),
+                NationalId = encryptedNationalIdBytes,
+                ElectoralRollNumber = Array.Empty<byte>(),
                 Sdi = sdi,
                 ConstituencyId = constituency.ConstituencyId,
-                FirstName = firstName.Trim(),
-                LastName = lastName.Trim(),
-                DateOfBirth = new DateTime(dateOfBirth.Year, dateOfBirth.Month, dateOfBirth.Day, 0, 0, 0, DateTimeKind.Utc),
-                AddressLine1 = addressLine1.Trim(),
-                PreviousAddress = string.IsNullOrWhiteSpace(previousAddress) ? "NA" : previousAddress.Trim(),
-                Postcode = postCode.Trim(),
-                FingerprintScan = fingerprintData,
+                WardId = constituencyHash.Trim().ToLowerInvariant(),
+                FirstName = encryptedFirstNameBytes,
+                LastName = encryptedLastNameBytes,
+                DateOfBirth = encryptedDateOfBirthBytes,
+                AddressLine1 = encryptedAddressLine1Bytes,
+                PreviousAddress = encryptedAddressLine2Bytes,
+                Postcode = encryptedPostCodeBytes,
+                FingerprintScan = encryptedFingerprintBytes,
                 HasVoted = false,
-                RegisteredDate = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day, 0, 0, 0, DateTimeKind.Utc),
-                County = county.Trim()
+                RegisteredDate = System.Text.Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)),
+                County = countyHash.Trim().ToLowerInvariant(),
+                KeyId = keyId.Trim(),
+                WrappedDek = wrappedDek
             };
 
             _dbContext.Voters.Add(voter);
@@ -260,14 +323,17 @@ public class DatabaseService
         string username,
         string passwordHash,
         Guid pollingStationId,
-        byte[] fingerprintData)
+        string keyId,
+        string wrappedDekBase64,
+        string encryptedFingerPrintScan)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(username) ||
                 string.IsNullOrWhiteSpace(passwordHash) ||
-                fingerprintData == null ||
-                fingerprintData.Length == 0)
+                string.IsNullOrWhiteSpace(keyId) ||
+                string.IsNullOrWhiteSpace(wrappedDekBase64) ||
+                string.IsNullOrWhiteSpace(encryptedFingerPrintScan))
             {
                 return (false, "Missing required fields", null);
             }
@@ -286,6 +352,19 @@ public class DatabaseService
                 return (false, "Polling station not found", null);
             }
 
+            byte[] wrappedDek;
+            byte[] encryptedFingerprintBytes;
+
+            try
+            {
+                wrappedDek = Convert.FromBase64String(wrappedDekBase64.Trim());
+                encryptedFingerprintBytes = Convert.FromBase64String(encryptedFingerPrintScan.Trim());
+            }
+            catch (FormatException)
+            {
+                return (false, "Encrypted fingerprint payload contains invalid base64", null);
+            }
+
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔐 Using client-provided Argon2 password hash for official: {username}");
 
             var official = new Official
@@ -295,7 +374,9 @@ public class DatabaseService
                 PasswordHash = passwordHash,
                 LastLogin = null,
                 AssignedPollingStationId = pollingStationId,
-                FingerPrintScan = fingerprintData
+                FingerPrintScan = encryptedFingerprintBytes,
+                KeyId = keyId.Trim(),
+                WrappedDek = wrappedDek
             };
 
             _dbContext.Officials.Add(official);
@@ -317,81 +398,15 @@ public class DatabaseService
 
     public async Task<Voter?> GetVoterByNINAsync(string nin)
     {
-        try
-        {
-            var normalizedNin = nin.Trim().ToUpperInvariant().Replace(" ", string.Empty);
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by NIN: {nin}");
-            
-            var voter = await _dbContext.Voters
-                .Include(v => v.Constituency)
-                .FirstOrDefaultAsync(v => 
-                    v.NationalId
-                        .Trim()
-                        .ToUpper()
-                        .Replace(" ", string.Empty) == normalizedNin);
-
-            if (voter == null)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with NIN '{nin}'");
-                return null;
-            }
-
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by NIN: {voter.FirstName} {voter.LastName} (ID: {voter.VoterId})");
-            return voter;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by NIN: {ex.Message}");
-            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-            return null;
-        }
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ NIN lookup disabled: NationalId is stored encrypted");
+        return null;
     }
 
     public async Task<Voter?> GetVoterByNameAndDateAsync(
         string firstName, string lastName, DateTime dateOfBirth)
     {
-        try
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by Name+DOB: {firstName} {lastName} ({dateOfBirth:yyyy-MM-dd})");
-            
-            var firstNameUpper = firstName.Trim().ToUpperInvariant();
-            var lastNameUpper = lastName.Trim().ToUpperInvariant();
-            var dobDate = dateOfBirth.Date;
-
-            // Use SQL date casting to avoid timezone shifts in timestamptz DOB values.
-            var firstNameParam = new NpgsqlParameter<string>("firstName", firstNameUpper);
-            var lastNameParam = new NpgsqlParameter<string>("lastName", lastNameUpper);
-            var dobParam = new NpgsqlParameter<DateTime>("dob", dobDate);
-
-            var voter = await _dbContext.Voters
-                .FromSqlRaw(
-                    @"SELECT v.*
-                      FROM public.""Voters"" v
-                      WHERE UPPER(TRIM(v.""FirstName"")) = @firstName
-                        AND UPPER(TRIM(v.""LastName"")) = @lastName
-                        AND (v.""DateOfBirth"" AT TIME ZONE 'UTC')::date = @dob::date
-                      LIMIT 1",
-                    firstNameParam,
-                    lastNameParam,
-                    dobParam)
-                .Include(v => v.Constituency)
-                .FirstOrDefaultAsync();
-
-            if (voter == null)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with Name '{firstName} {lastName}' DOB '{dateOfBirth:yyyy-MM-dd}'");
-                return null;
-            }
-
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by Name+DOB: {voter.FirstName} {voter.LastName} (ID: {voter.VoterId})");
-            return voter;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by Name+DOB: {ex.Message}");
-            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-            return null;
-        }
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Name+DOB lookup disabled: identity fields are stored encrypted");
+        return null;
     }
 
     public async Task<Voter?> GetVoterBySdiAsync(string sdi)
@@ -419,7 +434,7 @@ public class DatabaseService
             }
 
             var voter = matches[0];
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by SDI: {voter.FirstName} {voter.LastName} (ID: {voter.VoterId})");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by SDI: ID={voter.VoterId}");
             return voter;
         }
         catch (Exception ex)
@@ -427,6 +442,50 @@ public class DatabaseService
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by SDI: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return null;
+        }
+    }
+
+    public async Task<List<CandidateDto>> GetCandidatesByElectionIdAsync(Guid electionId)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Fetching candidates for election ID: {electionId}");
+            
+            var candidates = await _dbContext.Candidates
+                .Where(c => c.ElectionId == electionId)
+                .ToListAsync();
+
+            if (candidates.Count == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  No candidates found for election ID: {electionId}");
+                return new List<CandidateDto>();
+            }
+
+            var candidateDtos = candidates.Select(c => new CandidateDto(
+                c.CandidateId,
+                c.FirstName,
+                c.LastName,
+                c.Party ?? "Independent",
+                c.Bio ?? string.Empty
+            )).ToList();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found {candidateDtos.Count} candidates for election");
+            foreach (var candidate in candidateDtos.Take(5))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - {candidate.FirstName} {candidate.LastName} ({candidate.Party})");
+            }
+            if (candidateDtos.Count > 5)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   ... and {candidateDtos.Count - 5} more");
+            }
+
+            return candidateDtos;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching candidates by election ID: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return new List<CandidateDto>();
         }
     }
 }
@@ -438,4 +497,13 @@ public record PollingStationDto(
     string County,
     string Constituency,
     string DisplayName
+);
+
+// DTO for candidates response
+public record CandidateDto(
+    Guid CandidateId,
+    string FirstName,
+    string LastName,
+    string Party,
+    string Bio
 );

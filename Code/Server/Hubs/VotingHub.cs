@@ -20,6 +20,7 @@ public class VotingHub : Hub
         var user = Context.User;
         if (user == null)
         {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Connection aborted: no user principal");
             Context.Abort();
             return;
         }
@@ -30,9 +31,12 @@ public class VotingHub : Hub
 
         if (string.IsNullOrWhiteSpace(role) || string.IsNullOrWhiteSpace(county) || string.IsNullOrWhiteSpace(constituency))
         {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Connection aborted: missing claims (role='{role}', county='{county}', constituency='{constituency}')");
             Context.Abort();
             return;
         }
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Incoming connection {Context.ConnectionId} role={role} county={county} constituency={constituency}");
 
         await Groups.AddToGroupAsync(Context.ConnectionId, RealtimeGroups.County(county));
         await Groups.AddToGroupAsync(Context.ConnectionId, RealtimeGroups.CountyConstituency(county, constituency));
@@ -44,6 +48,7 @@ public class VotingHub : Hub
             var officialId = user.FindFirst("officialId")?.Value;
             if (string.IsNullOrWhiteSpace(officialId))
             {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Official connection aborted: missing officialId claim");
                 Context.Abort();
                 return;
             }
@@ -56,6 +61,7 @@ public class VotingHub : Hub
             var voterId = user.FindFirst("voterId")?.Value;
             if (string.IsNullOrWhiteSpace(voterId))
             {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Voter connection aborted: missing voterId claim");
                 Context.Abort();
                 return;
             }
@@ -71,15 +77,18 @@ public class VotingHub : Hub
         }
         else
         {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Connection aborted: unsupported role '{role}'");
             Context.Abort();
             return;
         }
 
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Connection established: {Context.ConnectionId}");
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Connection disconnected: {Context.ConnectionId}. Reason: {exception?.Message ?? "normal close"}");
         _registry.Remove(Context.ConnectionId, out _);
         await base.OnDisconnectedAsync(exception);
     }

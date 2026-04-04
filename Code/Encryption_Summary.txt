@@ -1,0 +1,99 @@
+SecureVote Encryption and Password Security Summary
+
+Date: 2026-04-03
+
+Overview
+- Sensitive payloads now use application-layer envelope encryption (in addition to HTTPS/TLS).
+- Voter biometric data is encrypted at rest and decrypted only when needed for matching.
+- SDI lookup identity inputs are transmitted inside encrypted envelopes.
+- Official passwords use Argon2 hashing and Argon2 verification.
+
+1) Envelope Encryption (In Transit)
+
+Pattern
+- Client generates a random 32-byte DEK (AES key).
+- Client encrypts entire JSON payload with AES-GCM.
+- Client wraps DEK with server RSA public key (OAEP-SHA256).
+- Client sends:
+  - wrappedDek
+  - encryptedPayload
+- Server unwraps DEK with RSA private key and decrypts payload at endpoint boundary.
+
+Server implementation
+- Envelope extraction helper: Server/Program.cs:548
+- Envelope decryption helper: Server/Program.cs:561
+- DEK unwrap (RSA private key): Server/Program.cs:527
+- AES-GCM decrypt primitive: Server/Program.cs:463
+
+Public key distribution
+- Public key endpoint for clients: Server/Program.cs:826
+
+Official app implementation
+- Envelope builder: officialApp/Services/ApiService.cs:50
+- AES-GCM encrypt helper: officialApp/Services/ApiService.cs:231
+- RSA DEK wrap helper: officialApp/Services/ApiService.cs:258
+- Public key loader: officialApp/Services/ApiService.cs:275
+
+SecureVote app implementation
+- Envelope builder: SecureVoteApp/Services/ApiService.cs:248
+- AES-GCM encrypt helper: SecureVoteApp/Services/ApiService.cs:164
+- RSA DEK wrap helper: SecureVoteApp/Services/ApiService.cs:191
+- Public key loader: SecureVoteApp/Services/ApiService.cs:207
+
+2) Sensitive Endpoints Using Envelope
+
+Server routes currently expecting/decrypting encrypted envelope payloads
+- /auth/official-login: Server/Program.cs:603
+- /api/official/create-voter: Server/Program.cs:850
+- /api/official/create-official: Server/Program.cs:1008
+- /api/official/set-access-code: Server/Program.cs:1116
+- /api/voter/verify-access-code: Server/Program.cs:1199
+- /api/voter/lookup-for-auth: Server/Program.cs:1271
+- /api/official/upload-fingerprint: Server/Program.cs:2110
+- /api/verify-prints: Server/Program.cs:2259
+
+3) Voter Fingerprint Encryption At Rest
+
+- Voter fingerprint is stored encrypted in DB.
+- During verification, server decrypts stored voter fingerprint only for matching.
+
+Implementation
+- Decrypt stored voter fingerprint helper: Server/Program.cs:499
+- Used in verify flow: Server/Program.cs:2422
+
+4) SDI Protection
+
+- Identity fields used for voter auth lookup (first name, last name, DOB, postcode) are now sent inside encrypted envelopes.
+- Server computes canonical identity and HMAC-based SDI for lookup.
+
+Implementation
+- SDI canonicalization/HMAC helpers: Server/Program.cs:420
+- Encrypted lookup endpoint: Server/Program.cs:1271
+- SecureVote client encrypted lookup call: SecureVoteApp/Services/ApiService.cs:366
+
+5) Argon2 Password Security
+
+Official password creation
+- officialApp hashes official password with Argon2 before sending create-official request.
+- Hash call: officialApp/Services/ApiService.cs:325
+- Used in create official flow: officialApp/Services/ApiService.cs:837
+
+Server-side policy and verification
+- Server requires Argon2-formatted hash on create-official.
+- Enforcement check: Server/Services/DatabaseService.cs:315
+- Server verifies credentials using Argon2 verification.
+- Verify call: Server/Services/PasswordHasher.cs:27
+- Used in DB credential checks: Server/Services/DatabaseService.cs:82
+
+6) Security Outcome
+
+- Sensitive authentication, biometric, and SDI lookup payloads are protected by envelope encryption at the application layer.
+- HTTPS/TLS still protects transport.
+- Voter biometrics are protected at rest.
+- Official passwords are not stored or compared in plaintext; Argon2 hashing/verification is used.
+
+This delivers layered defense:
+- Application-layer confidentiality for sensitive request bodies
+- Transport security
+- At-rest data encryption for biometrics/sensitive voter fields
+- Strong password hashing for official credentials

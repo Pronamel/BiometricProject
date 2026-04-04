@@ -17,6 +17,7 @@ public interface IServerHandler
     string CurrentDeviceStatus { get; set; }
     Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
     Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency);
+    Task<List<Candidate>> FetchCandidatesAsync();
     Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName);
     Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint);
     void Logout();
@@ -38,7 +39,6 @@ public interface IServerHandler
     // Events for real-time updates
     event Action<string>? AccessCodeReceived;
     event Action<VoterCommandResponse>? OfficialCommandReceived;
-    event Action<string>? VerificationResultReceived;
     event Action<bool>? ConnectionStatusChanged;
     event Action<string>? StatusMessageReceived;
 }

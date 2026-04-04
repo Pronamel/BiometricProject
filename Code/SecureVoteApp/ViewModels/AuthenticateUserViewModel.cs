@@ -24,6 +24,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IScannerService _scannerService;
     private readonly IServerHandler _serverHandler;
+    private readonly BallotPaperViewModel _ballotPaperViewModel;
     
     // Voter authentication fields
     private byte[]? _storedFingerprintBytes;
@@ -131,6 +132,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             VoterStatusMessage = "✅ Voter Found"; // Show green success message
             _serverHandler.CurrentDeviceStatus = "Authentication successful";
             await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
+            await _ballotPaperViewModel.LoadCandidatesAsync();
             await Task.Delay(750);
             await _navigationService.NavigateToBallot();
         }
@@ -276,11 +278,12 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public AuthenticateUserViewModel(INavigationService navigationService, IScannerService scannerService, IServerHandler serverHandler)
+    public AuthenticateUserViewModel(INavigationService navigationService, IScannerService scannerService, IServerHandler serverHandler, BallotPaperViewModel ballotPaperViewModel)
     {
         _navigationService = navigationService;
         _scannerService = scannerService;
         _serverHandler = serverHandler;
+        _ballotPaperViewModel = ballotPaperViewModel;
         
         // Initialize with default fingerprint image
         ImageSource = LoadImage("fingerPrint.png");

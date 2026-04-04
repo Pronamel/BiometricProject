@@ -11,6 +11,9 @@ public interface IApiService
     Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
     Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency);
     
+    // Candidates
+    Task<List<Candidate>> FetchCandidatesAsync();
+    
     // Vote Casting
     Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName);
     
@@ -40,6 +43,7 @@ public interface IApiService
     
     // Device Status Tracking
     Task<bool> SendDeviceStatusAsync(string status);
+    Task<List<VoterCommandResponse>> GetPendingDeviceCommandsAsync();
     
     // Fingerprint Verification
     Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint);

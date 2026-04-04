@@ -6,20 +6,22 @@ namespace Server.Models.Entities
     {
         public Guid VoterId { get; set; }
         public string? Sdi { get; set; }
-        public string NationalId { get; set; } = string.Empty;
-        public Guid ElectoralRollNumber { get; set; }
-        public Guid ConstituencyId { get; set; }
-        public Guid? WardId { get; set; }
-        public string FirstName { get; set; } = string.Empty;
-        public string LastName { get; set; } = string.Empty;
-        public DateTime DateOfBirth { get; set; }
-        public string AddressLine1 { get; set; } = string.Empty;
-        public string PreviousAddress { get; set; } = string.Empty;
-        public string Postcode { get; set; } = string.Empty;
+        public byte[] NationalId { get; set; } = Array.Empty<byte>();
+        public byte[] ElectoralRollNumber { get; set; } = Array.Empty<byte>();
+        public Guid? ConstituencyId { get; set; }
+        public string? WardId { get; set; }
+        public byte[] FirstName { get; set; } = Array.Empty<byte>();
+        public byte[] LastName { get; set; } = Array.Empty<byte>();
+        public byte[] DateOfBirth { get; set; } = Array.Empty<byte>();
+        public byte[] AddressLine1 { get; set; } = Array.Empty<byte>();
+        public byte[] PreviousAddress { get; set; } = Array.Empty<byte>();
+        public byte[]? Postcode { get; set; }
         public string County { get; set; } = string.Empty;
         public byte[]? FingerprintScan { get; set; }
         public bool HasVoted { get; set; }
-        public DateTime RegisteredDate { get; set; }
+        public byte[] RegisteredDate { get; set; } = Array.Empty<byte>();
+        public string? KeyId { get; set; }
+        public byte[]? WrappedDek { get; set; }
 
         public Constituency? Constituency { get; set; }
     }

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
             xmlns:vm="using:SecureVoteApp.ViewModels"
+            xmlns:models="using:SecureVoteApp.Models"
             xmlns:views="using:SecureVoteApp.Views.VoterUI"
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -56,34 +57,44 @@
             </StackPanel>
         </Grid>
         
-        <!-- Bottom Grid - 85% of view, split into two halves -->
-        <Grid Grid.Row="1">
+        <!-- Bottom Grid - 85% of view with candidates -->
+            <Grid Grid.Row="1" Background="#f6f2e6" Margin="15,0,15,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            
-            <!-- Left Half -->
-            <Grid Grid.Column="0" Background="#f6f2e6" Margin="15,0,0,10">
-                <StackPanel Spacing="20" Margin="20">
-                    <!-- voting candidates or parties. -->
-                    <views:CandidateButtonControl ButtonText="John Smith - Labour Party"/>
-                    <views:CandidateButtonControl ButtonText="Sarah Johnson - Conservative Party"/>
-                    <views:CandidateButtonControl ButtonText="Mike Brown - Liberal Democrats"/>
-                    <views:CandidateButtonControl ButtonText="Emma Davis - Green Party"/>
-                </StackPanel>
-            </Grid>
-            
-            <!-- Right Half -->
-            <Grid Grid.Column="1" Background="#f6f2e6" Margin="0,0,15,10">
-                <StackPanel Spacing="20" Margin="20">
-                    <!-- voting candidates or parties. -->
-                    <views:CandidateButtonControl ButtonText="David Wilson - UKIP"/>
-                    <views:CandidateButtonControl ButtonText="Lisa Thompson - Reform UK"/>
-                    <views:CandidateButtonControl ButtonText="James Taylor - Independent"/>
-                    <views:CandidateButtonControl ButtonText="Rachel White - Plaid Cymru"/>
-                </StackPanel>
-            </Grid>
+
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding LeftCandidates}" Margin="20">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="20" Orientation="Vertical"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <views:CandidateButtonControl/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding RightCandidates}" Margin="20">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="20" Orientation="Vertical"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <views:CandidateButtonControl/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </UserControl>

@@ -62,7 +62,6 @@ public partial class VoterLoginViewModel : ViewModelBase
     private readonly CountyService _countyService;
     private readonly IServerHandler _serverHandler;
     private readonly DeviceLockState _deviceLockState;
-    private bool _commandListenerStarted;
 
     // ==========================================
     // CONSTRUCTOR
@@ -203,13 +202,14 @@ public partial class VoterLoginViewModel : ViewModelBase
 
     private async Task StartOfficialCommandListenerAsync()
     {
-        if (_commandListenerStarted)
-        {
-            return;
-        }
-
+        // Always refresh the listener after a new link so it uses the latest voter token/session.
+        _serverHandler.StopContinuousListening();
         var started = await _serverHandler.StartContinuousListeningAsync(OnOfficialCommandReceived);
-        _commandListenerStarted = started || _commandListenerStarted;
+
+        if (!started)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Failed to start official command listener after voter link");
+        }
     }
 
     private void OnOfficialCommandReceived(VoterCommandResponse command)

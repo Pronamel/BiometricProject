@@ -13,11 +13,11 @@ public class ServerHandler : IServerHandler
     private CancellationTokenSource? _listeningCancellation;
     private bool _isListening;
     private Action<VoterCommandResponse>? _externalCommandHandler;
+    private Task? _fallbackPollingTask;
     
     // Events for real-time updates
     public event Action<string>? AccessCodeReceived;
     public event Action<VoterCommandResponse>? OfficialCommandReceived;
-    public event Action<string>? VerificationResultReceived;
     public event Action<bool>? ConnectionStatusChanged;
     public event Action<string>? StatusMessageReceived;
     
@@ -94,6 +94,9 @@ public class ServerHandler : IServerHandler
 
     public Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency)
         => _apiService.LookupVoterForAuthAsync(firstName, lastName, dateOfBirth, postCode, county, constituency);
+
+    public Task<List<Candidate>> FetchCandidatesAsync()
+        => _apiService.FetchCandidatesAsync();
 
     public Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName)
         => _apiService.CastVoteAsync(candidateName, partyName);
@@ -205,6 +208,36 @@ public class ServerHandler : IServerHandler
                 return false;
             }
 
+            _fallbackPollingTask = Task.Run(async () =>
+            {
+                while (_isListening && _listeningCancellation != null && !_listeningCancellation.Token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        // Realtime is primary. Poll fallback only when realtime is down.
+                        if (!_realtimeService.IsConnected)
+                        {
+                            var pendingCommands = await _apiService.GetPendingDeviceCommandsAsync();
+                            foreach (var pending in pendingCommands)
+                            {
+                                OfficialCommandReceived?.Invoke(pending);
+                                _externalCommandHandler?.Invoke(pending);
+                            }
+                        }
+
+                        await Task.Delay(2000, _listeningCancellation.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fallback command poll error: {ex.Message}");
+                    }
+                }
+            }, _listeningCancellation.Token);
+
             return true;
         }
         catch (Exception ex)
@@ -222,6 +255,7 @@ public class ServerHandler : IServerHandler
         {
             _listeningCancellation?.Cancel();
             _ = _realtimeService.DisconnectAsync();
+            _fallbackPollingTask = null;
             _externalCommandHandler = null;
             _isListening = false;
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stopped continuous listening");

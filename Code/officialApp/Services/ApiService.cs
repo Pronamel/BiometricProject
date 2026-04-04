@@ -31,6 +31,10 @@ public class ApiService : IApiService
     private string? _currentConstituency;
     private string? _currentSystemCode;
     private long _currentTokenId;
+    private string? _voterEncryptionPublicKeyPem;
+    private string? _voterEncryptionKeyId;
+    private string? _voterEncryptionKeyVersion;
+    private string? _voterEncryptionKeyFingerprint;
     
     // Authentication properties
     public bool IsAuthenticated => 
@@ -42,6 +46,28 @@ public class ApiService : IApiService
     public string? CurrentConstituency => _currentConstituency;
     public string? CurrentSystemCode => _currentSystemCode;
     public long CurrentTokenId => _currentTokenId;
+
+    private async Task<(bool Success, string WrappedDek, string EncryptedPayload)> BuildEncryptedEnvelopeAsync(object payload)
+    {
+        var publicKeyLoaded = await LoadVoterEncryptionPublicKeyAsync();
+        if (!publicKeyLoaded || string.IsNullOrWhiteSpace(_voterEncryptionPublicKeyPem))
+        {
+            return (false, string.Empty, string.Empty);
+        }
+
+        var payloadJson = JsonSerializer.Serialize(payload, _jsonOptions);
+        byte[] dek = RandomNumberGenerator.GetBytes(32);
+        try
+        {
+            var wrappedDek = WrapDekWithRsaPublicKey(dek, _voterEncryptionPublicKeyPem);
+            var encryptedPayload = EncryptStringToBase64(payloadJson, dek);
+            return (true, wrappedDek, encryptedPayload);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(dek);
+        }
+    }
 
     public string? GetAuthToken()
     {
@@ -82,13 +108,25 @@ public class ApiService : IApiService
         {
             var loginRequest = new { Username = username, Password = password };
 
-            var jsonContent = JsonSerializer.Serialize(loginRequest, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(loginRequest);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Login encryption key unavailable");
+                return null;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Sending login request:");
             Console.WriteLine($"  Username: '{username}'");
-            Console.WriteLine("  Password: '[plaintext over HTTPS]'");
-            Console.WriteLine($"  JSON: {jsonContent}");
+            Console.WriteLine("  Payload: [encrypted envelope]");
 
             var response = await _httpClient.PostAsync($"{_baseUrl}/auth/official-login", content);
 
@@ -113,6 +151,8 @@ public class ApiService : IApiService
                     _currentConstituency = loginResponse.Constituency;
                     _currentSystemCode = loginResponse.SystemCode;
                     _currentTokenId = loginResponse.TokenId;
+
+                    await LoadVoterEncryptionPublicKeyAsync();
 
                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official {username} logged in successfully");
                     return loginResponse;
@@ -181,6 +221,100 @@ public class ApiService : IApiService
         }
     }
 
+    private static string ComputeSha256Hex(string value)
+    {
+        using var sha256 = SHA256.Create();
+        var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(value.Trim()));
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    private static byte[] EncryptWithAesGcm(byte[] plaintext, byte[] dek)
+    {
+        byte[] nonce = RandomNumberGenerator.GetBytes(12);
+        byte[] ciphertext = new byte[plaintext.Length];
+        byte[] tag = new byte[16];
+
+        using var aes = new AesGcm(dek, tagSizeInBytes: 16);
+        aes.Encrypt(nonce, plaintext, ciphertext, tag);
+
+        byte[] payload = new byte[nonce.Length + tag.Length + ciphertext.Length];
+        Buffer.BlockCopy(nonce, 0, payload, 0, nonce.Length);
+        Buffer.BlockCopy(tag, 0, payload, nonce.Length, tag.Length);
+        Buffer.BlockCopy(ciphertext, 0, payload, nonce.Length + tag.Length, ciphertext.Length);
+        return payload;
+    }
+
+    private static string EncryptStringToBase64(string plaintext, byte[] dek)
+    {
+        var bytes = Encoding.UTF8.GetBytes(plaintext);
+        return Convert.ToBase64String(EncryptWithAesGcm(bytes, dek));
+    }
+
+    private static string EncryptBytesToBase64(byte[] plaintext, byte[] dek)
+    {
+        return Convert.ToBase64String(EncryptWithAesGcm(plaintext, dek));
+    }
+
+    private static string WrapDekWithRsaPublicKey(byte[] dek, string publicKeyPem)
+    {
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(publicKeyPem);
+        var wrappedDek = rsa.Encrypt(dek, RSAEncryptionPadding.OaepSHA256);
+        return Convert.ToBase64String(wrappedDek);
+    }
+
+    private sealed class VoterPublicKeyResponse
+    {
+        public bool Success { get; set; }
+        public string? KeyId { get; set; }
+        public string? KeyVersion { get; set; }
+        public string? PublicKeyPem { get; set; }
+        public string? Fingerprint { get; set; }
+    }
+
+    private async Task<bool> LoadVoterEncryptionPublicKeyAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_voterEncryptionPublicKeyPem))
+        {
+            return true;
+        }
+
+        try
+        {
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/crypto/voter-public-key");
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Failed to fetch voter encryption public key: {response.StatusCode}");
+                return false;
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            var keyResponse = JsonSerializer.Deserialize<VoterPublicKeyResponse>(responseBody, _jsonOptions);
+
+            if (keyResponse == null || string.IsNullOrWhiteSpace(keyResponse.PublicKeyPem))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter encryption public key response missing PEM");
+                return false;
+            }
+
+            _voterEncryptionPublicKeyPem = keyResponse.PublicKeyPem;
+            _voterEncryptionKeyId = keyResponse.KeyId;
+            _voterEncryptionKeyVersion = keyResponse.KeyVersion;
+            _voterEncryptionKeyFingerprint = keyResponse.Fingerprint;
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption public key loaded from server");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId: {_voterEncryptionKeyId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyVersion: {_voterEncryptionKeyVersion}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Fingerprint: {_voterEncryptionKeyFingerprint}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Failed to load voter encryption public key: {ex.Message}");
+            return false;
+        }
+    }
+
     private string HashOfficialPasswordForCreate(string plaintext)
     {
         if (string.IsNullOrWhiteSpace(plaintext))
@@ -245,7 +379,20 @@ public class ApiService : IApiService
             var hashedCode = HashAccessCode(accessCode);
 
             var setCodeRequest = new { accessCode = hashedCode };
-            var jsonContent = JsonSerializer.Serialize(setCodeRequest, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(setCodeRequest);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Access code encryption key unavailable");
+                return false;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Setting access code for station {_currentStationId}");
@@ -321,6 +468,10 @@ public class ApiService : IApiService
         _currentConstituency = null;
         _currentSystemCode = null;
         _currentTokenId = 0;
+        _voterEncryptionPublicKeyPem = null;
+        _voterEncryptionKeyId = null;
+        _voterEncryptionKeyVersion = null;
+        _voterEncryptionKeyFingerprint = null;
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Local session cleared");
     }
 
@@ -542,19 +693,29 @@ public class ApiService : IApiService
                 return null;
             }
 
-            // Convert scanned fingerprint to base64
-            string scannedFingerprintBase64 = Convert.ToBase64String(scannedFingerprint);
-
             var verifyRequest = new 
             { 
                 userType = "official",  // Identifier indicating this is an official
                 username = username,
                 password = password,
                 voterId = (string?)null,  // Not applicable for officials
-                scannedFingerprint = scannedFingerprintBase64
+                scannedFingerprint = Convert.ToBase64String(scannedFingerprint)
             };
 
-            var jsonContent = JsonSerializer.Serialize(verifyRequest, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(verifyRequest);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Fingerprint verification encryption key unavailable");
+                return null;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📸 Sending fingerprint verification request to /api/verify-prints");
@@ -605,18 +766,56 @@ public class ApiService : IApiService
                 return false;
             }
 
-            // Convert fingerprint (PNG) to base64
-            string fingerprintBase64 = Convert.ToBase64String(fingerprintData);
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Base64 encoded (PNG): {fingerprintBase64.Length} characters");
+            var publicKeyLoaded = await LoadVoterEncryptionPublicKeyAsync();
+            if (!publicKeyLoaded || string.IsNullOrWhiteSpace(_voterEncryptionPublicKeyPem))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Fingerprint upload encryption cannot continue: public key was not loaded");
+                return false;
+            }
+
+            string encryptionMode = "CLIENT_DEK_RSA";
+            string keyVersion = _voterEncryptionKeyVersion ?? "v1";
+            string keyId = _voterEncryptionKeyId ?? "officialapp-rsa-v1";
+            string wrappedDek;
+            string encryptedFingerPrintScan;
+
+            try
+            {
+                var dek = RandomNumberGenerator.GetBytes(32);
+                wrappedDek = WrapDekWithRsaPublicKey(dek, _voterEncryptionPublicKeyPem);
+                encryptedFingerPrintScan = EncryptBytesToBase64(fingerprintData, dek);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Fingerprint upload client-side encryption failed: {ex.Message}");
+                return false;
+            }
 
             var uploadRequest = new
             {
-                username = username,
-                password = password,
-                fingerPrintScan = fingerprintBase64
+                username,
+                password,
+                encryptionMode,
+                keyVersion,
+                keyId,
+                wrappedDek,
+                encryptedFingerPrintScan
             };
 
-            var jsonContent = JsonSerializer.Serialize(uploadRequest, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(uploadRequest);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Fingerprint upload encryption key unavailable");
+                return false;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📸 Uploading fingerprint (PNG format) for {username}");
@@ -665,16 +864,57 @@ public class ApiService : IApiService
             }
 
             string passwordHash = HashOfficialPasswordForCreate(password);
-            string fingerprintBase64 = Convert.ToBase64String(fingerprintData);
+            var publicKeyLoaded = await LoadVoterEncryptionPublicKeyAsync();
+            if (!publicKeyLoaded || string.IsNullOrWhiteSpace(_voterEncryptionPublicKeyPem))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official creation encryption cannot continue: public key was not loaded");
+                return false;
+            }
+
+            string encryptionMode = "CLIENT_DEK_RSA";
+            string keyVersion = _voterEncryptionKeyVersion ?? "v1";
+            string keyId = _voterEncryptionKeyId ?? "officialapp-rsa-v1";
+            string wrappedDek;
+            string encryptedFingerPrintScan;
+
+            try
+            {
+                var dek = RandomNumberGenerator.GetBytes(32);
+                wrappedDek = WrapDekWithRsaPublicKey(dek, _voterEncryptionPublicKeyPem);
+                encryptedFingerPrintScan = EncryptBytesToBase64(fingerprintData, dek);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official creation client-side encryption failed: {ex.Message}");
+                return false;
+            }
+
             var request = new
             {
                 username,
                 password = passwordHash,
                 assignedPollingStationId,
-                fingerPrintScan = fingerprintBase64
+                encryptionMode,
+                keyVersion,
+                keyId,
+                wrappedDek,
+                encryptedFingerPrintScan
             };
 
-            var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(request);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official creation encryption key unavailable");
+                return false;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📤 Creating official: {username}");
@@ -758,41 +998,116 @@ public class ApiService : IApiService
             }
 
             string fingerprintBase64 = Convert.ToBase64String(fingerprintData);
+            string countyHash = ComputeSha256Hex(county);
+            string constituencyHash = ComputeSha256Hex(constituency);
+            string? encryptionMode = null;
+            string? keyVersion = null;
+            string? keyId = null;
+            string? wrappedDek = null;
+            string? encryptedNationalInsuranceNumber = null;
+            string? encryptedFirstName = null;
+            string? encryptedLastName = null;
+            string? encryptedDateOfBirth = null;
+            string? encryptedAddressLine1 = null;
+            string? encryptedAddressLine2 = null;
+            string? encryptedPostCode = null;
+            string? encryptedCounty = null;
+            string? encryptedConstituency = null;
+            string? encryptedFingerPrintScan = null;
             
             // Convert date from UK format (DD/MM/yyyy) to ISO format (yyyy-MM-dd) for server
             string isoDateOfBirth = ConvertDateToIso8601(dateOfBirth);
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Date conversion: '{dateOfBirth}' -> '{isoDateOfBirth}'");
+
+            var publicKeyLoaded = await LoadVoterEncryptionPublicKeyAsync();
+            if (!publicKeyLoaded || string.IsNullOrWhiteSpace(_voterEncryptionPublicKeyPem))
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Client-side voter encryption cannot continue: public key was not loaded");
+                return false;
+            }
+
+            try
+            {
+                var dek = RandomNumberGenerator.GetBytes(32);
+                encryptionMode = "CLIENT_DEK_RSA";
+                keyVersion = _voterEncryptionKeyVersion ?? "v1";
+                keyId = _voterEncryptionKeyId ?? "officialapp-rsa-v1";
+                wrappedDek = WrapDekWithRsaPublicKey(dek, _voterEncryptionPublicKeyPem);
+
+                encryptedNationalInsuranceNumber = EncryptStringToBase64(nationalInsuranceNumber ?? string.Empty, dek);
+                encryptedFirstName = EncryptStringToBase64(firstName, dek);
+                encryptedLastName = EncryptStringToBase64(lastName, dek);
+                encryptedDateOfBirth = EncryptStringToBase64(isoDateOfBirth, dek);
+                encryptedAddressLine1 = EncryptStringToBase64(addressLine1, dek);
+                encryptedAddressLine2 = EncryptStringToBase64(addressLine2 ?? string.Empty, dek);
+                encryptedPostCode = EncryptStringToBase64(postCode, dek);
+                encryptedCounty = EncryptStringToBase64(county, dek);
+                encryptedConstituency = EncryptStringToBase64(constituency, dek);
+                encryptedFingerPrintScan = EncryptBytesToBase64(fingerprintData, dek);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Client-side voter encryption failed: {ex.Message}");
+                return false;
+            }
             
             // Create voter request with all required fields
             // NOTE: Official context (officialId, stationId, county, constituency) is extracted from JWT token claims server-side
             var request = new
             {
-                nationalInsuranceNumber,
+                nationalInsuranceNumber = string.Empty,
                 firstName,
                 lastName,
                 dateOfBirth = isoDateOfBirth,
-                addressLine1,
-                addressLine2,
+                addressLine1 = string.Empty,
+                addressLine2 = string.Empty,
                 postCode,
                 county,
                 constituency,
-                fingerPrintScan = fingerprintBase64
+                fingerPrintScan = string.Empty,
+                countyHash,
+                constituencyHash,
+                encryptionMode,
+                keyVersion,
+                keyId,
+                wrappedDek,
+                encryptedNationalInsuranceNumber,
+                encryptedFirstName,
+                encryptedLastName,
+                encryptedDateOfBirth,
+                encryptedAddressLine1,
+                encryptedAddressLine2,
+                encryptedPostCode,
+                encryptedCounty,
+                encryptedConstituency,
+                encryptedFingerPrintScan
             };
 
-            var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
+            var envelope = await BuildEncryptedEnvelopeAsync(request);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Create voter envelope encryption unavailable");
+                return false;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📤 Sending request payload:");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   === VOTER DATA ===");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   FirstName: {firstName}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   LastName: {lastName}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   NI Number: {nationalInsuranceNumber}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   DOB (original): {dateOfBirth}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   DOB (converted to ISO): {isoDateOfBirth}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Address: {addressLine1}, {addressLine2}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   PostCode: {postCode}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {county}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {constituency}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Sensitive fields encrypted: yes");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Non-sensitive routing fields included: county, constituency");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   CountyHash (SHA-256): {countyHash}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   ConstituencyHash (SHA-256): {constituencyHash}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   EncryptionMode: {encryptionMode ?? "none"}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyVersion: {keyVersion ?? "none"}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   EncryptedPayloadAttached: {!string.IsNullOrWhiteSpace(wrappedDek)}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Fingerprint Bytes: {fingerprintData.Length}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   === OFFICIAL CONTEXT ===");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Official ID: {_currentOfficialId}");

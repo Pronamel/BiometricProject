@@ -223,6 +223,53 @@ catch (Exception ex)
 {
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Database connection error: {ex.Message}");
 }
+
+try
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Preloading voter encryption public key from AWS Secrets Manager...");
+    await SecretsHelper.GetVoterEncryptionPublicKeyPem();
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption public key preloaded successfully");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Voter encryption public key preload failed: {ex.Message}");
+    throw;
+}
+
+try
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Preloading voter encryption private key from AWS Secrets Manager...");
+    var privateKeyPem = NormalizePem(await SecretsHelper.GetVoterEncryptionPrivateKeyPem());
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption private key preloaded successfully");
+
+    try
+    {
+        var publicKeyPem = NormalizePem(await SecretsHelper.GetVoterEncryptionPublicKeyPem());
+        var derivedPublicKeyPem = ExportPublicKeyPemFromPrivateKey(privateKeyPem);
+        var configuredPublicFingerprint = ComputeSha256Hex(publicKeyPem);
+        var derivedPublicFingerprint = ComputeSha256Hex(derivedPublicKeyPem);
+
+        if (string.Equals(configuredPublicFingerprint, derivedPublicFingerprint, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption key pair validated (public/private match)");
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter encryption key mismatch: configured public key does not match configured private key");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Public fingerprint:  {configuredPublicFingerprint}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Private->Public fingerprint: {derivedPublicFingerprint}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Unable to validate voter encryption key pair: {ex.Message}");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter encryption private key preload failed: {ex.Message}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter fingerprint verification will return 503 until private key is configured");
+}
 Console.Out.Flush();
 
 // Configure the HTTP request pipeline
@@ -382,6 +429,188 @@ static string ComputeSdiHmacSha256(string canonicalIdentity, string secret)
     return Convert.ToHexString(hashBytes).ToLowerInvariant();
 }
 
+static string ComputeSha256Hex(string value)
+{
+    using var sha256 = SHA256.Create();
+    var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(value.Trim()));
+    return Convert.ToHexString(hashBytes).ToLowerInvariant();
+}
+
+static string ToPem(string label, byte[] derBytes)
+{
+    var base64 = Convert.ToBase64String(derBytes);
+    var sb = new StringBuilder();
+    sb.AppendLine($"-----BEGIN {label}-----");
+
+    for (int i = 0; i < base64.Length; i += 64)
+    {
+        int len = Math.Min(64, base64.Length - i);
+        sb.AppendLine(base64.Substring(i, len));
+    }
+
+    sb.Append($"-----END {label}-----");
+    return sb.ToString();
+}
+
+static string ExportPublicKeyPemFromPrivateKey(string privateKeyPem)
+{
+    using var rsa = RSA.Create();
+    rsa.ImportFromPem(privateKeyPem);
+    var publicDer = rsa.ExportSubjectPublicKeyInfo();
+    return ToPem("PUBLIC KEY", publicDer);
+}
+
+static byte[] DecryptAesGcmPayload(byte[] payload, byte[] dek)
+{
+    if (payload == null || payload.Length < 28)
+    {
+        throw new CryptographicException("Encrypted payload is invalid or too short");
+    }
+
+    const int nonceLength = 12;
+    const int tagLength = 16;
+    int cipherLength = payload.Length - nonceLength - tagLength;
+
+    if (cipherLength <= 0)
+    {
+        throw new CryptographicException("Encrypted payload cipher text is missing");
+    }
+
+    byte[] nonce = new byte[nonceLength];
+    byte[] tag = new byte[tagLength];
+    byte[] ciphertext = new byte[cipherLength];
+
+    Buffer.BlockCopy(payload, 0, nonce, 0, nonceLength);
+    Buffer.BlockCopy(payload, nonceLength, tag, 0, tagLength);
+    Buffer.BlockCopy(payload, nonceLength + tagLength, ciphertext, 0, cipherLength);
+
+    byte[] plaintext = new byte[cipherLength];
+    using var aes = new AesGcm(dek, tagSizeInBytes: tagLength);
+    aes.Decrypt(nonce, ciphertext, tag, plaintext);
+
+    return plaintext;
+}
+
+static string NormalizePem(string pem)
+{
+    return pem.Replace("\\r", string.Empty).Replace("\\n", "\n").Trim();
+}
+
+async Task<byte[]> DecryptVoterFingerprintAsync(Voter voter)
+{
+    if (voter.FingerprintScan == null || voter.FingerprintScan.Length == 0)
+    {
+        throw new InvalidOperationException("Voter fingerprint is missing");
+    }
+
+    if (voter.WrappedDek == null || voter.WrappedDek.Length == 0)
+    {
+        throw new InvalidOperationException("Voter wrapped DEK is missing");
+    }
+
+    var privateKeyPem = NormalizePem(await SecretsHelper.GetVoterEncryptionPrivateKeyPem());
+
+    using var rsa = RSA.Create();
+    rsa.ImportFromPem(privateKeyPem);
+
+    byte[] dek = rsa.Decrypt(voter.WrappedDek, RSAEncryptionPadding.OaepSHA256);
+    try
+    {
+        return DecryptAesGcmPayload(voter.FingerprintScan, dek);
+    }
+    finally
+    {
+        CryptographicOperations.ZeroMemory(dek);
+    }
+}
+
+async Task<byte[]> DecryptOfficialFingerprintAsync(Official official)
+{
+    if (official.FingerPrintScan == null || official.FingerPrintScan.Length == 0)
+    {
+        throw new InvalidOperationException("Official fingerprint is missing");
+    }
+
+    if (official.WrappedDek == null || official.WrappedDek.Length == 0)
+    {
+        throw new InvalidOperationException("Official fingerprint must be encrypted. Wrapped DEK is missing.");
+    }
+
+    var privateKeyPem = NormalizePem(await SecretsHelper.GetVoterEncryptionPrivateKeyPem());
+
+    using var rsa = RSA.Create();
+    rsa.ImportFromPem(privateKeyPem);
+
+    byte[] dek = rsa.Decrypt(official.WrappedDek, RSAEncryptionPadding.OaepSHA256);
+    try
+    {
+        return DecryptAesGcmPayload(official.FingerPrintScan, dek);
+    }
+    finally
+    {
+        CryptographicOperations.ZeroMemory(dek);
+    }
+}
+
+async Task<byte[]> UnwrapRequestDekAsync(string wrappedDekBase64)
+{
+    if (string.IsNullOrWhiteSpace(wrappedDekBase64))
+    {
+        throw new InvalidOperationException("Wrapped DEK is required");
+    }
+
+    var wrappedDek = Convert.FromBase64String(wrappedDekBase64);
+    var privateKeyPem = NormalizePem(await SecretsHelper.GetVoterEncryptionPrivateKeyPem());
+
+    using var rsa = RSA.Create();
+    rsa.ImportFromPem(privateKeyPem);
+    return rsa.Decrypt(wrappedDek, RSAEncryptionPadding.OaepSHA256);
+}
+
+static byte[] DecryptRequestBytesField(string encryptedBase64, byte[] dek)
+{
+    var encryptedPayload = Convert.FromBase64String(encryptedBase64);
+    return DecryptAesGcmPayload(encryptedPayload, dek);
+}
+
+static bool TryReadEncryptedEnvelope(JsonElement root, out string wrappedDek, out string encryptedPayload)
+{
+    wrappedDek = root.TryGetProperty("wrappedDek", out var wrappedElement)
+        ? wrappedElement.GetString() ?? string.Empty
+        : string.Empty;
+
+    encryptedPayload = root.TryGetProperty("encryptedPayload", out var payloadElement)
+        ? payloadElement.GetString() ?? string.Empty
+        : string.Empty;
+
+    return !string.IsNullOrWhiteSpace(wrappedDek) && !string.IsNullOrWhiteSpace(encryptedPayload);
+}
+
+async Task<T> DecryptEnvelopePayloadAsync<T>(string wrappedDekBase64, string encryptedPayloadBase64)
+{
+    var dek = await UnwrapRequestDekAsync(wrappedDekBase64);
+    try
+    {
+        var plaintextBytes = DecryptRequestBytesField(encryptedPayloadBase64, dek);
+        var plaintextJson = Encoding.UTF8.GetString(plaintextBytes);
+        var payload = JsonSerializer.Deserialize<T>(plaintextJson, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        if (payload == null)
+        {
+            throw new InvalidOperationException("Decrypted payload could not be deserialized");
+        }
+
+        return payload;
+    }
+    finally
+    {
+        CryptographicOperations.ZeroMemory(dek);
+    }
+}
+
 
 
 
@@ -399,10 +628,34 @@ static string ComputeSdiHmacSha256(string canonicalIdentity, string secret)
 // API ENDPOINTS - AUTHENTICATION
 //===========================================
 // gets login from database and checks if official exists with those credentials, then generates JWT token with station and official info
-app.MapPost("/auth/official-login", async (OfficialLoginRequest request, DatabaseService dbService, TokenCounter counter, OfficialService officialService,
+app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseService dbService, TokenCounter counter, OfficialService officialService,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
     ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes) =>
 {
+    OfficialLoginRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new { success = false, message = "Encrypted payload is required" });
+        }
+
+        request = await DecryptEnvelopePayloadAsync<OfficialLoginRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt official login payload: {ex.Message}");
+        return Results.BadRequest(new { success = false, message = "Invalid encrypted payload" });
+    }
+
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Received login request for user: {request.Username}");
     
     // Check if official with username and password exists
@@ -598,18 +851,72 @@ app.MapPost("/auth/voter-logout", (ClaimsPrincipal user, VoterService voterServi
 .RequireAuthorization(policy => policy.RequireRole("voter"))
 .WithName("VoterLogout");
 
-// Create a voter record in the database from official app input.
-app.MapPost("/api/official/create-voter", async (CreateVoterRequest request, DatabaseService dbService) =>
+app.MapGet("/api/crypto/voter-public-key", async () =>
 {
-    if (string.IsNullOrWhiteSpace(request.FirstName) ||
-        string.IsNullOrWhiteSpace(request.LastName) ||
-        string.IsNullOrWhiteSpace(request.DateOfBirth) ||
-        string.IsNullOrWhiteSpace(request.AddressLine1))
+    try
+    {
+        var publicKeyPem = await SecretsHelper.GetVoterEncryptionPublicKeyPem();
+
+        return Results.Ok(new
+        {
+            success = true,
+            keyId = "officialapp-rsa-v1",
+            keyVersion = "v1",
+            publicKeyPem,
+            fingerprint = ComputeSha256Hex(publicKeyPem)
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to serve voter public key: {ex.Message}");
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+})
+.WithName("GetVoterPublicKey");
+
+// Create a voter record in the database from official app input.
+app.MapPost("/api/official/create-voter", async (HttpContext httpContext, DatabaseService dbService) =>
+{
+    CreateVoterRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new { success = false, message = "Encrypted payload is required" });
+        }
+
+        request = await DecryptEnvelopePayloadAsync<CreateVoterRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt create-voter payload: {ex.Message}");
+        return Results.BadRequest(new { success = false, message = "Invalid encrypted payload" });
+    }
+
+    if (!string.Equals(request.EncryptionMode, "CLIENT_DEK_RSA", StringComparison.Ordinal) ||
+        string.IsNullOrWhiteSpace(request.KeyId) ||
+        string.IsNullOrWhiteSpace(request.KeyVersion) ||
+        string.IsNullOrWhiteSpace(request.WrappedDek) ||
+        string.IsNullOrWhiteSpace(request.EncryptedNationalInsuranceNumber) ||
+        string.IsNullOrWhiteSpace(request.EncryptedFirstName) ||
+        string.IsNullOrWhiteSpace(request.EncryptedLastName) ||
+        string.IsNullOrWhiteSpace(request.EncryptedDateOfBirth) ||
+        string.IsNullOrWhiteSpace(request.EncryptedAddressLine1) ||
+        string.IsNullOrWhiteSpace(request.EncryptedAddressLine2) ||
+        string.IsNullOrWhiteSpace(request.EncryptedPostCode) ||
+        string.IsNullOrWhiteSpace(request.EncryptedFingerPrintScan))
     {
         return Results.BadRequest(new
         {
             success = false,
-            message = "FirstName, LastName, DateOfBirth, and AddressLine1 are required"
+            message = "Encrypted voter payload is required"
         });
     }
 
@@ -622,12 +929,53 @@ app.MapPost("/api/official/create-voter", async (CreateVoterRequest request, Dat
         });
     }
 
-    if (string.IsNullOrWhiteSpace(request.FingerPrintScan))
+    if (string.IsNullOrWhiteSpace(request.CountyHash))
     {
         return Results.BadRequest(new
         {
             success = false,
-            message = "Fingerprint scan is required"
+            message = "CountyHash is required"
+        });
+    }
+
+    var expectedCountyHash = ComputeSha256Hex(request.County);
+    if (!string.Equals(request.CountyHash, expectedCountyHash, StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "CountyHash does not match County"
+        });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.ConstituencyHash))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "ConstituencyHash is required"
+        });
+    }
+
+    var expectedConstituencyHash = ComputeSha256Hex(request.Constituency);
+    if (!string.Equals(request.ConstituencyHash, expectedConstituencyHash, StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "ConstituencyHash does not match Constituency"
+        });
+    }
+
+    if (string.IsNullOrWhiteSpace(request.FirstName) ||
+        string.IsNullOrWhiteSpace(request.LastName) ||
+        string.IsNullOrWhiteSpace(request.DateOfBirth) ||
+        string.IsNullOrWhiteSpace(request.PostCode))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "FirstName, LastName, DateOfBirth, and PostCode are required for identity indexing"
         });
     }
 
@@ -647,32 +995,21 @@ app.MapPost("/api/official/create-voter", async (CreateVoterRequest request, Dat
         request.PostCode);
     var sdi = ComputeSdiHmacSha256(canonicalIdentity, sdiHmacSecret!);
 
-    byte[] fingerprintData;
-    try
-    {
-        fingerprintData = Convert.FromBase64String(request.FingerPrintScan);
-    }
-    catch
-    {
-        return Results.BadRequest(new
-        {
-            success = false,
-            message = "FingerPrintScan must be valid base64"
-        });
-    }
-
     var result = await dbService.CreateVoterAsync(
-        request.NationalInsuranceNumber,
-        request.FirstName,
-        request.LastName,
-        parsedDateOfBirth,
-        request.AddressLine1,
-        request.AddressLine2,
-        request.PostCode,
-        request.County,
+        request.CountyHash!,
         request.Constituency,
         sdi,
-        fingerprintData);
+        request.ConstituencyHash!,
+        request.KeyId!,
+        request.WrappedDek!,
+        request.EncryptedNationalInsuranceNumber!,
+        request.EncryptedFirstName!,
+        request.EncryptedLastName!,
+        request.EncryptedDateOfBirth!,
+        request.EncryptedAddressLine1!,
+        request.EncryptedAddressLine2!,
+        request.EncryptedPostCode!,
+        request.EncryptedFingerPrintScan!);
 
     if (!result.Success)
     {
@@ -696,8 +1033,31 @@ app.MapPost("/api/official/create-voter", async (CreateVoterRequest request, Dat
 .WithName("CreateVoter");
 
 // Create an official record in the database from official app input.
-app.MapPost("/api/official/create-official", async (CreateOfficialRequest request, DatabaseService dbService) =>
+app.MapPost("/api/official/create-official", async (HttpContext httpContext, DatabaseService dbService) =>
 {
+    CreateOfficialRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new { success = false, message = "Encrypted payload is required" });
+        }
+
+        request = await DecryptEnvelopePayloadAsync<CreateOfficialRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt create-official payload: {ex.Message}");
+        return Results.BadRequest(new { success = false, message = "Invalid encrypted payload" });
+    }
+
     if (string.IsNullOrWhiteSpace(request.Username) ||
         string.IsNullOrWhiteSpace(request.Password))
     {
@@ -717,12 +1077,16 @@ app.MapPost("/api/official/create-official", async (CreateOfficialRequest reques
         });
     }
 
-    if (string.IsNullOrWhiteSpace(request.FingerPrintScan))
+    if (!string.Equals(request.EncryptionMode, "CLIENT_DEK_RSA", StringComparison.Ordinal) ||
+        string.IsNullOrWhiteSpace(request.KeyVersion) ||
+        string.IsNullOrWhiteSpace(request.KeyId) ||
+        string.IsNullOrWhiteSpace(request.WrappedDek) ||
+        string.IsNullOrWhiteSpace(request.EncryptedFingerPrintScan))
     {
         return Results.BadRequest(new
         {
             success = false,
-            message = "Fingerprint scan is required"
+            message = "Encrypted fingerprint payload is required"
         });
     }
 
@@ -736,25 +1100,13 @@ app.MapPost("/api/official/create-official", async (CreateOfficialRequest reques
         });
     }
 
-    byte[] fingerprintData;
-    try
-    {
-        fingerprintData = Convert.FromBase64String(request.FingerPrintScan);
-    }
-    catch
-    {
-        return Results.BadRequest(new
-        {
-            success = false,
-            message = "FingerPrintScan must be valid base64"
-        });
-    }
-
     var result = await dbService.CreateOfficialAsync(
         request.Username,
         request.Password,
         pollingStationId,
-        fingerprintData);
+        request.KeyId!,
+        request.WrappedDek!,
+        request.EncryptedFingerPrintScan!);
 
     if (!result.Success)
     {
@@ -781,11 +1133,37 @@ app.MapPost("/api/official/create-official", async (CreateOfficialRequest reques
 // API ENDPOINTS - ACCESS CODE MANAGEMENT
 //===========================================
 // Official sets the access code for their polling station (code is pre-hashed from the app and stored directly in DB)
-app.MapPost("/api/official/set-access-code", async (SetAccessCodeRequest request, ClaimsPrincipal user, 
-    [FromServices] ApplicationDbContext dbContext) =>
+app.MapPost("/api/official/set-access-code", async (HttpContext httpContext, ClaimsPrincipal user, 
+    [FromServices] ApplicationDbContext dbContext,
+    ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes) =>
 {
+    SetAccessCodeRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new { success = false, message = "Encrypted payload is required" });
+        }
+
+        request = await DecryptEnvelopePayloadAsync<SetAccessCodeRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt set-access-code payload: {ex.Message}");
+        return Results.BadRequest(new { success = false, message = "Invalid encrypted payload" });
+    }
+
     var stationId = user.FindFirst("station")?.Value;
     var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
+    var county = user.FindFirst("county")?.Value;
+    var constituency = user.FindFirst("constituency")?.Value;
     
     if (string.IsNullOrEmpty(stationId))
     {
@@ -811,6 +1189,14 @@ app.MapPost("/api/official/set-access-code", async (SetAccessCodeRequest request
         station.PollingStationCode = request.AccessCode;
         
         await dbContext.SaveChangesAsync();
+
+        // Keep in-memory official hash map in sync so voter linking uses the latest code immediately.
+        if (!string.IsNullOrEmpty(officialId) &&
+            !string.IsNullOrEmpty(county) &&
+            !string.IsNullOrEmpty(constituency))
+        {
+            officialPollingStationHashes[officialId] = (county, constituency, request.AccessCode);
+        }
         
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official {officialId} set access code for station {stationId}");
         
@@ -830,9 +1216,32 @@ app.MapPost("/api/official/set-access-code", async (SetAccessCodeRequest request
 
 
 
-app.MapPost("/api/voter/verify-access-code", async (VerifyAccessCodeRequest request, 
+app.MapPost("/api/voter/verify-access-code", async (HttpContext httpContext, 
     [FromServices] ApplicationDbContext dbContext) =>
 {
+    VerifyAccessCodeRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new VerifyAccessCodeResponse(false, "Encrypted payload is required"));
+        }
+
+        request = await DecryptEnvelopePayloadAsync<VerifyAccessCodeRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt verify-access-code payload: {ex.Message}");
+        return Results.BadRequest(new VerifyAccessCodeResponse(false, "Invalid encrypted payload"));
+    }
+
     if (string.IsNullOrEmpty(request.AccessCode))
     {
         return Results.BadRequest(new VerifyAccessCodeResponse(false, "Access code hash is required"));
@@ -879,17 +1288,60 @@ app.MapPost("/api/voter/verify-access-code", async (VerifyAccessCodeRequest requ
 // API ENDPOINTS - VOTER AUTHENTICATION LOOKUP
 //===========================================
 // SDI-based voter lookup using FirstName + LastName + DateOfBirth + PostCode.
-app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request, DatabaseService dbService) =>
+app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, DatabaseService dbService) =>
 {
     Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ===== VOTER AUTH LOOKUP ATTEMPT =====");
+
+    VoterAuthLookupRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new VoterAuthLookupResponse(
+                false,
+                "Encrypted payload is required.",
+                null,
+                null,
+                null,
+                null
+            ));
+        }
+
+        request = await DecryptEnvelopePayloadAsync<VoterAuthLookupRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt voter lookup payload: {ex.Message}");
+        return Results.BadRequest(new VoterAuthLookupResponse(
+            false,
+            "Invalid encrypted payload.",
+            null,
+            null,
+            null,
+            null
+        ));
+    }
 
     Voter? voter = null;
     string? matchedBy = null;
 
-    if (string.IsNullOrWhiteSpace(request.FirstName) ||
-        string.IsNullOrWhiteSpace(request.LastName) ||
-        string.IsNullOrWhiteSpace(request.DateOfBirth) ||
-        string.IsNullOrWhiteSpace(request.PostCode))
+    string? firstName = request.FirstName;
+    string? lastName = request.LastName;
+    string? dateOfBirth = request.DateOfBirth;
+    string? postCode = request.PostCode;
+
+    if (string.IsNullOrWhiteSpace(firstName) ||
+        string.IsNullOrWhiteSpace(lastName) ||
+        string.IsNullOrWhiteSpace(dateOfBirth) ||
+        string.IsNullOrWhiteSpace(postCode))
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Missing required identity fields for SDI lookup");
         return Results.BadRequest(new VoterAuthLookupResponse(
@@ -902,9 +1354,9 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
         ));
     }
 
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting SDI lookup for {request.FirstName} {request.LastName} ({request.DateOfBirth}) {request.PostCode}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting SDI lookup for {firstName} {lastName} ({dateOfBirth}) {postCode}");
 
-    var dobInput = request.DateOfBirth!.Trim();
+    var dobInput = dateOfBirth.Trim();
     DateTime parsedDob;
 
     if (DateTime.TryParseExact(
@@ -926,7 +1378,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
     }
     else
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Invalid DateOfBirth format: {request.DateOfBirth}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Invalid DateOfBirth format: {dateOfBirth}");
         return Results.BadRequest(new VoterAuthLookupResponse(
             false,
             "DateOfBirth is invalid. Use yyyy-MM-dd.",
@@ -938,10 +1390,10 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
     }
 
     var canonicalIdentity = BuildIdentityCanonicalString(
-        request.FirstName,
-        request.LastName,
+        firstName,
+        lastName,
         parsedDob,
-        request.PostCode);
+        postCode);
     var sdi = ComputeSdiHmacSha256(canonicalIdentity, sdiHmacSecret);
 
     voter = await dbService.GetVoterBySdiAsync(sdi);
@@ -954,8 +1406,8 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
     // Return result
     if (voter is not null)
     {
-        var fullName = $"{voter.FirstName} {voter.LastName}";
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ VOTER AUTH LOOKUP SUCCESSFUL - Voter: {fullName}, ID: {voter.VoterId}, Matched By: {matchedBy}");
+        var fullName = "Name protected";
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ VOTER AUTH LOOKUP SUCCESSFUL - VoterId: {voter.VoterId}, Matched By: {matchedBy}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
         
         return Results.Ok(new VoterAuthLookupResponse(
@@ -963,7 +1415,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (VoterAuthLookupRequest request,
             "Voter found successfully",
             voter.VoterId,
             fullName,
-            voter.FingerprintScan,
+            null,
             matchedBy
         ));
     }
@@ -1368,6 +1820,70 @@ app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
 .RequireAuthorization(policy => policy.RequireRole("voter"))
 .WithName("VoterSendDeviceStatus");
 
+app.MapGet("/api/voter/pending-device-commands", (ClaimsPrincipal user,
+    string deviceId,
+    [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<DeviceCommandNotification>>>> countyDeviceCommands) =>
+{
+    var tokenVoterId = user.FindFirst("voterId")?.Value;
+    var tokenCounty = user.FindFirst("county")?.Value;
+    var tokenConstituency = user.FindFirst("constituency")?.Value;
+
+    if (!int.TryParse(tokenVoterId, out var parsedTokenVoterId) ||
+        string.IsNullOrWhiteSpace(tokenCounty) ||
+        string.IsNullOrWhiteSpace(tokenConstituency) ||
+        string.IsNullOrWhiteSpace(deviceId))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Invalid voter context or device ID"
+        });
+    }
+
+    if (!countyDeviceCommands.TryGetValue(tokenCounty, out var byConstituency) ||
+        !byConstituency.TryGetValue(tokenConstituency, out var byTarget))
+    {
+        return Results.Ok(new { success = true, commands = Array.Empty<object>() });
+    }
+
+    var targetKey = $"{parsedTokenVoterId}:{deviceId}";
+    if (!byTarget.TryGetValue(targetKey, out var queue))
+    {
+        return Results.Ok(new { success = true, commands = Array.Empty<object>() });
+    }
+
+    var drained = new List<DeviceCommandNotification>();
+    while (queue.TryTake(out var command))
+    {
+        drained.Add(command);
+    }
+
+    var payload = drained
+        .OrderBy(c => c.Timestamp)
+        .Select(c => new
+        {
+            success = true,
+            commandType = c.CommandType,
+            officialId = c.OfficialId,
+            message = c.Message,
+            data = new
+            {
+                c.Timestamp,
+                c.DeviceId,
+                c.VoterId
+            }
+        })
+        .ToList();
+
+    return Results.Ok(new
+    {
+        success = true,
+        commands = payload
+    });
+})
+.RequireAuthorization(policy => policy.RequireRole("voter"))
+.WithName("VoterGetPendingDeviceCommands");
+
 
 
 
@@ -1382,6 +1898,7 @@ app.MapPost("/api/official/send-device-command", (SendDeviceCommandRequest reque
     var county = user.FindFirst("county")?.Value;
     var constituency = user.FindFirst("constituency")?.Value;
     var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
+    var stationId = user.FindFirst("station")?.Value;
 
     if (string.IsNullOrWhiteSpace(county) || string.IsNullOrWhiteSpace(constituency))
     {
@@ -1409,8 +1926,36 @@ app.MapPost("/api/official/send-device-command", (SendDeviceCommandRequest reque
 
     if (string.IsNullOrWhiteSpace(linkedOfficial.OfficialId) || !linkedOfficial.ConnectedVoters.Contains(request.VoterId))
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Rejecting device command from official {officialId}: voter {request.VoterId} not linked");
-        return Results.BadRequest(new { success = false, message = "Target voter is not linked to this official" });
+        // Fallback recovery if in-memory link was reset while token/session is still valid.
+        var fallbackOfficials = activeOfficials
+            .Where(kvp =>
+                kvp.Key.StartsWith($"{county}_", StringComparison.Ordinal) &&
+                kvp.Value.OfficialId == officialId &&
+                kvp.Value.Constituency == constituency &&
+                (string.IsNullOrEmpty(stationId) || kvp.Value.StationId == stationId))
+            .ToList();
+
+        if (fallbackOfficials.Count > 0)
+        {
+            foreach (var kvp in fallbackOfficials)
+            {
+                if (!kvp.Value.ConnectedVoters.Contains(request.VoterId))
+                {
+                    var healed = kvp.Value with { ConnectedVoters = new List<int>(kvp.Value.ConnectedVoters) { request.VoterId } };
+                    activeOfficials[kvp.Key] = healed;
+                }
+            }
+
+            linkedOfficial = fallbackOfficials
+                .Select(kvp => activeOfficials[kvp.Key])
+                .FirstOrDefault(v => v.ConnectedVoters.Contains(request.VoterId));
+        }
+
+        if (string.IsNullOrWhiteSpace(linkedOfficial.OfficialId) || !linkedOfficial.ConnectedVoters.Contains(request.VoterId))
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Rejecting device command from official {officialId}: voter {request.VoterId} not linked");
+            return Results.BadRequest(new { success = false, message = "Target voter is not linked to this official" });
+        }
     }
 
     var targetKey = $"{request.VoterId}:{request.DeviceId}";
@@ -1579,6 +2124,20 @@ app.MapGet("/api/polling-stations", async (DatabaseService db) =>
 })
 .WithName("GetPollingStations");
 
+// Fetch candidates for the current election
+app.MapGet("/api/candidates", async (DatabaseService db) =>
+{
+    var HARDCODED_ELECTION_ID = Guid.Parse("e5f6a7b8-c9d1-4e5f-3a4b-5c6d7e8f9a1b");
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] GET /api/candidates - Fetching candidates for election ID: {HARDCODED_ELECTION_ID}");
+    
+    var candidates = await db.GetCandidatesByElectionIdAsync(HARDCODED_ELECTION_ID);
+    
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Returning {candidates.Count} candidates");
+    return Results.Ok(candidates);
+})
+.WithName("GetCandidates");
+
 //===========================================
 // API ENDPOINTS - OFFICIAL DATA UPDATE
 //===========================================
@@ -1591,7 +2150,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
 
     string username = string.Empty;
     string password = string.Empty;
-    string fingerprintBase64 = string.Empty;
+    string encryptedFingerprintBase64 = string.Empty;
     
     try
     {
@@ -1610,27 +2169,25 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
         using var json = JsonDocument.Parse(rawBody);
         var root = json.RootElement;
 
-        username = root.TryGetProperty("username", out var usernameElement)
-            ? usernameElement.GetString() ?? string.Empty
-            : string.Empty;
-
-        password = root.TryGetProperty("password", out var passwordElement)
-            ? passwordElement.GetString() ?? string.Empty
-            : string.Empty;
-
-        // Support both field names
-        if (root.TryGetProperty("fingerPrintScan", out var fpElement))
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
         {
-            fingerprintBase64 = fpElement.GetString() ?? string.Empty;
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing encrypted envelope");
+            return Results.BadRequest(new
+            {
+                success = false,
+                message = "Encrypted payload is required"
+            });
         }
-        else if (root.TryGetProperty("fingerprintData", out var legacyElement))
-        {
-            fingerprintBase64 = legacyElement.GetString() ?? string.Empty;
-        }
+
+        var decryptedRequest = await DecryptEnvelopePayloadAsync<UpdateFingerprintRequest>(wrappedDek, encryptedPayload);
+
+        username = decryptedRequest.Username ?? string.Empty;
+        password = decryptedRequest.Password ?? string.Empty;
+        encryptedFingerprintBase64 = decryptedRequest.EncryptedFingerPrintScan ?? string.Empty;
 
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Parsed username present: {!string.IsNullOrEmpty(username)}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Parsed password present: {!string.IsNullOrEmpty(password)}");
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Parsed fingerprint data present: {!string.IsNullOrEmpty(fingerprintBase64)}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Parsed encrypted payload and decrypted request");
 
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
         {
@@ -1641,45 +2198,29 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
             });
         }
 
-        if (string.IsNullOrEmpty(fingerprintBase64))
+        if (!string.Equals(decryptedRequest.EncryptionMode, "CLIENT_DEK_RSA", StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(decryptedRequest.KeyVersion) ||
+            string.IsNullOrWhiteSpace(decryptedRequest.KeyId) ||
+            string.IsNullOrWhiteSpace(decryptedRequest.WrappedDek) ||
+            string.IsNullOrWhiteSpace(encryptedFingerprintBase64))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing fingerprint data");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing encrypted fingerprint data");
             return Results.BadRequest(new {
                 success = false,
-                message = "Fingerprint data is required (fingerPrintScan must be PNG format)"
+                message = "Encrypted fingerprint payload is required"
             });
         }
 
-        // Decode base64 to bytes
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Converting base64 to bytes...");
-        byte[] fingerprintBytes = Convert.FromBase64String(fingerprintBase64);
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Decoded: {fingerprintBytes.Length} bytes");
-        
-        // Validate PNG format (check magic bytes: 89 50 4E 47 = .PNG)
-        if (fingerprintBytes.Length < 8 || 
-            fingerprintBytes[0] != 0x89 || 
-            fingerprintBytes[1] != 0x50 || 
-            fingerprintBytes[2] != 0x4E || 
-            fingerprintBytes[3] != 0x47)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Invalid PNG format - magic bytes not found");
-            return Results.BadRequest(new {
-                success = false,
-                message = "Fingerprint must be in PNG format"
-            });
-        }
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Valid PNG format confirmed");
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Updating fingerprint in database...");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Updating encrypted fingerprint in database...");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Username: '{username}'");
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Fingerprint size: {fingerprintBytes.Length} bytes (PNG)");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Encrypted fingerprint payload size: {encryptedFingerprintBase64.Length} chars (base64)");
         
-        // Update the official's fingerprint in database
         bool updateSuccessful = await dbService.UpdateOfficialFingerprintAsync(
             username,
             password,
-            fingerprintBytes
+            decryptedRequest.KeyId!,
+            decryptedRequest.WrappedDek!,
+            encryptedFingerprintBase64
         );
         
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] DatabaseService returned: {updateSuccessful}");
@@ -1690,7 +2231,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
             return Results.Ok(new { 
                 success = true, 
                 message = "Fingerprint uploaded successfully",
-                dataSize = fingerprintBytes.Length
+                dataSize = encryptedFingerprintBase64.Length
             });
         }
         else
@@ -1708,7 +2249,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
         return Results.BadRequest(new { 
             success = false, 
-            message = "Fingerprint data must be valid base64 encoded",
+            message = "FingerPrintScan must be valid base64",
             error = ex.Message
         });
     }
@@ -1733,9 +2274,41 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
 //===========================================
 // API ENDPOINTS - FINGERPRINT VERIFICATION
 //===========================================
-app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, DatabaseService dbService) =>
+app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseService dbService) =>
 {
     const double MATCH_THRESHOLD = 40.0;
+
+    VerifyFingerprintsRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new
+            {
+                success = false,
+                message = "Encrypted payload is required"
+            });
+        }
+
+        request = await DecryptEnvelopePayloadAsync<VerifyFingerprintsRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt verify-prints payload: {ex.Message}");
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Invalid encrypted payload"
+        });
+    }
     
     try
     {
@@ -1758,13 +2331,12 @@ app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, Data
             });
         }
 
-        // Validate scanned fingerprint is present
-        if (string.IsNullOrEmpty(request.ScannedFingerprint))
+        if (string.IsNullOrWhiteSpace(request.ScannedFingerprint))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing scanned fingerprint");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing scanned fingerprint in decrypted payload");
             return Results.BadRequest(new { 
                 success = false, 
-                message = "Scanned fingerprint is required" 
+                message = "ScannedFingerprint is required" 
             });
         }
 
@@ -1812,9 +2384,25 @@ app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, Data
                 });
             }
 
-            storedFingerprintBytes = official.FingerPrintScan;
-            userIdentifier = official.OfficialId.ToString();
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official found, retrieving stored fingerprint ({storedFingerprintBytes.Length} bytes)");
+                try
+                {
+                    storedFingerprintBytes = await DecryptOfficialFingerprintAsync(official);
+                }
+                catch (Exception ex)
+                {
+                    var wrappedDekLength = official.WrappedDek?.Length ?? 0;
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to decrypt official fingerprint for official {official.OfficialId}: {ex.Message}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId={official.KeyId ?? "<null>"}, WrappedDekBytes={wrappedDekLength}");
+                    return Results.Json(new
+                    {
+                        success = false,
+                        message = "Official fingerprint decryption unavailable. Configure official encryption private key.",
+                        code = "OFFICIAL_DECRYPTION_UNAVAILABLE"
+                    }, statusCode: StatusCodes.Status503ServiceUnavailable);
+                }
+
+                userIdentifier = official.OfficialId.ToString();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official found, retrieving stored fingerprint ({storedFingerprintBytes.Length} bytes)");
         }
         else if (request.UserType == "voter")
         {
@@ -1856,16 +2444,32 @@ app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, Data
             // Get stored fingerprint from database
             if (voter.FingerprintScan == null || voter.FingerprintScan.Length == 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ No stored fingerprint found for voter {voter.FirstName} {voter.LastName}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ No stored fingerprint found for voter ID {voter.VoterId}");
                 return Results.BadRequest(new { 
                     success = false, 
                     message = "No stored fingerprint on record" 
                 });
             }
 
-            storedFingerprintBytes = voter.FingerprintScan;
+            try
+            {
+                storedFingerprintBytes = await DecryptVoterFingerprintAsync(voter);
+            }
+            catch (Exception ex)
+            {
+                var wrappedDekLength = voter.WrappedDek?.Length ?? 0;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to decrypt voter fingerprint for voter ID {voter.VoterId}: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId={voter.KeyId ?? "<null>"}, WrappedDekBytes={wrappedDekLength}");
+                return Results.Json(new
+                {
+                    success = false,
+                    message = "Voter fingerprint decryption unavailable. Configure voter encryption private key.",
+                    code = "VOTER_DECRYPTION_UNAVAILABLE"
+                }, statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
             userIdentifier = voter.VoterId.ToString();
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter found, retrieving stored fingerprint ({storedFingerprintBytes.Length} bytes)");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter found, decrypted stored fingerprint ({storedFingerprintBytes.Length} bytes)");
         }
 
         // COMMON FINGERPRINT COMPARISON LOGIC (applies to both official and voter)
@@ -1875,8 +2479,9 @@ app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, Data
             return Results.BadRequest(new { success = false, message = "Failed to retrieve stored fingerprint" });
         }
 
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Decoding scanned fingerprint from base64...");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Decoding scanned fingerprint from decrypted payload...");
         byte[] scannedFingerprintBytes = Convert.FromBase64String(request.ScannedFingerprint);
+
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Scanned fingerprint size: {scannedFingerprintBytes.Length} bytes");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stored fingerprint size: {storedFingerprintBytes.Length} bytes");
 
@@ -1951,6 +2556,9 @@ app.MapPost("/api/verify-prints", async (VerifyFingerprintsRequest request, Data
 
 app.MapHub<VotingHub>("/hubs/voting");
 
+// Prevent production exception handler from returning 404 when /Error is invoked.
+app.Map("/Error", () => Results.Problem("An internal server error occurred."));
+
 //===========================================
 // START APPLICATION
 //===========================================
@@ -1974,14 +2582,34 @@ record CreateVoterRequest(
     string PostCode,
     string County,
     string Constituency,
-    string FingerPrintScan
+    string FingerPrintScan,
+    string? CountyHash,
+    string? ConstituencyHash,
+    string? EncryptionMode,
+    string? KeyVersion,
+    string? KeyId,
+    string? WrappedDek,
+    string? EncryptedNationalInsuranceNumber,
+    string? EncryptedFirstName,
+    string? EncryptedLastName,
+    string? EncryptedDateOfBirth,
+    string? EncryptedAddressLine1,
+    string? EncryptedAddressLine2,
+    string? EncryptedPostCode,
+    string? EncryptedCounty,
+    string? EncryptedConstituency,
+    string? EncryptedFingerPrintScan
 );
 
 record CreateOfficialRequest(
     string Username,
     string Password,
     string AssignedPollingStationId,
-    string FingerPrintScan
+    string? EncryptionMode,
+    string? KeyVersion,
+    string? KeyId,
+    string? WrappedDek,
+    string? EncryptedFingerPrintScan
 );
 
 record VoterAccessRequest(
@@ -1996,7 +2624,11 @@ record GenerateCodeRequest(
 record UpdateFingerprintRequest(
     string Username,
     string Password,
-    string FingerPrintScan  // Base64 encoded fingerprint image data
+    string? EncryptionMode,
+    string? KeyVersion,
+    string? KeyId,
+    string? WrappedDek,
+    string? EncryptedFingerPrintScan
 );
 
 record SetAccessCodeRequest(
@@ -2098,7 +2730,7 @@ record VerifyFingerprintsRequest(
     string? Username,             // Official username for database lookup (null for voters)
     string? Password,             // Official password for authentication (null for voters)
     string? VoterId,              // Voter unique ID as string (null for officials)
-    string ScannedFingerprint     // Base64 encoded newly scanned fingerprint (PNG format)
+    string? ScannedFingerprint    // Base64 encoded newly scanned fingerprint (PNG format)
 );
 
 // Voter authentication lookup models (flexible identification)
