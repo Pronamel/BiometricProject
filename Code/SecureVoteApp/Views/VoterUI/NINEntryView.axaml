@@ -92,6 +92,38 @@
                 </StackPanel>
             </StackPanel>
         </StackPanel>
+
+        <Border Grid.Column="1"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Width="320"
+                Padding="18"
+                CornerRadius="14"
+                Background="#fff1f1"
+                BorderBrush="#c0392b"
+                BorderThickness="2"
+                IsVisible="{Binding ShowAlreadyVotedMessage}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Already Voted"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="#8e1d1d"
+                           TextAlignment="Center"/>
+
+                <TextBlock Text="{Binding AlreadyVotedMessage}"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="#8e1d1d"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"/>
+
+                <TextBlock Text="Please speak to an official for assistance."
+                           FontSize="14"
+                           Foreground="#8e1d1d"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"/>
+            </StackPanel>
+        </Border>
     </Grid>
 
     

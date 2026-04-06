@@ -5,7 +5,6 @@ using CommunityToolkit.Mvvm.Input;
 using System.Text.Json;
 using System.Net.Http;
 using System.Globalization;
-using System.Reflection;
 using SecureVoteApp.Views.VoterUI;
 using SecureVoteApp.Services;
 using SecureVoteApp.Models;
@@ -43,22 +42,16 @@ public partial class NINEntryViewModel : ViewModelBase
     private string postCode = string.Empty;
 
     [ObservableProperty]
-    private string nationalInsuranceNumber = string.Empty;
-
-    [ObservableProperty]
-    private string blueTextHave = "I cannot remember or do not have my National insurance number";
-    
-    [ObservableProperty]
-    private bool showNinOnly = false;
-
-    [ObservableProperty]
     private bool dateOfBirthVisible = true;
 
     [ObservableProperty]
-    private bool textBoxEnabled = true;
+    private string statusMessage = string.Empty;
 
     [ObservableProperty]
-    private string statusMessage = string.Empty;
+    private bool showAlreadyVotedMessage = false;
+
+    [ObservableProperty]
+    private string alreadyVotedMessage = string.Empty;
 
     [ObservableProperty]
     private bool isLooking = false;
@@ -75,6 +68,19 @@ public partial class NINEntryViewModel : ViewModelBase
         _navigationService = navigationService;
         _serverHandler = serverHandler;
         _countyService = countyService;
+    }
+
+    public void ResetSensitiveFields()
+    {
+        FirstName = string.Empty;
+        LastName = string.Empty;
+        DateOfBirth = string.Empty;
+        PostCode = string.Empty;
+        DateOfBirthVisible = true;
+        StatusMessage = string.Empty;
+        ShowAlreadyVotedMessage = false;
+        AlreadyVotedMessage = string.Empty;
+        IsLooking = false;
     }
 
     // ==========================================
@@ -136,14 +142,28 @@ public partial class NINEntryViewModel : ViewModelBase
             if (lookup?.Success == true && lookup.VoterId.HasValue)
             {
                 StatusMessage = "✅ Voter found!";
+                ShowAlreadyVotedMessage = false;
+                AlreadyVotedMessage = string.Empty;
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter lookup successful: {lookup.FullName}");
                 
                 // Navigate to authenticate user view, passing the lookup data
                 await _navigationService.NavigateToAuthenticateUser(lookup);
             }
+            else if (!string.IsNullOrWhiteSpace(lookup?.Message) &&
+                     lookup.Message.Contains("already voted", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusMessage = string.Empty;
+                ShowAlreadyVotedMessage = true;
+                AlreadyVotedMessage = lookup.Message;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter already voted: {lookup.Message}");
+            }
             else
             {
-                StatusMessage = "❌ Voter not found. Check your details and try again.";
+                ShowAlreadyVotedMessage = false;
+                AlreadyVotedMessage = string.Empty;
+                StatusMessage = string.IsNullOrWhiteSpace(lookup?.Message)
+                    ? "❌ Voter not found. Check your details and try again."
+                    : $"❌ {lookup.Message}";
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Voter lookup failed: {lookup?.Message}");
             }
         }
@@ -156,12 +176,6 @@ public partial class NINEntryViewModel : ViewModelBase
         {
             IsLooking = false;
         }
-    }
-
-    [RelayCommand]
-    private void BlueTextPress()
-    {
-        // Deprecated: lookup now always uses FirstName + LastName + DateOfBirth + PostCode.
     }
 
     private static bool TryNormalizeDateOfBirth(string input, out string normalizedDate)

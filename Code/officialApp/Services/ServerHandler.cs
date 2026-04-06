@@ -131,6 +131,9 @@ public class ServerHandler : IServerHandler
 
     public Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request)
         => _apiService.SendDeviceCommandAsync(request);
+
+    public Task<PollingStationVoteCountResponse?> GetPollingStationVoteCountAsync()
+        => _apiService.GetPollingStationVoteCountAsync();
     
     public async Task<bool> UpdateDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo)
     {

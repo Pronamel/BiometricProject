@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System;
 
 namespace SecureVoteApp.ViewModels;
 
@@ -22,7 +23,7 @@ public partial class CandidateButtonViewModel : ViewModelBase
     private bool isSelected = false;
 
     [ObservableProperty]
-    private int candidateId;
+    private Guid candidateId;
 
 
 
@@ -48,7 +49,7 @@ public partial class CandidateButtonViewModel : ViewModelBase
         BallotPaperViewModel.SelectionChanged += OnSelectionChanged;
     }
 
-    public CandidateButtonViewModel(int id, string name, string party, string bio)
+    public CandidateButtonViewModel(Guid id, string name, string party, string bio)
     {
         CandidateId = id;
         CandidateName = name;

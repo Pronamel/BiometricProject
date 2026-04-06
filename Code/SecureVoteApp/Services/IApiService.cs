@@ -15,7 +15,7 @@ public interface IApiService
     Task<List<Candidate>> FetchCandidatesAsync();
     
     // Vote Casting
-    Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName);
+    Task<CastVoteResponse> CastVoteAsync(Guid candidateId, string candidateName, string partyName);
     
     // Voter State
     bool IsAuthenticated { get; }

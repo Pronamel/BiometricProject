@@ -199,6 +199,7 @@ builder.Services.AddCors(options =>
 // APP BUILD & MIDDLEWARE PIPELINE
 //===========================================
 var app = builder.Build();
+var currentElectionId = Guid.Parse("e5f6a7b8-c9d1-4e5f-3a4b-5c6d7e8f9a1b");
 
 // Test database connection on startup
 try
@@ -1406,6 +1407,19 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
     // Return result
     if (voter is not null)
     {
+        if (voter.HasVoted)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter {voter.VoterId} already voted - redirecting to official assistance");
+            return Results.BadRequest(new VoterAuthLookupResponse(
+                false,
+                "You have already voted. Please speak to an official.",
+                null,
+                null,
+                null,
+                matchedBy
+            ));
+        }
+
         var fullName = "Name protected";
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ VOTER AUTH LOOKUP SUCCESSFUL - VoterId: {voter.VoterId}, Matched By: {matchedBy}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
@@ -1544,14 +1558,25 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
 })
 .WithName("VoterLinkToOfficial");
 
-app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
+app.MapPost("/api/voter/cast-vote", async (CastVoteRequest request,
     ClaimsPrincipal user,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    ApplicationDbContext dbContext,
     IHubContext<VotingHub> hubContext,
     [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>> countyVoteChannels) =>
 {
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast attempt - Voter ID: {request.VoterId}, County: {request.County}, Constituency: {request.Constituency}, Station: {request.PollingStationCode}");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote for: {request.CandidateName} - {request.PartyName}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast attempt - Voter ID: {request.VoterId}, County: {request.County}, Constituency: {request.Constituency}, StationId: {request.PollingStationId}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote for: {request.CandidateName} - {request.PartyName} (CandidateId: {request.CandidateId})");
+
+    if (request.CandidateId == Guid.Empty || request.PollingStationId == Guid.Empty)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - candidate or station ID missing");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: candidate and station IDs are required",
+            DateTime.UtcNow
+        ));
+    }
 
     // Validate cast request against voter token claims.
     var tokenVoterId = user.FindFirst("voterId")?.Value;
@@ -1577,6 +1602,89 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
         return Results.BadRequest(new CastVoteResponse(
             false,
             "Vote failed: invalid location context",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (!string.IsNullOrWhiteSpace(tokenStationId) &&
+        !string.Equals(tokenStationId, request.PollingStationId.ToString(), StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - request station ID does not match token claim");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid polling station context",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (!request.VoterDatabaseId.HasValue || request.VoterDatabaseId == Guid.Empty)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - voter database ID missing");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: voter identity missing",
+            DateTime.UtcNow
+        ));
+    }
+
+    var voter = await dbContext.Voters.FirstOrDefaultAsync(v => v.VoterId == request.VoterDatabaseId.Value);
+    if (voter == null)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - voter not found: {request.VoterDatabaseId}");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: voter not found",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (voter.HasVoted)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - voter {request.VoterDatabaseId} has already voted");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "You have already voted. Please speak to an official.",
+            DateTime.UtcNow
+        ));
+    }
+
+    var constituencyId = await dbContext.Constituencies
+        .Where(c => EF.Functions.ILike(c.Name, request.Constituency))
+        .Select(c => (Guid?)c.ConstituencyId)
+        .FirstOrDefaultAsync();
+
+    if (!constituencyId.HasValue)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - constituency not found: {request.Constituency}");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: constituency not found",
+            DateTime.UtcNow
+        ));
+    }
+
+    var candidateExists = await dbContext.Candidates.AnyAsync(c =>
+        c.CandidateId == request.CandidateId && c.ElectionId == currentElectionId);
+
+    if (!candidateExists)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - candidate {request.CandidateId} not in current election {currentElectionId}");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid candidate for current election",
+            DateTime.UtcNow
+        ));
+    }
+
+    var pollingStationExists = await dbContext.PollingStations.AnyAsync(ps =>
+        ps.PollingStationId == request.PollingStationId && ps.ConstituencyId == constituencyId.Value);
+
+    if (!pollingStationExists)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - polling station {request.PollingStationId} not in constituency {constituencyId.Value}");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid polling station for constituency",
             DateTime.UtcNow
         ));
     }
@@ -1635,6 +1743,39 @@ app.MapPost("/api/voter/cast-vote", (CastVoteRequest request,
 
     if (officialsInConstituency.Count > 0)
     {
+        try
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
+            voter.HasVoted = true;
+            await dbContext.SaveChangesAsync();
+
+            var voteRecord = new VoteRecord
+            {
+                RecordId = Guid.NewGuid(),
+                ElectionId = currentElectionId,
+                CandidateId = request.CandidateId,
+                ConstituencyId = constituencyId.Value,
+                PollingStationId = request.PollingStationId,
+                VotedAt = DateTime.UtcNow
+            };
+
+            dbContext.VoteRecords.Add(voteRecord);
+            await dbContext.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Vote record inserted: {voteRecord.RecordId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast failed - database insert error: {ex.Message}");
+            return Results.Problem(
+                detail: "Vote failed: could not persist vote record",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
+        }
+
         // Create vote notification with county and constituency
         var voteNotification = new VoteNotification(
             request.VoterId,
@@ -2007,6 +2148,35 @@ app.MapPost("/api/official/send-device-command", (SendDeviceCommandRequest reque
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialSendDeviceCommand");
 
+app.MapGet("/api/official/polling-station-vote-count", async (
+    ClaimsPrincipal user,
+    DatabaseService dbService) =>
+{
+    var stationId = user.FindFirst("station")?.Value;
+
+    if (string.IsNullOrWhiteSpace(stationId) || !Guid.TryParse(stationId, out var pollingStationId))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Polling station claim missing or invalid"
+        });
+    }
+
+    var totalVotes = await dbService.GetVoteRecordsCountByPollingStationAsync(pollingStationId);
+    var expectedVotes = await dbService.GetExpectedVotesByPollingStationAsync(pollingStationId);
+
+    return Results.Ok(new
+    {
+        success = true,
+        pollingStationId,
+        totalVotes,
+        expectedVotes
+    });
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialGetPollingStationVoteCount");
+
 
 app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, OfficialService officialService, ClaimsPrincipal user, IHubContext<VotingHub> hubContext) =>
 {
@@ -2127,11 +2297,9 @@ app.MapGet("/api/polling-stations", async (DatabaseService db) =>
 // Fetch candidates for the current election
 app.MapGet("/api/candidates", async (DatabaseService db) =>
 {
-    var HARDCODED_ELECTION_ID = Guid.Parse("e5f6a7b8-c9d1-4e5f-3a4b-5c6d7e8f9a1b");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] GET /api/candidates - Fetching candidates for election ID: {currentElectionId}");
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] GET /api/candidates - Fetching candidates for election ID: {HARDCODED_ELECTION_ID}");
-    
-    var candidates = await db.GetCandidatesByElectionIdAsync(HARDCODED_ELECTION_ID);
+    var candidates = await db.GetCandidatesByElectionIdAsync(currentElectionId);
     
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Returning {candidates.Count} candidates");
     return Results.Ok(candidates);
@@ -2665,8 +2833,10 @@ record VoterLinkResponse(
 // Vote casting models
 record CastVoteRequest(
     int VoterId,
+    Guid? VoterDatabaseId,
     string County,
-    string PollingStationCode,
+    Guid PollingStationId,
+    Guid CandidateId,
     string CandidateName,
     string PartyName,
     string Constituency

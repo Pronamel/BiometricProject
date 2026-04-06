@@ -18,7 +18,7 @@ public interface IServerHandler
     Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
     Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency);
     Task<List<Candidate>> FetchCandidatesAsync();
-    Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName);
+    Task<CastVoteResponse> CastVoteAsync(Guid candidateId, string candidateName, string partyName);
     Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint);
     void Logout();
     

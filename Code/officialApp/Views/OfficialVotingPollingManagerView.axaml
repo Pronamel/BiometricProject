@@ -57,17 +57,13 @@
             <!-- Left Section -->
             <StackPanel Grid.Column="0" Margin="0,0,10,0">
                 
-                <!-- System Health -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                    <TextBlock Text="System Health" VerticalAlignment="Center" FontSize="16" FontWeight="Bold" Margin="0,0,10,0"/>
-                    <Ellipse Width="20" Height="20" Fill="{Binding SystemHealthColor}" Stroke="Black" StrokeThickness="1"/>
-                </StackPanel>
+                <TextBlock Text="Connected Voter Devices" FontSize="14" FontWeight="Bold" Margin="0,20,0,10"/>
                 
                 <!-- Half Vertical Space Box - Connected Devices -->
                 <Border Background="LightGray" 
                         BorderBrush="Black" 
                         BorderThickness="1" 
-                        Height="200" 
+                        Height="400" 
                         Margin="0,0,0,20"
                         Padding="10">
                     <ScrollViewer>
@@ -134,43 +130,9 @@
                 </Border>
                 
                 <!-- Connected Voter Devices Section -->
-                <TextBlock Text="Connected Voter Devices" FontSize="14" FontWeight="Bold" Margin="0,20,0,10"/>
                 
-                <!-- Command Input Area -->
-                <Border Background="White" 
-                        BorderBrush="Black" 
-                        BorderThickness="1" 
-                        Padding="10"
-                        Height="80">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        
-                        <TextBlock Grid.Row="0" Text="Command Input (e.g., refresh-status)" FontSize="12" Margin="0,0,0,5"/>
-                        
-                        <Grid Grid.Row="1">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <TextBox Grid.Column="0" 
-                                     Padding="8" 
-                                     VerticalAlignment="Top"
-                                     Foreground="Black"/>
-                            
-                            <Button Grid.Column="1" 
-                                    Content="Execute" 
-                                    Padding="15,5" 
-                                    Margin="10,0,0,0"
-                                    Background="#CCCCCC"
-                                    Foreground="Black"
-                                    VerticalAlignment="Top"/>
-                        </Grid>
-                    </Grid>
-                </Border>
+                
+                
                 
             </StackPanel>
             
@@ -202,28 +164,28 @@
                     </Grid.ColumnDefinitions>
                     
                     <!-- Row 1 -->
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Total Votes:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Votes (VoteRecords):" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TotalVotes}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
                     <Rectangle Grid.Row="1" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
                     
                     <!-- Row 2 -->
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Valid Votes:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ValidVotes}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Expected Voters:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ExpectedVoters}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
                     <Rectangle Grid.Row="3" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
                     
                     <!-- Row 3 -->
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Invalid Votes:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding InvalidVotes}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Turnout %:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding TurnoutRate}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
                     <Rectangle Grid.Row="5" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
                     
                     <!-- Row 4 -->
-                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Registered Voters:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding RegisteredVoters}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Devices Locked:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding DevicesLocked}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
                     <Rectangle Grid.Row="7" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
                     
                     <!-- Row 5 -->
-                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Turnout Rate:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding TurnoutRate}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Registered Voters:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
+                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding RegisteredVoters}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
                     <Rectangle Grid.Row="9" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
                     
                     <!-- Row 6 -->

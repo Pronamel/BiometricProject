@@ -3,7 +3,7 @@
             xmlns:vm="using:SecureVoteApp.ViewModels"
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+            mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="380"
             x:Class="SecureVoteApp.Views.VoterUI.AuthenticateUserView"
             x:DataType="vm:AuthenticateUserViewModel">
 
@@ -16,81 +16,67 @@
 
 
     <Grid Background="#f6f2e6">
-        <Border HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Padding="20"
-                MaxWidth="980">
-            <StackPanel Spacing="14" VerticalAlignment="Center">
-                <StackPanel Spacing="12" VerticalAlignment="Center">
-                    <TextBlock Text="Voter Information"
-                               FontSize="20"
-                               FontWeight="Bold"
-                               Foreground="#333"/>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
+            <!-- Start Scanning Button -->
+            <Button Content="Start Scanning"
+                    Background="Purple"
+                    Foreground="White"
+                    Width="150"
+                    Height="40"
+                    FontSize="14"
+                    FontWeight="Bold"
+                    HorizontalAlignment="Center"
+                    Command="{Binding StartScanningCommand}"
+                    IsEnabled="{Binding !IsCapturing}"/>
 
-                    <TextBlock Text="Voter Name"
-                               FontSize="14"
-                               Foreground="#333"/>
-                    <TextBlock Text="{Binding VoterFullName}"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#333"/>
+            <!-- Live Preview Image -->
+            <Panel Background="Black" 
+                   Width="250"
+                   Height="250"
+                   HorizontalAlignment="Center">
+                <Image Source="{Binding PreviewImage}"
+                    Width="250"
+                    Height="250"
+                    Stretch="Uniform"
+                    HorizontalAlignment="Center"/>
+            </Panel>
 
-                    <TextBlock Text="Scan Instruction"
-                               FontSize="14"
-                               Foreground="#333"
-                               Margin="0,10,0,0"/>
+            <!-- Image and Scan Instructions Side by Side -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="30" Margin="-20,0,0,0">
+                <Image Source="{Binding ImageSource}"
+                    Width="180"
+                    Height="180"
+                    Stretch="Uniform"/>
+                
+                <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="Place finger on the scanner"
-                               FontSize="20"
-                               Foreground="Black"/>
-                    <TextBlock Text="Press lightly and hold for 3 seconds"
-                               FontSize="14"
-                               Foreground="Black"/>
+                            FontSize="18"
+                            Foreground="Black"
+                            FontWeight="Bold"/>
+                    
+                    <TextBlock Text="Press lightly and hold for 3 seconds" 
+                            FontSize="14"
+                            Foreground="#333"
+                            Margin="0,5,0,15"/>
 
-                    <TextBlock Text="{Binding StatusMessage}"
-                               FontSize="16"
-                               Foreground="Green"
-                               TextWrapping="Wrap"
-                               Margin="0,10,0,0"/>
-
+                    <TextBlock Text="{Binding StatusMessage}" 
+                            FontSize="14"
+                            Foreground="DarkGreen"
+                            FontWeight="SemiBold"
+                            TextWrapping="Wrap"
+                            Margin="0,0,0,5"/>
+                    
                     <TextBlock Text="{Binding VoterStatusMessage}"
-                               FontSize="14"
-                               FontWeight="Bold"
-                               Foreground="Green"
-                               TextWrapping="Wrap"
-                               Margin="0,10,0,0"/>
+                            FontSize="14"
+                            FontWeight="Bold"
+                            Foreground="DarkGreen"
+                            TextWrapping="Wrap"/>
                 </StackPanel>
+            </StackPanel>
 
-                      <Button Content="Start Scanning"
-                           Background="Purple"
-                           Foreground="White"
-                           Width="150"
-                           Height="40"
-                           FontSize="14"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Center"
-                           Command="{Binding StartScanningCommand}"
-                           IsEnabled="{Binding !IsCapturing}"/>
+        </StackPanel>
 
-                      <Panel Background="Black"
-                          Width="250"
-                          Height="250"
-                          HorizontalAlignment="Center">
-                          <Image Source="{Binding PreviewImage}"
-                              Width="250"
-                              Height="250"
-                              Stretch="Uniform"
-                              HorizontalAlignment="Center"/>
-                      </Panel>
-
-                      <Image Source="{Binding ImageSource}"
-                          Width="180"
-                          Height="180"
-                          Stretch="Uniform"
-                          HorizontalAlignment="Center"/>
-                     </StackPanel>
-        </Border>
-
-        <!-- Sign Out Button at Bottom Left -->
+        <!-- Back Button at Bottom Left -->
         <Button Content="Back" 
                 Background="Crimson" 
                 Foreground="White"

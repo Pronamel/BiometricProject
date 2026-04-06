@@ -98,8 +98,8 @@ public class ServerHandler : IServerHandler
     public Task<List<Candidate>> FetchCandidatesAsync()
         => _apiService.FetchCandidatesAsync();
 
-    public Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName)
-        => _apiService.CastVoteAsync(candidateName, partyName);
+    public Task<CastVoteResponse> CastVoteAsync(Guid candidateId, string candidateName, string partyName)
+        => _apiService.CastVoteAsync(candidateId, candidateName, partyName);
 
     public Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint)
         => _apiService.VerifyFingerprintAsync(voterId, scannedFingerprint);

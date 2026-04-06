@@ -206,12 +206,18 @@ public class CastVoteRequest
 {
     [JsonPropertyName("voterId")]
     public int VoterId { get; set; }
+
+    [JsonPropertyName("voterDatabaseId")]
+    public Guid? VoterDatabaseId { get; set; }
     
     [JsonPropertyName("county")]
     public string County { get; set; } = string.Empty;
     
-    [JsonPropertyName("pollingStationCode")]
-    public string PollingStationCode { get; set; } = string.Empty;
+    [JsonPropertyName("pollingStationId")]
+    public Guid PollingStationId { get; set; }
+
+    [JsonPropertyName("candidateId")]
+    public Guid CandidateId { get; set; }
     
     [JsonPropertyName("candidateName")]
     public string CandidateName { get; set; } = string.Empty;

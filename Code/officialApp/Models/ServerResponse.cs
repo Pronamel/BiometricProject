@@ -86,3 +86,21 @@ public class SendDeviceCommandRequest
     [JsonPropertyName("commandType")]
     public string CommandType { get; set; } = string.Empty;
 }
+
+public class PollingStationVoteCountResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+
+    [JsonPropertyName("message")]
+    public string? Message { get; set; }
+
+    [JsonPropertyName("pollingStationId")]
+    public Guid PollingStationId { get; set; }
+
+    [JsonPropertyName("totalVotes")]
+    public int TotalVotes { get; set; }
+
+    [JsonPropertyName("expectedVotes")]
+    public int ExpectedVotes { get; set; }
+}

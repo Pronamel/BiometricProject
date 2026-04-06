@@ -53,7 +53,13 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     private string invalidVotes = "0";
 
     [ObservableProperty]
+    private string devicesLocked = "0";
+
+    [ObservableProperty]
     private string registeredVoters = "0";
+
+    [ObservableProperty]
+    private string expectedVoters = "0";
 
     [ObservableProperty]
     private string turnoutRate = "0.0%";
@@ -76,6 +82,8 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     [ObservableProperty] 
     private bool isListeningForVotes = false;
 
+    private int _devicesLockedCount;
+
     [ObservableProperty]
     private ObservableCollection<ConnectedVoterDevice> connectedDevices = new();
 
@@ -97,6 +105,7 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
 
     public async Task ActivateAsync()
     {
+        await RefreshPollingStationVoteCountAsync();
         await StartVoteListening();
     }
 
@@ -191,21 +200,10 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     }
     
     // Method to be called when a vote is received
-    public void OnVoteReceived(string candidateName, string partyName, int voterId)
+    public async Task OnVoteReceivedAsync(string candidateName, string partyName, int voterId)
     {
-        TotalVotesCast++;
-        
-        // Update the UI-bound properties
-        TotalVotes = TotalVotesCast.ToString();
-        ValidVotes = TotalVotesCast.ToString(); // Assuming all votes are valid for now
-        
-        LastVoteInfo = $"Vote #{TotalVotesCast}: {candidateName} - {partyName} (Voter ID: {voterId})";
-        
-        // Update status messages to show total votes
-        StatusMessages = $"System initialized successfully.\nPolling stations online: 45/45\nLast update: {DateTime.Now:HH:mm:ss}\n\nTotal Votes: {TotalVotesCast}";
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote received: {LastVoteInfo}");
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Total votes now: {TotalVotesCast}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Realtime vote received from voter {voterId}: {candidateName} - {partyName}");
+        await RefreshPollingStationVoteCountAsync();
     }
 
     // Method to handle device status updates from voters
@@ -316,6 +314,8 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         {
             device.IsLockedByOfficial = true;
             device.Status = "Locked by official";
+            _devicesLockedCount++;
+            DevicesLocked = _devicesLockedCount.ToString();
             return;
         }
 
@@ -403,6 +403,32 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         // Connected devices will be populated when voters connect via API
     }
 
+    private async Task RefreshPollingStationVoteCountAsync()
+    {
+        var stats = await _serverHandler.GetPollingStationVoteCountAsync();
+        if (stats == null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Could not refresh polling station vote count");
+            return;
+        }
+
+        TotalVotes = stats.TotalVotes.ToString();
+        ExpectedVoters = stats.ExpectedVotes.ToString();
+
+        if (stats.ExpectedVotes > 0)
+        {
+            var turnout = (double)stats.TotalVotes / stats.ExpectedVotes * 100;
+            TurnoutRate = $"{turnout:F1}%";
+        }
+        else
+        {
+            TurnoutRate = "0.0%";
+        }
+
+        StatusMessages = $"System initialized successfully.\nPolling stations online: 45/45\nLast update: {DateTime.Now:HH:mm:ss}\n\nPolling Station Votes (VoteRecords): {TotalVotes}";
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Polling station stats refreshed from VoteRecords: total={TotalVotes}, expected={ExpectedVoters}, turnout={TurnoutRate}");
+    }
+
     // Add methods here for updating statistics in real-time
     public void UpdateSystemHealth(bool isHealthy)
     {
@@ -450,7 +476,7 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
             Dispatcher.UIThread.Post(() =>
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Realtime vote from Voter {vote.VoterId}: {vote.CandidateName} - {vote.PartyName}");
-                OnVoteReceived(vote.CandidateName, vote.PartyName, vote.VoterId);
+                _ = OnVoteReceivedAsync(vote.CandidateName, vote.PartyName, vote.VoterId);
             });
         };
 

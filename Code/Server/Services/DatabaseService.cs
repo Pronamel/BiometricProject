@@ -24,6 +24,21 @@ public class DatabaseService
         return await _dbContext.Voters.ToListAsync();
     }
 
+    public async Task<int> GetVoteRecordsCountByPollingStationAsync(Guid pollingStationId)
+    {
+        return await _dbContext.VoteRecords
+            .Where(vr => vr.PollingStationId == pollingStationId)
+            .CountAsync();
+    }
+
+    public async Task<int> GetExpectedVotesByPollingStationAsync(Guid pollingStationId)
+    {
+        return await _dbContext.PollingStations
+            .Where(ps => ps.PollingStationId == pollingStationId)
+            .Select(ps => ps.ExpectedVotes)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<List<PollingStationDto>> GetAllPollingStationsAsync()
     {
         try

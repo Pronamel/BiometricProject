@@ -612,6 +612,42 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task<PollingStationVoteCountResponse?> GetPollingStationVoteCountAsync()
+    {
+        try
+        {
+            if (!IsAuthenticated)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Not authenticated for polling station vote count");
+                return null;
+            }
+
+            var response = await SendAuthenticatedGetAsync("/api/official/polling-station-vote-count");
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to fetch polling station vote count: {response.StatusCode} {errorBody}");
+                return null;
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var payload = JsonSerializer.Deserialize<PollingStationVoteCountResponse>(body, _jsonOptions);
+
+            if (payload?.Success != true)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Polling station vote count response was not successful");
+                return null;
+            }
+
+            return payload;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching polling station vote count: {ex.Message}");
+            return null;
+        }
+    }
+
     //--------------------------------------------
     // Fingerprint Verification Methods
     //--------------------------------------------

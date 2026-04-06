@@ -43,7 +43,7 @@ public partial class BallotPaperViewModel : ViewModelBase
     // ==========================================
 
     // Track which candidate is selected (null = none selected)
-    public static int? SelectedCandidateId { get; set; } = null;
+    public static Guid? SelectedCandidateId { get; set; } = null;
     
     // Track the voting result - candidate and party information
     
@@ -79,7 +79,7 @@ public partial class BallotPaperViewModel : ViewModelBase
     // ==========================================
     
     // Method to set selection and notify all buttons
-    public static void SetSelectedCandidate(int candidateId, string candidateName, string partyName)
+    public static void SetSelectedCandidate(Guid candidateId, string candidateName, string partyName)
     {
         SelectedCandidateId = candidateId;
         SelectedCandidateName = candidateName;
@@ -145,7 +145,7 @@ public partial class BallotPaperViewModel : ViewModelBase
     private static CandidateButtonViewModel CreateCandidateButtonViewModel(Candidate candidate)
     {
         return new CandidateButtonViewModel(
-            candidate.CandidateId.GetHashCode(),
+            candidate.CandidateId,
             $"{candidate.FirstName} {candidate.LastName}",
             candidate.Party ?? "Independent",
             candidate.Bio ?? string.Empty);
@@ -154,6 +154,14 @@ public partial class BallotPaperViewModel : ViewModelBase
     // Load candidates from the API
     public async Task LoadCandidatesAsync()
     {
+        // Always clear all candidate collections at the very start to prevent duplication
+        // across multiple voters using the reused singleton ViewModel
+        // This must happen BEFORE any guards, so even if a second voter authenticates
+        // while the first is still loading, the old candidates are cleared
+        Candidates.Clear();
+        LeftCandidates.Clear();
+        RightCandidates.Clear();
+        
         if (IsLoadingCandidates) return;
         
         if (!_serverHandler.IsAuthenticated)
@@ -176,8 +184,7 @@ public partial class BallotPaperViewModel : ViewModelBase
                 return;
             }
             
-            // Clear and populate the candidates collection
-            Candidates.Clear();
+            // Populate the candidates collection
             foreach (var candidate in candidateList)
             {
                 Candidates.Add(candidate);
@@ -226,7 +233,7 @@ public partial class BallotPaperViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Attempting to cast vote for: {SelectedCandidateName} - {SelectedParty}");
             
             // Cast the vote through the API
-            var response = await _serverHandler.CastVoteAsync(SelectedCandidateName!, SelectedParty!);
+            var response = await _serverHandler.CastVoteAsync(SelectedCandidateId!.Value, SelectedCandidateName!, SelectedParty!);
             
             if (response.Success)
             {
@@ -238,9 +245,9 @@ public partial class BallotPaperViewModel : ViewModelBase
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status updated: {_serverHandler.CurrentDeviceStatus}");
                 await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
                 
-                // Keep showing success message instead of navigating
-                await Task.Delay(3000); // Show success message for longer
-                VoteStatus = "Vote completed - thank you for voting!";
+                await Task.Delay(1000);
+                ClearSelection();
+                await _navigationService.NavigateToPersonalOrProxy();
             }
             else
             {

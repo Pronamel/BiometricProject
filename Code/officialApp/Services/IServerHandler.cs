@@ -39,6 +39,7 @@ public interface IServerHandler
     Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint);
     Task<bool> SetAccessCodeAsync(string accessCode);
     Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request);
+    Task<PollingStationVoteCountResponse?> GetPollingStationVoteCountAsync();
     
     Task<bool> GenerateAccessCodeForVoterAsync(string voterId);
     

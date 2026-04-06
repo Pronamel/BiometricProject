@@ -90,6 +90,16 @@ public partial class VoterLoginViewModel : ViewModelBase
         StatusMessage = ""; // Clear any previous messages
     }
 
+    private void ClearLoginSessionFields()
+    {
+        PollingStationCode = string.Empty;
+        SelectedConstituency = string.Empty;
+        AssignedVoterId = 0;
+        ConnectedOfficialId = string.Empty;
+        ConnectedStationId = string.Empty;
+        StatusMessage = string.Empty;
+    }
+
     // ==========================================
     // COMMANDS
     // ==========================================
@@ -179,6 +189,8 @@ public partial class VoterLoginViewModel : ViewModelBase
                 await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
 
                 await StartOfficialCommandListenerAsync();
+
+                ClearLoginSessionFields();
                 
                 // Navigate to the personal or proxy selection
                 await _navigationService.NavigateToPersonalOrProxy();

@@ -25,7 +25,9 @@ public class ApiService : IApiService
     private string? _jwtToken;
     private DateTime _tokenExpiry;
     private string? _currentVoterId;
+    private Guid? _authenticatedVoterDatabaseId;
     private string? _assignedStationId;
+    private Guid? _assignedStationGuid;
     
     // Voter linking fields
     private int _assignedVoterId = 0;
@@ -50,6 +52,7 @@ public class ApiService : IApiService
         !string.IsNullOrEmpty(_jwtToken) && DateTime.UtcNow < _tokenExpiry;
     
     public string? CurrentVoterId => _currentVoterId;
+    public Guid? AuthenticatedVoterDatabaseId => _authenticatedVoterDatabaseId;
     public string? AssignedStationId => _assignedStationId;
     public int AssignedVoterId => _assignedVoterId;
     public string SelectedCounty => _selectedCounty;
@@ -312,6 +315,10 @@ public class ApiService : IApiService
                     _selectedCounty = county;
                     _pollingStationCode = pollingStationCode;
                     _selectedConstituency = constituency;
+                    _assignedStationId = linkResponse.ConnectedStationId;
+                    _assignedStationGuid = Guid.TryParse(linkResponse.ConnectedStationId, out var parsedStationId)
+                        ? parsedStationId
+                        : null;
                     
                     // Retrieve and store device ID (Machine GUID hashed to 32 characters)
                     _deviceId = GetHashedDeviceId();
@@ -435,6 +442,7 @@ public class ApiService : IApiService
                     {
                         if (lookupResponse.VoterId.HasValue)
                         {
+                            _authenticatedVoterDatabaseId = lookupResponse.VoterId.Value;
                             _currentVoterId = lookupResponse.VoterId.Value.ToString();
                         }
 
@@ -500,7 +508,7 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<CastVoteResponse> CastVoteAsync(string candidateName, string partyName)
+    public async Task<CastVoteResponse> CastVoteAsync(Guid candidateId, string candidateName, string partyName)
     {
         try
         {
@@ -514,11 +522,23 @@ public class ApiService : IApiService
                 };
             }
 
+            if (!_assignedStationGuid.HasValue || _assignedStationGuid.Value == Guid.Empty)
+            {
+                return new CastVoteResponse
+                {
+                    Success = false,
+                    Message = "No linked polling station ID found. Please relink to an official before voting.",
+                    Timestamp = DateTime.UtcNow
+                };
+            }
+
             var castVoteRequest = new CastVoteRequest
             {
                 VoterId = _assignedVoterId,
+                VoterDatabaseId = _authenticatedVoterDatabaseId,
                 County = _selectedCounty,
-                PollingStationCode = _pollingStationCode,
+                PollingStationId = _assignedStationGuid.Value,
+                CandidateId = candidateId,
                 CandidateName = candidateName,
                 PartyName = partyName,
                 Constituency = _selectedConstituency
@@ -529,8 +549,10 @@ public class ApiService : IApiService
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Casting vote:");
             Console.WriteLine($"  Voter ID: {_assignedVoterId}");
+            Console.WriteLine($"  Voter Database ID: {_authenticatedVoterDatabaseId}");
             Console.WriteLine($"  County: {_selectedCounty}");
-            Console.WriteLine($"  Polling Station: {_pollingStationCode}");
+            Console.WriteLine($"  Polling Station ID: {_assignedStationGuid}");
+            Console.WriteLine($"  Candidate ID: {candidateId}");
             Console.WriteLine($"  Candidate: {candidateName} - {partyName}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Using JWT Token: {(!string.IsNullOrEmpty(_jwtToken) ? "Yes" : "No")}");
 
@@ -771,7 +793,9 @@ public class ApiService : IApiService
             _jwtToken = null;
             _tokenExpiry = DateTime.MinValue;
             _currentVoterId = null;
+            _authenticatedVoterDatabaseId = null;
             _assignedStationId = null;
+            _assignedStationGuid = null;
             _assignedVoterId = 0;
             _selectedCounty = string.Empty;
             _pollingStationCode = string.Empty;

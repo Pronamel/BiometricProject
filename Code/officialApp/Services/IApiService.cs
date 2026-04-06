@@ -58,4 +58,5 @@ public interface IApiService
     
     // Polling Stations
     Task<List<PollingStationOption>?> GetAllPollingStationsAsync();
+    Task<PollingStationVoteCountResponse?> GetPollingStationVoteCountAsync();
 }
