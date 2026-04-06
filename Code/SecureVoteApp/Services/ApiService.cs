@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -122,30 +123,99 @@ public class ApiService : IApiService
     }
 
     /// <summary>
-    /// Hashes the Machine GUID to a 32-character hex string using SHA256.
+    /// Retrieves the macOS Hardware UUID (IOPlatformUUID) using system_profiler.
+    /// This is a unique identifier for the Mac's hardware and is safe to transmit.
+    /// The UUID is specifically designed by Apple to be read by applications.
+    /// </summary>
+    [SupportedOSPlatform("macos")]
+    private string GetMacDeviceUuid()
+    {
+        try
+        {
+            var processInfo = new ProcessStartInfo
+            {
+                FileName = "/usr/bin/system_profiler",
+                Arguments = "SPHardwareDataType",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using (var process = Process.Start(processInfo))
+            {
+                if (process == null)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Failed to start system_profiler process");
+                    return "Unknown";
+                }
+
+                var output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit(5000); // 5 second timeout
+
+                // Parse the UUID from output: "Hardware UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                var lines = output.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    if (line.Contains("Hardware UUID", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = line.Split(':');
+                        if (parts.Length == 2)
+                        {
+                            var uuid = parts[1].Trim();
+                            if (!string.IsNullOrEmpty(uuid))
+                            {
+                                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Mac Hardware UUID retrieved: {uuid}");
+                                return uuid;
+                            }
+                        }
+                    }
+                }
+
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Hardware UUID not found in system_profiler output");
+                return "Unknown";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Error retrieving Mac Hardware UUID: {ex.Message}");
+            return "Unknown";
+        }
+    }
+
+    /// <summary>
+    /// Hashes the device identifier (Machine GUID on Windows, Hardware UUID on macOS) 
+    /// to a 32-character hex string using SHA256.
     /// This provides a clean, consistent device identifier for transmission.
     /// </summary>
     private string GetHashedDeviceId()
     {
         try
         {
-            if (!OperatingSystem.IsWindows())
+            string deviceId;
+
+            if (OperatingSystem.IsWindows())
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Machine GUID lookup is only supported on Windows");
+                deviceId = GetMachineGuid();
+            }
+            else if (OperatingSystem.IsMacOS())
+            {
+                deviceId = GetMacDeviceUuid();
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Device ID lookup is not supported on this platform");
                 return "Unknown";
             }
-
-            string machineGuid = GetMachineGuid();
             
-            if (machineGuid == "Unknown")
+            if (deviceId == "Unknown")
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Machine GUID is unknown, cannot hash");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Device identifier is unknown, cannot hash");
                 return "Unknown";
             }
 
             using (var sha = SHA256.Create())
             {
-                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(machineGuid));
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(deviceId));
                 string hashedDeviceId = Convert.ToHexString(hash).Substring(0, 32);
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Device ID hashed: {hashedDeviceId}");
                 return hashedDeviceId;
