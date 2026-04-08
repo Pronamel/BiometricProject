@@ -92,7 +92,7 @@ public class ServerHandler : IServerHandler
     public Task<List<PollingStationOption>?> GetAllPollingStationsAsync()
         => _apiService.GetAllPollingStationsAsync();
 
-    public Task<bool> CreateVoterWithFingerprintAsync(
+    public Task<(bool Success, string Message)> CreateVoterWithFingerprintAsync(
         string nin,
         string firstName,
         string lastName,
@@ -115,7 +115,7 @@ public class ServerHandler : IServerHandler
             constituency,
             fingerprintData);
 
-    public Task<bool> CreateOfficialWithFingerprintAsync(
+    public Task<(bool Success, string Message)> CreateOfficialWithFingerprintAsync(
         string username,
         string password,
         string pollingStationId,

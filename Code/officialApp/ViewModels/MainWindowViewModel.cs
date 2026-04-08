@@ -2,6 +2,8 @@ using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 using officialApp.Views;
 using Avalonia.Controls;
+using Avalonia.Threading;
+using officialApp.Services;
 
 namespace officialApp.ViewModels;
 
@@ -28,6 +30,7 @@ public partial class MainWindowViewModel : ViewModelBase
     
     // Navigation service
     private readonly INavigationService _navigationService;
+    private readonly IRealtimeService _realtimeService;
 
     // ==========================================
     // CONSTRUCTOR
@@ -40,10 +43,12 @@ public partial class MainWindowViewModel : ViewModelBase
         OfficialGenerateAccessCodeViewModel officialGenerateAccessCodeViewModel,
         OfficialVotingPollingManagerViewModel officialVotingPollingManagerViewModel,
         OfficialAddVoterViewModel officialAddVoterViewModel,
-        INavigationService navigationService)
+        INavigationService navigationService,
+        IRealtimeService realtimeService)
     {
         // Get navigation service instance
         _navigationService = navigationService;
+        _realtimeService = realtimeService;
         
         // Subscribe to navigation events
         _navigationService.NavigationRequested += OnNavigationRequested;
@@ -68,6 +73,8 @@ public partial class MainWindowViewModel : ViewModelBase
         
         // Set initial view to Official Authenticate
         CurrentView = _officialLoginView;
+
+        _realtimeService.ConnectionStateChanged += OnRealtimeConnectionStateChanged;
     }
 
     // ==========================================
@@ -77,5 +84,24 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OnNavigationRequested(UserControl view)
     {
         CurrentView = view;
+    }
+
+    private void OnRealtimeConnectionStateChanged(string state)
+    {
+        if (!state.StartsWith("Disconnected", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (CurrentView == _officialLoginView)
+            {
+                return;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Realtime disconnected. Returning to official login.");
+            _navigationService.NavigateToOfficialLogin();
+        });
     }
 }

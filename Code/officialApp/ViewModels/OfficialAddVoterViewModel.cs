@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -32,7 +33,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     private string lastName = string.Empty;
 
     [ObservableProperty]
-    private string dateOfBirth = string.Empty;
+    private DateTimeOffset? selectedDateOfBirth;
 
     [ObservableProperty]
     private string addressLine1 = string.Empty;
@@ -196,12 +197,13 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         }
 
         byte[] pngFingerprintData = ConvertGrayscaleToPngBytes(_capturedFingerprintData, _capturedFingerprintWidth, _capturedFingerprintHeight);
+        string? formattedDateOfBirth = SelectedDateOfBirth?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         if (IsCreateVoterMode)
         {
             if (string.IsNullOrWhiteSpace(FirstName) ||
                 string.IsNullOrWhiteSpace(LastName) ||
-                string.IsNullOrWhiteSpace(DateOfBirth) ||
+                string.IsNullOrWhiteSpace(formattedDateOfBirth) ||
                 string.IsNullOrWhiteSpace(AddressLine1) ||
                 string.IsNullOrWhiteSpace(PostCode) ||
                 string.IsNullOrWhiteSpace(SelectedCounty) ||
@@ -238,19 +240,21 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fingerprint data size (raw): {_capturedFingerprintData.Length} bytes");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fingerprint data size (PNG encoded): {pngFingerprintData.Length} bytes");
 
-            bool submitSuccess = IsCreateVoterMode
+            (bool voterSuccess, string voterMessage) = IsCreateVoterMode
                 ? await _serverHandler.CreateVoterWithFingerprintAsync(
                     NationalInsuranceNumber,
                     FirstName,
                     LastName,
-                    DateOfBirth,
+                    formattedDateOfBirth!,
                     AddressLine1,
                     AddressLine2,
                     PostCode,
                     SelectedCounty,
                     SelectedConstituency,
                     pngFingerprintData)
-                : await CreateOfficialWithPollingStation(pngFingerprintData);
+                : (false, string.Empty);
+
+            bool submitSuccess = IsCreateVoterMode ? voterSuccess : await CreateOfficialWithPollingStation(pngFingerprintData);
 
             if (submitSuccess)
             {
@@ -264,10 +268,13 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             }
             else
             {
-                StatusMessage = IsCreateVoterMode
-                    ? "Create voter failed. Check server endpoint and input values."
-                    : "Create official failed. Check server endpoint and input values.";
-                StatusColor = "#e74c3c";
+                // For CreateVoter, display the error message from the server
+                if (IsCreateVoterMode)
+                {
+                    StatusMessage = voterMessage;
+                    StatusColor = "#e74c3c";
+                }
+                // For CreateOfficial, the StatusMessage is already set by CreateOfficialWithPollingStation
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Submit failed");
             }
         }
@@ -316,14 +323,20 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             }
 
             // Call the API with extracted polling station data
-            bool result = await _serverHandler.CreateOfficialWithFingerprintAsync(
+            var (success, message) = await _serverHandler.CreateOfficialWithFingerprintAsync(
                 OfficialUsername,
                 Password,
                 selectedStation.PollingStationId.ToString(),
                 selectedStation.County,
                 fingerprintData);
 
-            return result;
+            if (!success)
+            {
+                StatusMessage = message;
+                StatusColor = "#e74c3c";
+            }
+
+            return success;
         }
         catch (Exception ex)
         {
@@ -345,7 +358,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         NationalInsuranceNumber = string.Empty;
         FirstName = string.Empty;
         LastName = string.Empty;
-        DateOfBirth = string.Empty;
+        SelectedDateOfBirth = null;
         AddressLine1 = string.Empty;
         AddressLine2 = string.Empty;
         PostCode = string.Empty;

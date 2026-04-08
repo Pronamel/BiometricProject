@@ -273,6 +273,15 @@ public class DatabaseService
                 return (false, "Constituency name not found", null);
             }
 
+            // Check if a voter with this SDI already exists
+            var existingVoter = await _dbContext.Voters
+                .FirstOrDefaultAsync(v => v.Sdi == sdi);
+
+            if (existingVoter != null)
+            {
+                return (false, "A voter with this identity information has already been registered", null);
+            }
+
             byte[] wrappedDek;
             byte[] encryptedNationalIdBytes;
             byte[] encryptedFirstNameBytes;
@@ -365,6 +374,15 @@ public class DatabaseService
             if (pollingStation == null)
             {
                 return (false, "Polling station not found", null);
+            }
+
+            // Check if username already exists
+            var existingOfficial = await _dbContext.Officials
+                .FirstOrDefaultAsync(o => o.Username == username.Trim());
+
+            if (existingOfficial != null)
+            {
+                return (false, "An official with this username has already been created", null);
             }
 
             byte[] wrappedDek;

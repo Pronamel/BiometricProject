@@ -38,7 +38,7 @@ public interface IApiService
     
     // Fingerprint Management
     Task<bool> UploadOfficialFingerprintAsync(string username, string password, byte[] fingerprintData);
-    Task<bool> CreateVoterWithFingerprintAsync(
+    Task<(bool Success, string Message)> CreateVoterWithFingerprintAsync(
         string nationalInsuranceNumber,
         string firstName,
         string lastName,
@@ -49,7 +49,7 @@ public interface IApiService
         string county,
         string constituency,
         byte[] fingerprintData);
-    Task<bool> CreateOfficialWithFingerprintAsync(
+    Task<(bool Success, string Message)> CreateOfficialWithFingerprintAsync(
         string username,
         string password,
         string assignedPollingStationId,

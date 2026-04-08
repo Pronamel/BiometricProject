@@ -111,7 +111,7 @@ public class ServerHandler : IServerHandler
     public void Logout()
     {
         StopContinuousListening();
-        _apiService.Logout();
+        _ = _apiService.LogoutAsync();
         StatusMessageReceived?.Invoke("Logged out successfully");
     }
     

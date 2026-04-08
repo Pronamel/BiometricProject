@@ -56,7 +56,7 @@
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Date of Birth (e.g., 1985-11-23)" 
+                    <TextBlock Text="Date of Birth" 
                                FontWeight="Medium" 
                                Foreground="#333" 
                                Margin="0,0,0,5"/>

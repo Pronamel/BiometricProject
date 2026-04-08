@@ -25,7 +25,7 @@ public class CountyService
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] County updated to: {value}");
         }
     }
-    
+
     /// <summary>
     /// Clears the selected county (for logout scenarios)
     /// </summary>

@@ -19,7 +19,7 @@ public interface IServerHandler
     Task<bool> UpdateDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo);
     Task<List<dynamic>?> GetAllVotersAsync();
     Task<List<PollingStationOption>?> GetAllPollingStationsAsync();
-    Task<bool> CreateVoterWithFingerprintAsync(
+    Task<(bool Success, string Message)> CreateVoterWithFingerprintAsync(
         string nin,
         string firstName,
         string lastName,
@@ -30,7 +30,7 @@ public interface IServerHandler
         string county,
         string constituency,
         byte[] fingerprintData);
-    Task<bool> CreateOfficialWithFingerprintAsync(
+    Task<(bool Success, string Message)> CreateOfficialWithFingerprintAsync(
         string username,
         string password,
         string pollingStationId,

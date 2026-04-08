@@ -25,4 +25,6 @@ public partial class ConnectedVoterDevice : ObservableObject
 
     [ObservableProperty]
     private bool isLockedByOfficial;
+
+    public string DisplayLabel => $"Device #{DeviceNumber}";
 }

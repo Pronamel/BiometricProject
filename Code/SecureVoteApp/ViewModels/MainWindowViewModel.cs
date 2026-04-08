@@ -2,6 +2,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using SecureVoteApp.Views.VoterUI;
 using Avalonia.Controls;
+using Avalonia.Threading;
+using SecureVoteApp.Services;
+using System.Threading.Tasks;
 
 namespace SecureVoteApp.ViewModels;
 
@@ -31,6 +34,7 @@ public partial class MainWindowViewModel : ViewModelBase
     
     // Navigation service
     private readonly INavigationService _navigationService;
+    private readonly IServerHandler _serverHandler;
 
 
 
@@ -46,9 +50,11 @@ public partial class MainWindowViewModel : ViewModelBase
         ProxyVoteDetailsViewModel proxyVoteDetailsViewModel,
         AuthenticateUserViewModel authenticateUserViewModel,
         BallotPaperViewModel ballotPaperViewModel,
-        INavigationService navigationService)
+        INavigationService navigationService,
+        IServerHandler serverHandler)
     {
         _navigationService = navigationService;
+        _serverHandler = serverHandler;
         
         // Subscribe to navigation events
         _navigationService.NavigationRequested += OnNavigationRequested;
@@ -76,6 +82,9 @@ public partial class MainWindowViewModel : ViewModelBase
         
         // Set initial view to Voter Login
         CurrentView = _voterLoginView;
+
+        // If the realtime channel dies (e.g., server crash), force UI back to login.
+        _serverHandler.ConnectionStatusChanged += OnServerConnectionStatusChanged;
     }
 
 
@@ -88,6 +97,28 @@ public partial class MainWindowViewModel : ViewModelBase
     private void OnNavigationRequested(UserControl view)
     {
         CurrentView = view;
+    }
+
+    private void OnServerConnectionStatusChanged(bool isConnected)
+    {
+        if (isConnected)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (CurrentView == _voterLoginView)
+            {
+                return;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Server disconnected. Returning to voter login.");
+            _navigationService.NavigateToVoterLogin();
+
+            // Run logout off the UI thread so a dead server cannot freeze the window.
+            _ = Task.Run(() => _serverHandler.Logout());
+        });
     }
 }
 

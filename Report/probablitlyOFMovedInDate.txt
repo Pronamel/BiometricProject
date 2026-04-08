@@ -1,0 +1,19 @@
+Let me run through this roughly with real UK numbers.
+The Probability Breakdown
+Field
+Approximate Odds of Two People Matching
+First name~1 in 50
+Last name~1 in 300
+Date of birth~1 in 25,000
+Postcode~1 in 50,000
+Date moved in~1 in 7,300
+Multiplied together that's roughly 1 in 137 quadrillion for any given pair of people.
+What That Means in Practice
+The UK has around 48 million registered voters, which produces roughly 1.1 quadrillion possible pairs of people.
+
+Without move-in date across all those pairs you'd statistically expect around 50-100 genuine collisions nationally
+With move-in date added that drops to statistically zero expected collisions across the entire UK voter population
+
+The Conclusion
+Adding date moved in essentially eliminates the collision problem entirely from a statistical standpoint. Your four original fields had a real, if small, vulnerability. The fifth field closes it.
+Your main remaining concern — as discussed — is just data entry consistency. If move-in date is recorded precisely (day/month/year rather than just a year), the system is statistically robust.

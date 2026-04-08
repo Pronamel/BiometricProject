@@ -83,10 +83,10 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             
-                                            <!-- Device Identifier (GUID) -->
+                                            <!-- Device Label -->
                                             <StackPanel Grid.Column="0" Spacing="3">
-                                                <TextBlock Text="Device ID" FontSize="11" FontWeight="Bold" Foreground="Gray"/>
-                                                <TextBlock Text="{Binding DeviceIdentifier}" FontSize="14" FontWeight="Bold" Foreground="Blue"/>
+                                                <TextBlock Text="Device #" FontSize="11" FontWeight="Bold" Foreground="Gray"/>
+                                                <TextBlock Text="{Binding DisplayLabel}" FontSize="14" FontWeight="Bold" Foreground="Blue"/>
                                                 <TextBlock Text="{Binding VoterId, StringFormat=Voter {0}}" FontSize="11" Foreground="Gray"/>
                                             </StackPanel>
                                             

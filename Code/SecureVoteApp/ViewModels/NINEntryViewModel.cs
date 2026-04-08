@@ -36,10 +36,13 @@ public partial class NINEntryViewModel : ViewModelBase
     private string lastName = string.Empty;
 
     [ObservableProperty]
-    private string dateOfBirth = string.Empty;
+    private DateTimeOffset? selectedDateOfBirth;
 
     [ObservableProperty]
     private string postCode = string.Empty;
+
+    [ObservableProperty]
+    private string townOfBirth = string.Empty;
 
     [ObservableProperty]
     private bool dateOfBirthVisible = true;
@@ -74,8 +77,9 @@ public partial class NINEntryViewModel : ViewModelBase
     {
         FirstName = string.Empty;
         LastName = string.Empty;
-        DateOfBirth = string.Empty;
+        SelectedDateOfBirth = null;
         PostCode = string.Empty;
+        TownOfBirth = string.Empty;
         DateOfBirthVisible = true;
         StatusMessage = string.Empty;
         ShowAlreadyVotedMessage = false;
@@ -122,13 +126,13 @@ public partial class NINEntryViewModel : ViewModelBase
             string? normalizedDob = null;
             if (DateOfBirthVisible)
             {
-                if (string.IsNullOrWhiteSpace(DateOfBirth) || !TryNormalizeDateOfBirth(DateOfBirth, out var parsedDob))
+                if (!SelectedDateOfBirth.HasValue)
                 {
-                    StatusMessage = "❌ Enter Date of Birth as yyyy-MM-dd (example: 1985-11-23).";
+                    StatusMessage = "❌ Select Date of Birth.";
                     return;
                 }
 
-                normalizedDob = parsedDob;
+                normalizedDob = SelectedDateOfBirth.Value.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             }
             
             var lookup = await _serverHandler.LookupVoterForAuthAsync(
@@ -155,7 +159,9 @@ public partial class NINEntryViewModel : ViewModelBase
                 StatusMessage = string.Empty;
                 ShowAlreadyVotedMessage = true;
                 AlreadyVotedMessage = lookup.Message;
+                _serverHandler.CurrentDeviceStatus = "Already voted - official assistance required";
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter already voted: {lookup.Message}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 Device status set for heartbeat delivery: {_serverHandler.CurrentDeviceStatus}");
             }
             else
             {
@@ -178,22 +184,4 @@ public partial class NINEntryViewModel : ViewModelBase
         }
     }
 
-    private static bool TryNormalizeDateOfBirth(string input, out string normalizedDate)
-    {
-        var supportedFormats = new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy" };
-
-        if (DateTime.TryParseExact(
-                input.Trim(),
-                supportedFormats,
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var parsedDate))
-        {
-            normalizedDate = parsedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            return true;
-        }
-
-        normalizedDate = string.Empty;
-        return false;
-    }
 }

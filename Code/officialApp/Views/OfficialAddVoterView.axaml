@@ -64,15 +64,17 @@
                             </StackPanel>
                         </Grid>
 
-                        <StackPanel Spacing="5">
-                            <TextBlock Text="Date of Birth (e.g., 15/05/1985)" Foreground="black" FontSize="14"/>
-                            <TextBox Text="{Binding DateOfBirth}" Height="40" FontSize="14" Padding="10"/>
-                        </StackPanel>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <StackPanel Grid.Column="0" Spacing="5">
+                                <TextBlock Text="National Insurance Number (optional, e.g., AB123456C)" Foreground="black" FontSize="14"/>
+                                <TextBox Text="{Binding NationalInsuranceNumber}" Height="40" FontSize="14" Padding="10"/>
+                            </StackPanel>
 
-                        <StackPanel Spacing="5">
-                            <TextBlock Text="National Insurance Number (optional, e.g., AB123456C)" Foreground="black" FontSize="14"/>
-                            <TextBox Text="{Binding NationalInsuranceNumber}" Height="40" FontSize="14" Padding="10"/>
-                        </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                                <TextBlock Text="Date of Birth" Foreground="black" FontSize="14"/>
+                                <DatePicker SelectedDate="{Binding SelectedDateOfBirth}" Height="40" FontSize="14"/>
+                            </StackPanel>
+                        </Grid>
 
                         <StackPanel Spacing="5">
                             <TextBlock Text="Address Line 1 (e.g., 123 High Street)" Foreground="black" FontSize="14"/>

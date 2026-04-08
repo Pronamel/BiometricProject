@@ -17,7 +17,7 @@
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="25" Width="400">
             
             <!-- Voter Login Title -->
-            <TextBlock Text="Voter Login" 
+            <TextBlock Text="Link Device" 
                        FontSize="32" 
                        FontWeight="Bold"
                        HorizontalAlignment="Center" 
@@ -129,9 +129,9 @@
                 </Button.Styles>
             </Button>
 
-            <!-- Continue Button -->
+                <!-- Link  Button -->
             <Button Command="{Binding ContinueCommand}"
-                    Content="Continue"
+                    Content="Link"
                     Background="#0bac02"
                     Foreground="White"
                     FontSize="16"
