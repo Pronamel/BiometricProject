@@ -117,9 +117,10 @@ public partial class NINEntryViewModel : ViewModelBase
 
             if (string.IsNullOrWhiteSpace(FirstName) ||
                 string.IsNullOrWhiteSpace(LastName) ||
-                string.IsNullOrWhiteSpace(PostCode))
+                string.IsNullOrWhiteSpace(PostCode) ||
+                string.IsNullOrWhiteSpace(TownOfBirth))
             {
-                StatusMessage = "❌ Enter First Name, Last Name, and Post Code.";
+                StatusMessage = "❌ Enter First Name, Last Name, Post Code, and Town Of Birth.";
                 return;
             }
 
@@ -139,7 +140,8 @@ public partial class NINEntryViewModel : ViewModelBase
                 firstName: string.IsNullOrWhiteSpace(FirstName) ? null : FirstName,
                 lastName: string.IsNullOrWhiteSpace(LastName) ? null : LastName,
                 dateOfBirth: normalizedDob,
-                            postCode: string.IsNullOrWhiteSpace(PostCode) ? null : PostCode,
+                postCode: string.IsNullOrWhiteSpace(PostCode) ? null : PostCode,
+                townOfBirth: string.IsNullOrWhiteSpace(TownOfBirth) ? null : TownOfBirth,
                 county: _countyService.SelectedCounty,
                 constituency: selectedConstituency);
 
@@ -151,6 +153,15 @@ public partial class NINEntryViewModel : ViewModelBase
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter lookup successful: {lookup.FullName}");
                 
                 // Navigate to authenticate user view, passing the lookup data
+                await _navigationService.NavigateToAuthenticateUser(lookup);
+            }
+            else if (lookup?.RequiresDisambiguation == true && lookup.CandidateVoterIds?.Count > 0)
+            {
+                StatusMessage = "✅ Multiple matches found. Continue with fingerprint scan.";
+                ShowAlreadyVotedMessage = false;
+                AlreadyVotedMessage = string.Empty;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter lookup collision: {lookup.CandidateVoterIds.Count} candidates");
+
                 await _navigationService.NavigateToAuthenticateUser(lookup);
             }
             else if (!string.IsNullOrWhiteSpace(lookup?.Message) &&

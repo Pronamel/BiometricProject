@@ -36,6 +36,9 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     private DateTimeOffset? selectedDateOfBirth;
 
     [ObservableProperty]
+    private string townOfBirth = string.Empty;
+
+    [ObservableProperty]
     private string addressLine1 = string.Empty;
 
     [ObservableProperty]
@@ -85,6 +88,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
     private readonly INavigationService _navigationService;
     private readonly IServerHandler _serverHandler;
+
     private readonly IScannerService _scannerService;
 
     public List<string> CountyOptions => UKCounties.Counties
@@ -204,6 +208,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             if (string.IsNullOrWhiteSpace(FirstName) ||
                 string.IsNullOrWhiteSpace(LastName) ||
                 string.IsNullOrWhiteSpace(formattedDateOfBirth) ||
+                string.IsNullOrWhiteSpace(TownOfBirth) ||
                 string.IsNullOrWhiteSpace(AddressLine1) ||
                 string.IsNullOrWhiteSpace(PostCode) ||
                 string.IsNullOrWhiteSpace(SelectedCounty) ||
@@ -246,6 +251,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                     FirstName,
                     LastName,
                     formattedDateOfBirth!,
+                    TownOfBirth,
                     AddressLine1,
                     AddressLine2,
                     PostCode,
@@ -359,6 +365,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         FirstName = string.Empty;
         LastName = string.Empty;
         SelectedDateOfBirth = null;
+        TownOfBirth = string.Empty;
         AddressLine1 = string.Empty;
         AddressLine2 = string.Empty;
         PostCode = string.Empty;

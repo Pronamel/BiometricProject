@@ -53,7 +53,11 @@ public class ServerHandler : IServerHandler
 
         _realtimeService.ConnectionStateChanged += state =>
         {
-            ConnectionStatusChanged?.Invoke(state.Equals("Connected", StringComparison.OrdinalIgnoreCase));
+            var isConnectedOrReconnecting =
+                state.StartsWith("Connected", StringComparison.OrdinalIgnoreCase) ||
+                state.StartsWith("Reconnecting", StringComparison.OrdinalIgnoreCase);
+
+            ConnectionStatusChanged?.Invoke(isConnectedOrReconnecting);
             StatusMessageReceived?.Invoke($"Realtime state: {state}");
         };
     }
@@ -73,27 +77,12 @@ public class ServerHandler : IServerHandler
     // ==========================================
     // SERVER COMMUNICATION
     // ==========================================
-    
-    public async Task<bool> TestConnectionAsync()
-    {
-        try
-        {
-            var isConnected = await _apiService.TestConnectionAsync();
-            ConnectionStatusChanged?.Invoke(isConnected);
-            return isConnected;
-        }
-        catch
-        {
-            ConnectionStatusChanged?.Invoke(false);
-            return false;
-        }
-    }
 
     public Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency)
         => _apiService.LinkToOfficialAsync(pollingStationCode, county, constituency);
 
-    public Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency)
-        => _apiService.LookupVoterForAuthAsync(firstName, lastName, dateOfBirth, postCode, county, constituency);
+    public Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string? townOfBirth, string county, string constituency)
+        => _apiService.LookupVoterForAuthAsync(firstName, lastName, dateOfBirth, postCode, townOfBirth, county, constituency);
 
     public Task<List<Candidate>> FetchCandidatesAsync()
         => _apiService.FetchCandidatesAsync();
@@ -101,8 +90,17 @@ public class ServerHandler : IServerHandler
     public Task<CastVoteResponse> CastVoteAsync(Guid candidateId, string candidateName, string partyName)
         => _apiService.CastVoteAsync(candidateId, candidateName, partyName);
 
-    public Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint)
-        => _apiService.VerifyFingerprintAsync(voterId, scannedFingerprint);
+    public Task<ProxyAuthorizationResponse?> ValidateProxyAuthorizationAsync(Guid representedVoterId, Guid proxyVoterId)
+        => _apiService.ValidateProxyAuthorizationAsync(representedVoterId, proxyVoterId);
+
+    public void ConfigureProxyVotingSession(Guid representedVoterId, Guid proxyVoterId)
+        => _apiService.ConfigureProxyVotingSession(representedVoterId, proxyVoterId);
+
+    public void ClearProxyVotingSession()
+        => _apiService.ClearProxyVotingSession();
+
+    public Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string? voterId, byte[] scannedFingerprint, List<string>? candidateVoterIds = null)
+        => _apiService.VerifyFingerprintAsync(voterId, scannedFingerprint, candidateVoterIds);
     
     // ==========================================
     // VOTER AUTHENTICATION & SESSION MANAGEMENT

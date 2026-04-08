@@ -40,18 +40,6 @@ public class ServerHandler : IServerHandler
     // ==========================================
     // SERVER COMMUNICATION (calls ApiService)
     // ==========================================
-    
-    public async Task<bool> TestConnectionAsync()
-    {
-        try
-        {
-            return await _apiService.TestConnectionAsync();
-        }
-        catch
-        {
-            return false;
-        }
-    }
 
     public Task<OfficialLoginResponse?> LoginAsync(string username, string password)
         => _apiService.LoginAsync(username, password);
@@ -97,6 +85,7 @@ public class ServerHandler : IServerHandler
         string firstName,
         string lastName,
         string dateOfBirth,
+        string townOfBirth,
         string addressLine1,
         string addressLine2,
         string postCode,
@@ -108,6 +97,7 @@ public class ServerHandler : IServerHandler
             firstName,
             lastName,
             dateOfBirth,
+            townOfBirth,
             addressLine1,
             addressLine2,
             postCode,
@@ -122,6 +112,31 @@ public class ServerHandler : IServerHandler
         string county,
         byte[] fingerprintData)
         => _apiService.CreateOfficialWithFingerprintAsync(username, password, pollingStationId, county, fingerprintData);
+
+    public Task<ProxyAssignmentResponse?> AssignProxyVoterAsync(
+        string representedFirstName,
+        string representedLastName,
+        string representedDateOfBirth,
+        string representedPostCode,
+        string representedTownOfBirth,
+        string proxyFirstName,
+        string proxyLastName,
+        string proxyDateOfBirth,
+        string proxyPostCode,
+        string proxyTownOfBirth,
+        byte[] scannedFingerprint)
+        => _apiService.AssignProxyVoterAsync(
+            representedFirstName,
+            representedLastName,
+            representedDateOfBirth,
+            representedPostCode,
+            representedTownOfBirth,
+            proxyFirstName,
+            proxyLastName,
+            proxyDateOfBirth,
+            proxyPostCode,
+            proxyTownOfBirth,
+            scannedFingerprint);
 
     public Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint)
         => _apiService.VerifyFingerprintAsync(username, password, scannedFingerprint);

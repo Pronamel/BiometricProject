@@ -27,8 +27,18 @@ namespace Server.Data
                 .HasDatabaseName("idx_voters_sdi");
 
             modelBuilder.Entity<Voter>()
+                .HasIndex(v => v.ProxySdi)
+                .HasDatabaseName("idx_voters_proxy_sdi");
+
+            modelBuilder.Entity<Voter>()
                 .Property(v => v.Sdi)
                 .HasColumnName("sdi");
+
+            modelBuilder.Entity<Voter>()
+                .Property(v => v.ProxySdi)
+                .HasColumnName("ProxySDI")
+                .HasColumnType("text")
+                .IsRequired(false);
 
             modelBuilder.Entity<Voter>()
                 .Property(v => v.NationalId)
@@ -49,6 +59,11 @@ namespace Server.Data
             modelBuilder.Entity<Voter>()
                 .Property(v => v.DateOfBirth)
                 .HasColumnType("bytea");
+
+            modelBuilder.Entity<Voter>()
+                .Property(v => v.TownOfBirth)
+                .HasColumnType("bytea")
+                .IsRequired(false);
 
             modelBuilder.Entity<Voter>()
                 .Property(v => v.AddressLine1)

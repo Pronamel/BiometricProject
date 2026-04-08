@@ -27,7 +27,7 @@
                     FontWeight="Bold"
                     HorizontalAlignment="Center"
                     Command="{Binding StartScanningCommand}"
-                    IsEnabled="{Binding !IsCapturing}"/>
+                    IsEnabled="{Binding IsStartScanningEnabled}"/>
 
             <!-- Live Preview Image -->
             <Panel Background="Black" 
@@ -87,6 +87,7 @@
                 HorizontalAlignment="Left"
                 VerticalAlignment="Bottom"
                 Margin="10"
-                Command="{Binding BackCommand}"/>
+            IsEnabled="{Binding IsBackEnabled}"
+            Command="{Binding BackCommand}"/>
     </Grid>
 </UserControl>

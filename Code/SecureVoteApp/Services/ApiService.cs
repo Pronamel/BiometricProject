@@ -27,6 +27,9 @@ public class ApiService : IApiService
     private DateTime _tokenExpiry;
     private string? _currentVoterId;
     private Guid? _authenticatedVoterDatabaseId;
+    private Guid? _representedVoterDatabaseId;
+    private Guid? _proxyVoterDatabaseId;
+    private bool _isProxyVotingSession;
     private string? _assignedStationId;
     private Guid? _assignedStationGuid;
     
@@ -448,7 +451,7 @@ public class ApiService : IApiService
     }
 
     public async Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(
-        string? firstName, string? lastName, string? dateOfBirth, string? postCode,
+        string? firstName, string? lastName, string? dateOfBirth, string? postCode, string? townOfBirth,
         string county, string constituency)
     {
         try
@@ -456,13 +459,14 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(firstName) ||
                 string.IsNullOrWhiteSpace(lastName) ||
                 string.IsNullOrWhiteSpace(dateOfBirth) ||
-                string.IsNullOrWhiteSpace(postCode))
+                string.IsNullOrWhiteSpace(postCode) ||
+                string.IsNullOrWhiteSpace(townOfBirth))
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing required voter identity fields for lookup");
                 return new VoterAuthLookupResponse
                 {
                     Success = false,
-                    Message = "FirstName, LastName, DateOfBirth, and PostCode are required."
+                    Message = "FirstName, LastName, DateOfBirth, PostCode, and TownOfBirth are required."
                 };
             }
 
@@ -472,6 +476,7 @@ public class ApiService : IApiService
                 LastName = lastName,
                 DateOfBirth = dateOfBirth,
                 PostCode = postCode,
+                TownOfBirth = townOfBirth,
                 County = county,
                 Constituency = constituency
             };
@@ -517,6 +522,10 @@ public class ApiService : IApiService
                         }
 
                         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found: {lookupResponse.FullName} (Matched by: {lookupResponse.MatchedBy})");
+                    }
+                    else if (lookupResponse.RequiresDisambiguation && lookupResponse.CandidateVoterIds?.Count > 0)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Multiple voters matched identity. Candidate count: {lookupResponse.CandidateVoterIds.Count}");
                     }
                     else
                     {
@@ -602,10 +611,35 @@ public class ApiService : IApiService
                 };
             }
 
+            var targetVoterDatabaseId = _isProxyVotingSession
+                ? _representedVoterDatabaseId
+                : _authenticatedVoterDatabaseId;
+
+            if (!targetVoterDatabaseId.HasValue || targetVoterDatabaseId.Value == Guid.Empty)
+            {
+                return new CastVoteResponse
+                {
+                    Success = false,
+                    Message = "Voter authentication context missing. Please authenticate again.",
+                    Timestamp = DateTime.UtcNow
+                };
+            }
+
+            if (_isProxyVotingSession && (!_proxyVoterDatabaseId.HasValue || _proxyVoterDatabaseId == Guid.Empty))
+            {
+                return new CastVoteResponse
+                {
+                    Success = false,
+                    Message = "Proxy voter context missing. Please restart proxy authentication.",
+                    Timestamp = DateTime.UtcNow
+                };
+            }
+
             var castVoteRequest = new CastVoteRequest
             {
                 VoterId = _assignedVoterId,
-                VoterDatabaseId = _authenticatedVoterDatabaseId,
+                VoterDatabaseId = targetVoterDatabaseId,
+                ProxyVoterDatabaseId = _isProxyVotingSession ? _proxyVoterDatabaseId : null,
                 County = _selectedCounty,
                 PollingStationId = _assignedStationGuid.Value,
                 CandidateId = candidateId,
@@ -614,19 +648,50 @@ public class ApiService : IApiService
                 Constituency = _selectedConstituency
             };
 
-            var jsonContent = JsonSerializer.Serialize(castVoteRequest, _jsonOptions);
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+            var endpoint = _isProxyVotingSession ? "/api/voter/cast-proxy-vote" : "/api/voter/cast-vote";
+            StringContent content;
+
+            if (_isProxyVotingSession)
+            {
+                var envelope = await BuildEncryptedEnvelopeAsync(castVoteRequest);
+                if (!envelope.Success)
+                {
+                    return new CastVoteResponse
+                    {
+                        Success = false,
+                        Message = "Proxy vote encryption key unavailable. Please try again.",
+                        Timestamp = DateTime.UtcNow
+                    };
+                }
+
+                var encryptedRequest = new
+                {
+                    wrappedDek = envelope.WrappedDek,
+                    encryptedPayload = envelope.EncryptedPayload
+                };
+
+                var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
+                content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Proxy vote payload protected with encrypted envelope");
+            }
+            else
+            {
+                var jsonContent = JsonSerializer.Serialize(castVoteRequest, _jsonOptions);
+                content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+            }
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Casting vote:");
             Console.WriteLine($"  Voter ID: {_assignedVoterId}");
-            Console.WriteLine($"  Voter Database ID: {_authenticatedVoterDatabaseId}");
+            Console.WriteLine($"  Voter Database ID: {targetVoterDatabaseId}");
+            Console.WriteLine($"  Proxy Session: {_isProxyVotingSession}");
+            Console.WriteLine($"  Proxy Voter Database ID: {_proxyVoterDatabaseId}");
             Console.WriteLine($"  County: {_selectedCounty}");
             Console.WriteLine($"  Polling Station ID: {_assignedStationGuid}");
             Console.WriteLine($"  Candidate ID: {candidateId}");
             Console.WriteLine($"  Candidate: {candidateName} - {partyName}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Using JWT Token: {(!string.IsNullOrEmpty(_jwtToken) ? "Yes" : "No")}");
 
-            var response = await SendAuthenticatedPostAsync("/api/voter/cast-vote", content);
+            var response = await SendAuthenticatedPostAsync(endpoint, content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Cast Vote Response Status: {response.StatusCode}");
@@ -637,6 +702,11 @@ public class ApiService : IApiService
                 var voteResponse = JsonSerializer.Deserialize<CastVoteResponse>(responseContent, _jsonOptions);
                 if (voteResponse != null)
                 {
+                    if (voteResponse.Success && _isProxyVotingSession)
+                    {
+                        ClearProxyVotingSession();
+                    }
+
                     return voteResponse;
                 }
             }
@@ -672,6 +742,72 @@ public class ApiService : IApiService
                 Timestamp = DateTime.UtcNow
             };
         }
+    }
+
+    public async Task<ProxyAuthorizationResponse?> ValidateProxyAuthorizationAsync(Guid representedVoterId, Guid proxyVoterId)
+    {
+        try
+        {
+            var request = new ProxyAuthorizationRequest
+            {
+                RepresentedVoterId = representedVoterId,
+                ProxyVoterId = proxyVoterId
+            };
+
+            var envelope = await BuildEncryptedEnvelopeAsync(request);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Proxy validation encryption key unavailable");
+                return null;
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+            var response = await SendAuthenticatedPostAsync("/api/voter/validate-proxy-authorization", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                return JsonSerializer.Deserialize<ProxyAuthorizationResponse>(responseContent, _jsonOptions);
+            }
+
+            return new ProxyAuthorizationResponse
+            {
+                Success = false,
+                Message = "Unexpected proxy validation response from server."
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Proxy authorization validation error: {ex.Message}");
+            return new ProxyAuthorizationResponse
+            {
+                Success = false,
+                Message = $"Proxy validation failed: {ex.Message}"
+            };
+        }
+    }
+
+    public void ConfigureProxyVotingSession(Guid representedVoterId, Guid proxyVoterId)
+    {
+        _representedVoterDatabaseId = representedVoterId;
+        _proxyVoterDatabaseId = proxyVoterId;
+        _isProxyVotingSession = true;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Proxy voting session configured. Represented={representedVoterId}, Proxy={proxyVoterId}");
+    }
+
+    public void ClearProxyVotingSession()
+    {
+        _representedVoterDatabaseId = null;
+        _proxyVoterDatabaseId = null;
+        _isProxyVotingSession = false;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Proxy voting session cleared.");
     }
 
     //--------------------------------------------
@@ -864,6 +1000,9 @@ public class ApiService : IApiService
             _tokenExpiry = DateTime.MinValue;
             _currentVoterId = null;
             _authenticatedVoterDatabaseId = null;
+            _representedVoterDatabaseId = null;
+            _proxyVoterDatabaseId = null;
+            _isProxyVotingSession = false;
             _assignedStationId = null;
             _assignedStationGuid = null;
             _assignedVoterId = 0;
@@ -959,26 +1098,6 @@ public class ApiService : IApiService
         return await _httpClient.SendAsync(request);
     }
 
-    public async Task<bool> TestConnectionAsync()
-    {
-        try
-        {
-            var response = await _httpClient.GetAsync($"{_baseUrl}/securevote");
-            if (response.IsSuccessStatusCode)
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter app connected successfully: {responseContent}");
-                return true;
-            }
-            return false;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter app connection failed: {ex.Message}");
-            return false;
-        }
-    }
-
     //--------------------------------------------
     // Voter Access Management
     //--------------------------------------------
@@ -1069,13 +1188,22 @@ public class ApiService : IApiService
     // Fingerprint Verification Methods
     //--------------------------------------------
 
-    public async Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint)
+    public async Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string? voterId, byte[] scannedFingerprint, List<string>? candidateVoterIds = null)
     {
         try
         {
-            if (string.IsNullOrEmpty(voterId))
+            if (candidateVoterIds != null && candidateVoterIds.Count > 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error: VoterId is empty");
+                // In collision mode, server expects candidate IDs only.
+                voterId = null;
+            }
+
+            var hasSingleVoter = !string.IsNullOrWhiteSpace(voterId);
+            var hasCandidates = candidateVoterIds != null && candidateVoterIds.Count > 0;
+
+            if (hasSingleVoter == hasCandidates)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error: Provide either voterId or candidateVoterIds");
                 return null;
             }
 
@@ -1091,6 +1219,7 @@ public class ApiService : IApiService
                 username = (string?)null,  // Not applicable for voters
                 password = (string?)null,  // Not applicable for voters
                 voterId = voterId,
+                candidateVoterIds = candidateVoterIds,
                 scannedFingerprint = Convert.ToBase64String(scannedFingerprint)
             };
 
@@ -1112,7 +1241,8 @@ public class ApiService : IApiService
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📸 Sending fingerprint verification request to /api/verify-prints");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   UserType: voter");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   VoterId: {voterId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   VoterId: {(string.IsNullOrWhiteSpace(voterId) ? "<collision-mode>" : voterId)}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   CandidateVoterIds: {candidateVoterIds?.Count ?? 0}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Scanned fingerprint size: {scannedFingerprint.Length} bytes");
 
             var response = await _httpClient.PostAsync($"{_baseUrl}/api/verify-prints", content);
@@ -1124,10 +1254,17 @@ public class ApiService : IApiService
 
             if (verifyResponse != null)
             {
+                if (verifyResponse.IsMatch && verifyResponse.MatchedVoterId.HasValue)
+                {
+                    _authenticatedVoterDatabaseId = verifyResponse.MatchedVoterId.Value;
+                    _currentVoterId = verifyResponse.MatchedVoterId.Value.ToString();
+                }
+
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {(response.IsSuccessStatusCode ? "✅" : "⚠️")} Fingerprint verification result:");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Match: {verifyResponse.IsMatch}");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Score: {verifyResponse.Score}");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Threshold: {verifyResponse.Threshold}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   MatchedVoterId: {verifyResponse.MatchedVoterId}");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Message: {verifyResponse.Message}");
                 return verifyResponse;
             }

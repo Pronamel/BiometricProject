@@ -5,6 +5,7 @@ using Avalonia.Media.Imaging;
 using Avalonia;
 using Avalonia.Threading;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -25,10 +26,13 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     private readonly IScannerService _scannerService;
     private readonly IServerHandler _serverHandler;
     private readonly BallotPaperViewModel _ballotPaperViewModel;
+    private readonly DeviceLockState _deviceLockState;
     
     // Voter authentication fields
     private byte[]? _storedFingerprintBytes;
     private Guid? _currentVoterId;
+    private List<string>? _candidateVoterIds;
+    private bool _lockDueToAlreadyVoted;
 
     // ==========================================
     // OBSERVABLE PROPERTIES
@@ -57,6 +61,12 @@ public partial class AuthenticateUserViewModel : ViewModelBase
 
     [ObservableProperty]
     private string voterStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool isBackEnabled = true;
+
+    [ObservableProperty]
+    private bool isStartScanningEnabled = true;
 
     // ==========================================
     // PUBLIC PROPERTIES
@@ -103,29 +113,33 @@ public partial class AuthenticateUserViewModel : ViewModelBase
         scannAttempts = type;
     }
 
+    public void ResetAuthenticationState()
+    {
+        _storedFingerprintBytes = null;
+        _currentVoterId = null;
+        _capturedFingerprintData = null;
+        _capturedFingerprintWidth = 0;
+        _capturedFingerprintHeight = 0;
+        _candidateVoterIds = null;
+        _lockDueToAlreadyVoted = false;
+        scannAttempts = 0;
+        validFingerPrintScan = false;
+
+        VoterFullName = string.Empty;
+        VoterStatusMessage = string.Empty;
+        StatusMessage = string.Empty;
+        PreviewImage = null;
+        QualityScore = 0;
+        IsCapturing = false;
+        CaptureStatusMessage = "Ready to scan";
+        ImageSource = LoadImage("fingerPrint.png");
+        IsBackEnabled = !_deviceLockState.IsLocked;
+        IsStartScanningEnabled = !_deviceLockState.IsLocked && !IsCapturing;
+    }
+
     public async Task attemptHandler(int attempts, bool scanResult)
     {
-        if (attempts == 1 && scanResult == false)
-        {
-            SetImageSource("fingerPrintWrong.png");
-            SetStatusMessage("You have 2 attempts left.");
-            VoterStatusMessage = ""; // Clear status on mismatch
-        }
-        else if (attempts == 2 && scanResult == false)
-        {
-            SetImageSource("fingerPrintWrong.png");
-            SetStatusMessage("You have 1 attempts left.");
-            VoterStatusMessage = ""; // Clear status on mismatch
-        }
-        else if (attempts == 3 && scanResult == false)
-        {
-            SetImageSource("fingerPrintWrong.png");
-            SetStatusMessage("You have no attempts left. Please Contact an official.");
-            VoterStatusMessage = "❌ Authentication failed after 3 attempts. You may have mistyped your details.";
-            _serverHandler.CurrentDeviceStatus = "Authentication failed after 3 attempts";
-            await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
-        }
-        else if (scanResult == true)
+        if (scanResult == true)
         {
             SetImageSource("fingerPrintCorrect.png");
             SetStatusMessage("Authentication successful. You may proceed to vote.");
@@ -135,6 +149,41 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             await _ballotPaperViewModel.LoadCandidatesAsync();
             await Task.Delay(750);
             await _navigationService.NavigateToBallot();
+
+            ResetAuthenticationState();
+            return;
+        }
+
+        if (attempts == 1)
+        {
+            SetImageSource("fingerPrintWrong.png");
+            SetStatusMessage("You have 2 attempts left.");
+            VoterStatusMessage = ""; // Clear status on mismatch
+        }
+        else if (attempts == 2)
+        {
+            SetImageSource("fingerPrintWrong.png");
+            SetStatusMessage("You have 1 attempts left.");
+            VoterStatusMessage = ""; // Clear status on mismatch
+        }
+        else if (attempts >= 3)
+        {
+            _deviceLockState.SetLocked(true);
+            SetImageSource("fingerPrintWrong.png");
+            if (_lockDueToAlreadyVoted)
+            {
+                SetStatusMessage("You have already voted. Please contact an official.");
+                VoterStatusMessage = "❌ You have already voted. Official assistance is required.";
+                _serverHandler.CurrentDeviceStatus = "Already voted - official assistance required";
+            }
+            else
+            {
+                SetStatusMessage("You have no attempts left. Please Contact an official.");
+                VoterStatusMessage = "❌ Authentication failed after 3 attempts. You may have mistyped your details.";
+                _serverHandler.CurrentDeviceStatus = "Authentication failed after 3 attempts";
+            }
+
+            await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
         }
     }
 
@@ -168,10 +217,22 @@ public partial class AuthenticateUserViewModel : ViewModelBase
 
             Console.WriteLine($"[AuthenticateUserViewModel] Encoded fingerprint size: {scannedImagePng.Length} bytes (PNG)");
 
-            // Prefer voter ID from lookup initialization for this auth flow.
-            // Fallback to API session voter ID only if needed.
-            string? voterId = _currentVoterId?.ToString() ?? _serverHandler.CurrentVoterId;
-            if (string.IsNullOrEmpty(voterId))
+            var hasCandidates = _candidateVoterIds != null && _candidateVoterIds.Count > 0;
+            string? voterId;
+
+            if (hasCandidates)
+            {
+                // Collision disambiguation must use candidate IDs only.
+                voterId = null;
+            }
+            else
+            {
+                // Prefer voter ID from lookup initialization for single-match auth flow.
+                // Fallback to API session voter ID only if needed.
+                voterId = _currentVoterId?.ToString() ?? _serverHandler.CurrentVoterId;
+            }
+
+            if (string.IsNullOrEmpty(voterId) && !hasCandidates)
             {
                 Console.WriteLine("[AuthenticateUserViewModel] ❌ No voter ID available for fingerprint verification");
                 CaptureStatusMessage = "Error: Voter ID not found";
@@ -182,13 +243,32 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             // Call the server verify-prints endpoint with voterId and scanned fingerprint
             // The server will fetch the stored fingerprint from the database and compare
             Console.WriteLine("[AuthenticateUserViewModel] Calling /api/verify-prints endpoint...");
-            Console.WriteLine($"[AuthenticateUserViewModel] VoterId: {voterId}");
-            var verificationResult = await _serverHandler.VerifyFingerprintAsync(voterId, scannedImagePng);
+            Console.WriteLine($"[AuthenticateUserViewModel] VoterId: {(string.IsNullOrWhiteSpace(voterId) ? "<collision-mode>" : voterId)}");
+            Console.WriteLine($"[AuthenticateUserViewModel] Candidate IDs: {_candidateVoterIds?.Count ?? 0}");
+            var verificationResult = await _serverHandler.VerifyFingerprintAsync(voterId, scannedImagePng, _candidateVoterIds);
 
-            if (verificationResult == null || !verificationResult.Success)
+            if (verificationResult == null)
             {
-                Console.WriteLine($"[AuthenticateUserViewModel] ❌ Fingerprint verification failed: {verificationResult?.Message}");
-                CaptureStatusMessage = $"Error: {verificationResult?.Message}";
+                Console.WriteLine("[AuthenticateUserViewModel] ❌ Fingerprint verification failed: empty response");
+                CaptureStatusMessage = "Error: Fingerprint verification failed";
+                validFingerPrintScan = false;
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(verificationResult.Message) &&
+                verificationResult.Message.Contains("already voted", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("[AuthenticateUserViewModel] ⚠️ Matched voter has already voted - locking station for official assistance");
+                _lockDueToAlreadyVoted = true;
+                scannAttempts = 2;
+                validFingerPrintScan = false;
+                return;
+            }
+
+            if (!verificationResult.Success)
+            {
+                Console.WriteLine($"[AuthenticateUserViewModel] ❌ Fingerprint verification failed: {verificationResult.Message}");
+                CaptureStatusMessage = $"Error: {verificationResult.Message}";
                 validFingerPrintScan = false;
                 return;
             }
@@ -203,6 +283,11 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             
             if (verificationResult.IsMatch)
             {
+                if (verificationResult.MatchedVoterId.HasValue)
+                {
+                    _currentVoterId = verificationResult.MatchedVoterId.Value;
+                }
+
                 Console.WriteLine("[AuthenticateUserViewModel] ✓ FINGERPRINT VERIFIED - Authentication successful");
             }
             else
@@ -278,12 +363,14 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
 
-    public AuthenticateUserViewModel(INavigationService navigationService, IScannerService scannerService, IServerHandler serverHandler, BallotPaperViewModel ballotPaperViewModel)
+    public AuthenticateUserViewModel(INavigationService navigationService, IScannerService scannerService, IServerHandler serverHandler, BallotPaperViewModel ballotPaperViewModel, DeviceLockState deviceLockState)
     {
         _navigationService = navigationService;
         _scannerService = scannerService;
         _serverHandler = serverHandler;
         _ballotPaperViewModel = ballotPaperViewModel;
+        _deviceLockState = deviceLockState;
+        _deviceLockState.LockStateChanged += OnLockStateChanged;
         
         // Initialize with default fingerprint image
         ImageSource = LoadImage("fingerPrint.png");
@@ -291,8 +378,36 @@ public partial class AuthenticateUserViewModel : ViewModelBase
         QualityScore = 0;
         IsCapturing = false;
         CaptureStatusMessage = "Ready to scan";
+        IsBackEnabled = !_deviceLockState.IsLocked;
+        IsStartScanningEnabled = !_deviceLockState.IsLocked && !IsCapturing;
         
-        // Check if there's a pending voter lookup and initialize
+    }
+
+    private void OnLockStateChanged(bool isLocked)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            IsBackEnabled = !isLocked;
+            IsStartScanningEnabled = !isLocked && !IsCapturing;
+
+            if (isLocked)
+            {
+                StatusMessage = "Device locked. Authentication controls are disabled until an official unlocks this device.";
+            }
+            else if (StatusMessage.Contains("Device locked", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusMessage = "Device unlocked. Authentication controls are enabled.";
+            }
+        });
+    }
+
+    partial void OnIsCapturingChanged(bool value)
+    {
+        IsStartScanningEnabled = !_deviceLockState.IsLocked && !value;
+    }
+
+    public void ApplyPendingLookup()
+    {
         if (_navigationService is NavigationService navService && navService.PendingVoterLookup != null)
         {
             Initialize(navService.PendingVoterLookup);
@@ -306,18 +421,32 @@ public partial class AuthenticateUserViewModel : ViewModelBase
 
     public void Initialize(VoterAuthLookupResponse lookup)
     {
-        if (lookup == null || !lookup.VoterId.HasValue)
+        if (lookup == null)
         {
-            Console.WriteLine("[AuthenticateUserViewModel] ❌ Invalid lookup data - missing voter ID");
+            Console.WriteLine("[AuthenticateUserViewModel] ❌ Invalid lookup data");
             return;
         }
 
+        var hasSingleVoterId = lookup.VoterId.HasValue;
+        var hasCandidates = lookup.RequiresDisambiguation && lookup.CandidateVoterIds?.Count > 0;
+        if (!hasSingleVoterId && !hasCandidates)
+        {
+            Console.WriteLine("[AuthenticateUserViewModel] ❌ Invalid lookup data - missing voter ID and candidate IDs");
+            return;
+        }
+
+        ResetAuthenticationState();
+
         _storedFingerprintBytes = lookup.FingerprintScan;
         _currentVoterId = lookup.VoterId;
-        VoterFullName = lookup.FullName ?? "Unknown Voter";
+        _candidateVoterIds = hasCandidates
+            ? lookup.CandidateVoterIds!.Select(id => id.ToString()).ToList()
+            : null;
+        VoterFullName = lookup.FullName ?? "Identity protected";
 
         Console.WriteLine($"[AuthenticateUserViewModel] ✓ Initialized with voter: {VoterFullName}");
         Console.WriteLine($"[AuthenticateUserViewModel]   Voter ID: {_currentVoterId}");
+        Console.WriteLine($"[AuthenticateUserViewModel]   Candidate IDs: {_candidateVoterIds?.Count ?? 0}");
         Console.WriteLine($"[AuthenticateUserViewModel]   Fingerprint available: {(_storedFingerprintBytes?.Length ?? 0) > 0}");
     }
 
@@ -329,6 +458,13 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     private async Task StartScanning()
     {
         Console.WriteLine("[AuthenticateUserViewModel] Start scanning command triggered");
+        ApplyPendingLookup();
+
+        if (_deviceLockState.IsLocked)
+        {
+            CaptureStatusMessage = "Device locked by official. Wait for unlock.";
+            return;
+        }
         
         try
         {
@@ -465,7 +601,10 @@ public partial class AuthenticateUserViewModel : ViewModelBase
                         
                         if (_navigationService != null)
                         {
-                            await attemptHandler(scannAttempts, validFingerPrintScan);
+                            await Dispatcher.UIThread.InvokeAsync(async () =>
+                            {
+                                await attemptHandler(scannAttempts, validFingerPrintScan);
+                            }, DispatcherPriority.Input);
                         }
                         else
                         {
@@ -622,6 +761,11 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     [RelayCommand]
     private void Back()
     {
+        if (_deviceLockState.IsLocked)
+        {
+            return;
+        }
+
         _navigationService.NavigateToMain();
     }
 

@@ -2,7 +2,6 @@ using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 using officialApp.Views;
 using Avalonia.Controls;
-using Avalonia.Threading;
 using officialApp.Services;
 
 namespace officialApp.ViewModels;
@@ -27,6 +26,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly OfficialGenerateAccessCodeView _officialGenerateAccessCodeView;
     private readonly OfficialVotingPollingManagerView _officialVotingPollingManagerView;
     private readonly OfficialAddVoterView _officialAddVoterView;
+    private readonly OfficialAssignProxyView _officialAssignProxyView;
     
     // Navigation service
     private readonly INavigationService _navigationService;
@@ -43,6 +43,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OfficialGenerateAccessCodeViewModel officialGenerateAccessCodeViewModel,
         OfficialVotingPollingManagerViewModel officialVotingPollingManagerViewModel,
         OfficialAddVoterViewModel officialAddVoterViewModel,
+        OfficialAssignProxyViewModel officialAssignProxyViewModel,
         INavigationService navigationService,
         IRealtimeService realtimeService)
     {
@@ -60,6 +61,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _officialGenerateAccessCodeView = new OfficialGenerateAccessCodeView { DataContext = officialGenerateAccessCodeViewModel };
         _officialVotingPollingManagerView = new OfficialVotingPollingManagerView { DataContext = officialVotingPollingManagerViewModel };
         _officialAddVoterView = new OfficialAddVoterView { DataContext = officialAddVoterViewModel };
+        _officialAssignProxyView = new OfficialAssignProxyView { DataContext = officialAssignProxyViewModel };
         
         // Initialize navigation service with all view factories
         ((NavigationService)_navigationService).Initialize(
@@ -68,7 +70,8 @@ public partial class MainWindowViewModel : ViewModelBase
             () => _officialMenuView,
             () => _officialGenerateAccessCodeView,
             () => _officialVotingPollingManagerView,
-            () => _officialAddVoterView
+            () => _officialAddVoterView,
+            () => _officialAssignProxyView
         );
         
         // Set initial view to Official Authenticate
@@ -88,20 +91,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnRealtimeConnectionStateChanged(string state)
     {
-        if (!state.StartsWith("Disconnected", StringComparison.OrdinalIgnoreCase))
+        if (state.StartsWith("Disconnected", StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Realtime disconnected. Staying on the current official screen.");
         }
-
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (CurrentView == _officialLoginView)
-            {
-                return;
-            }
-
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Realtime disconnected. Returning to official login.");
-            _navigationService.NavigateToOfficialLogin();
-        });
     }
 }

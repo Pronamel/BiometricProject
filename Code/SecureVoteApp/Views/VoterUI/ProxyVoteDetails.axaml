@@ -7,10 +7,7 @@
             x:Class="SecureVoteApp.Views.VoterUI.ProxyVoteDetailsView"
             x:DataType="vm:ProxyVoteDetailsViewModel">
 
-    
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-            to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:ProxyVoteDetailsViewModel/>
     </Design.DataContext>
 
@@ -19,104 +16,103 @@
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        
-        <TextBlock Grid.ColumnSpan="2" 
-                   Text="Enter Voter Details" 
-                   FontSize="24" 
-                   FontWeight="Bold" 
+
+        <TextBlock Grid.ColumnSpan="2"
+                   Text="Proxy Vote Identity Check"
+                   FontSize="24"
+                   FontWeight="Bold"
                    HorizontalAlignment="Center"
-                   Margin="0,20,0,30" 
+                   Margin="0,20,0,30"
                    Foreground="#333"/>
 
-        <!-- Left Grid - 4 Text Boxes -->
         <StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
-            <StackPanel Spacing="20">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Represented Voter" FontWeight="Bold" Foreground="#333" FontSize="16"/>
+
                 <StackPanel>
-                    <TextBlock Text="Full Name (e.g., John Smith)" 
-                               FontWeight="Medium" 
-                               Foreground="#333" 
-                               Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35"/>
-                </StackPanel>
-                
-                <StackPanel>
-                    <TextBlock Text="Address (e.g., 123 High Street, London)" 
-                               FontWeight="Medium" 
-                               Foreground="#333" 
-                               Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35"/>
+                    <TextBlock Text="First Name" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35" Text="{Binding RepresentedFirstName}"/>
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="National Insurance Number (e.g., AB123456C)" 
-                               FontWeight="Medium" 
-                               Foreground="#333" 
-                               Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" IsEnabled="{Binding TextBoxEnabled}"/>
+                    <TextBlock Text="Last Name" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35" Text="{Binding RepresentedLastName}"/>
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Date of Birth" 
-                               FontWeight="Medium" 
-                               Foreground="#333" 
-                               Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35"/>
+                    <TextBlock Text="Date Of Birth" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <DatePicker Width="300" Height="35" SelectedDate="{Binding RepresentedDateOfBirth}"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="Post Code" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35" Text="{Binding RepresentedPostCode}"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="Town Of Birth" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35" Text="{Binding RepresentedTownOfBirth}"/>
                 </StackPanel>
             </StackPanel>
         </StackPanel>
 
-
-
-        <!-- Right Grid - 3 Text Boxes with Button -->
         <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
-            <StackPanel Spacing="20">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Proxy Voter" FontWeight="Bold" Foreground="#333" FontSize="16"/>
+
                 <StackPanel>
-                    <TextBlock Text="Proxy Full Name (e.g., Sarah Jones)" 
-                               FontWeight="Medium" 
-                               Foreground="#333" 
-                               Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35"/>
-                </StackPanel>
-                
-                <StackPanel>
-                    <TextBlock Text="Proxy Address (e.g., 45 Market Road, Leeds)" 
-                               FontWeight="Medium" 
-                               Foreground="#333" 
-                               Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35"/>
+                    <TextBlock Text="First Name" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35" Text="{Binding ProxyFirstName}"/>
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Reason for Proxy Vote (e.g., Medical treatment):" 
-                               FontWeight="Medium" 
-                               Foreground="#333" 
-                               Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35"/>
+                    <TextBlock Text="Last Name" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35" Text="{Binding ProxyLastName}"/>
                 </StackPanel>
 
-                <!-- Button underneath the text boxes -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,20,0,0">
-                    <Button Content="Back" 
-                            Width="80" 
+                <StackPanel>
+                    <TextBlock Text="Date Of Birth" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <DatePicker Width="300" Height="35" SelectedDate="{Binding ProxyDateOfBirth}"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="Post Code" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35" Text="{Binding ProxyPostCode}"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="Town Of Birth" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
+                    <TextBox Width="300" Height="35" Text="{Binding ProxyTownOfBirth}"/>
+                </StackPanel>
+
+                <TextBlock Text="{Binding StatusMessage}"
+                           Foreground="DarkGreen"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           Width="300"/>
+
+                <ProgressBar IsIndeterminate="True"
+                             IsVisible="{Binding IsLooking}"
+                             Width="300"
+                             Height="8"/>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,16,0,0">
+                    <Button Content="Back"
+                            Width="80"
                             Height="35"
                             Background="LightGray"
                             FontSize="14"
                             Command="{Binding BackCommand}"/>
-                    <Button Content="Authenticate >" 
-                            Width="120" 
+                    <Button Content="Authenticate >"
+                            Width="120"
                             Height="35"
                             Background="Green"
                             Foreground="White"
                             FontSize="14"
+                            IsEnabled="{Binding !IsLooking}"
                             Command="{Binding AuthenticateCommand}"/>
                 </StackPanel>
             </StackPanel>
         </StackPanel>
     </Grid>
-
-    
-        
-
-
-
 </UserControl>

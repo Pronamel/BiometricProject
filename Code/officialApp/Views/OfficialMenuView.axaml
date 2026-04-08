@@ -13,70 +13,100 @@
         <vm:OfficialMenuViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6">
+    <Grid Background="#f6f2e6" RowDefinitions="Auto,*,Auto">
 
-        <StackPanel>
-            <TextBlock Text="Official Admin Menu" HorizontalAlignment="Left" Margin="0,0,0,5" Foreground="black"/>
-        </StackPanel>
+        <TextBlock Grid.Row="0"
+                   Text="Official Admin Menu"
+                   HorizontalAlignment="Left"
+                   Margin="20,16,0,0"
+                   Foreground="black"
+                   FontSize="18"
+                   FontWeight="Bold"/>
 
-        <!-- Three orange buttons arranged horizontally -->
-        <StackPanel Orientation="Horizontal" 
-                   HorizontalAlignment="Center" 
-                   VerticalAlignment="Center"
-                   Spacing="30">
+        <!-- Four menu tiles arranged in a compact grid -->
+        <Grid Grid.Row="1"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              ColumnDefinitions="Auto,Auto"
+              RowDefinitions="Auto,Auto"
+              ColumnSpacing="30"
+              RowSpacing="30">
             
             <Button 
+                Grid.Row="0"
+                Grid.Column="0"
                 Command="{Binding VotingStartCommand}"
                 Background="#d97509"  
-                Width="120"
-                Height="100" 
+                Width="140"
+                Height="110" 
                 BorderThickness="2"
                 BorderBrush="Black"
-                FontSize="20">
+                FontSize="18">
                 <StackPanel>
-                    <TextBlock Text="Generate" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                    <TextBlock Text="Access" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                    <TextBlock Text="Code" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Generate" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Access" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Code" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
                 </StackPanel>
             </Button>
 
             <Button
+                Grid.Row="0"
+                Grid.Column="1"
                 Command="{Binding ManagerCommand}"
                 Background="#d97509"  
-                Width="120"
-                Height="100" 
+                Width="140"
+                Height="110" 
                 BorderThickness="2"
                 BorderBrush="Black"
-                FontSize="20">
+                FontSize="18">
                 <StackPanel>
-                    <TextBlock Text="Polling" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                    <TextBlock Text="System" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                    <TextBlock Text="Managment" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Polling" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="System" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Management" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
                 </StackPanel>
             </Button>
 
             <Button
+                Grid.Row="1"
+                Grid.Column="0"
                 Command="{Binding ReportsCommand}"
                 Background="#d97509"  
-                Width="120"
-                Height="100" 
+                Width="140"
+                Height="110" 
                 BorderThickness="2"
                 BorderBrush="Black"
-                FontSize="20">
+                FontSize="18">
                 <StackPanel>
-                    <TextBlock Text="Create" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                    <TextBlock Text="User" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                    <TextBlock Text="Create" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="User" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
                 </StackPanel>
             </Button>
-            
-        </StackPanel>
+
+            <Button
+                Grid.Row="1"
+                Grid.Column="1"
+                Command="{Binding AssignProxyCommand}"
+                Background="#6b4423"  
+                Width="140"
+                Height="110" 
+                BorderThickness="2"
+                BorderBrush="Black"
+                FontSize="18">
+                <StackPanel>
+                    <TextBlock Text="Assign" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Proxy" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Voter" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                </StackPanel>
+            </Button>
+        </Grid>
 
         <!-- Bottom Controls: Status Message and Buttons -->
-        <StackPanel Orientation="Vertical" 
-                   VerticalAlignment="Bottom" 
-                   HorizontalAlignment="Center"
-                   Spacing="10"
-                   Margin="0,0,0,15">
+        <StackPanel Grid.Row="2"
+               Orientation="Vertical" 
+               VerticalAlignment="Bottom" 
+               HorizontalAlignment="Center"
+               Spacing="10"
+               Margin="0,0,0,15">
             
             <!-- Status Message -->
             <TextBlock Text="{Binding StatusMessage}" 
@@ -89,18 +119,6 @@
             <StackPanel Orientation="Horizontal" 
                        HorizontalAlignment="Center"
                        Spacing="15">
-                
-                <!-- Test Voters Button -->
-                <Button 
-                    Command="{Binding FetchVotersTestCommand}"
-                    Background="#6b4423"  
-                    Width="150"
-                    Height="50" 
-                    BorderThickness="2"
-                    BorderBrush="Black"
-                    FontSize="14">
-                    <TextBlock Text="Test: Fetch Voters" Foreground="white"/>
-                </Button>
                 
                 <!-- Logout Button -->
                 <Button 

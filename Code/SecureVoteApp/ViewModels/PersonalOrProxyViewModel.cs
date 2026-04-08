@@ -11,13 +11,15 @@ public partial class PersonalOrProxyViewModel : ViewModelBase
     // ==========================================
 
     private readonly INavigationService _navigationService;
+    private readonly IServerHandler _serverHandler;
     // ==========================================
     // CONSTRUCTOR
     // ==========================================
     
-    public PersonalOrProxyViewModel(INavigationService navigationService)
+    public PersonalOrProxyViewModel(INavigationService navigationService, IServerHandler serverHandler)
     {
         _navigationService = navigationService;
+        _serverHandler = serverHandler;
     }
 
     // ==========================================
@@ -27,6 +29,7 @@ public partial class PersonalOrProxyViewModel : ViewModelBase
     [RelayCommand]
     private void OpenNINEntry()
     {
+        _serverHandler.ClearProxyVotingSession();
         // Navigate to NIN entry screen (fire and forget)
         _ = _navigationService.NavigateToNINEntry();
     }
@@ -34,6 +37,7 @@ public partial class PersonalOrProxyViewModel : ViewModelBase
     [RelayCommand]
     private void OpenProxyVote()
     {
+        _serverHandler.ClearProxyVotingSession();
         // Navigate to proxy vote details screen
         _navigationService.NavigateToProxyVoteDetails();
     }

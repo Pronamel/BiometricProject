@@ -2,10 +2,6 @@ using System;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Text.Json;
-using System.Net.Http;
-using System.Reflection;
-using Avalonia.Controls;
 using officialApp.Services;
 
 namespace officialApp.ViewModels;
@@ -62,6 +58,12 @@ public partial class OfficialMenuViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void AssignProxy()
+    {
+        _navigationService.NavigateToOfficialAssignProxy();
+    }
+
+    [RelayCommand]
     private async Task Logout()
     {
         try
@@ -100,29 +102,5 @@ public partial class OfficialMenuViewModel : ViewModelBase
             StatusColor = "#e74c3c";
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Logout error: {ex.Message}");
         }
-    }
-
-    [RelayCommand]
-    private async Task FetchVotersTest()
-    {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== FETCHING VOTERS FROM DATABASE =====");
-        
-        var voters = await _serverHandler.GetAllVotersAsync();
-        
-        if (voters != null && voters.Count > 0)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Successfully retrieved {voters.Count} voters:");
-            
-            foreach (var voter in voters)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter: {JsonSerializer.Serialize(voter)}");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No voters found or API call failed");
-        }
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER FETCH =====\n");
     }
 }

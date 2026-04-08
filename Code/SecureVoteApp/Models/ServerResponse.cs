@@ -172,6 +172,9 @@ public class VoterAuthLookupRequest
 
     [JsonPropertyName("postCode")]
     public string? PostCode { get; set; }
+
+    [JsonPropertyName("townOfBirth")]
+    public string? TownOfBirth { get; set; }
     
     [JsonPropertyName("county")]
     public string County { get; set; } = string.Empty;
@@ -199,6 +202,12 @@ public class VoterAuthLookupResponse
     
     [JsonPropertyName("matchedBy")]
     public string? MatchedBy { get; set; }
+
+    [JsonPropertyName("requiresDisambiguation")]
+    public bool RequiresDisambiguation { get; set; }
+
+    [JsonPropertyName("candidateVoterIds")]
+    public List<Guid>? CandidateVoterIds { get; set; }
 }
 
 // Vote casting models
@@ -209,6 +218,9 @@ public class CastVoteRequest
 
     [JsonPropertyName("voterDatabaseId")]
     public Guid? VoterDatabaseId { get; set; }
+
+    [JsonPropertyName("proxyVoterDatabaseId")]
+    public Guid? ProxyVoterDatabaseId { get; set; }
     
     [JsonPropertyName("county")]
     public string County { get; set; } = string.Empty;
@@ -239,6 +251,24 @@ public class CastVoteResponse
     
     [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
+}
+
+public class ProxyAuthorizationRequest
+{
+    [JsonPropertyName("representedVoterId")]
+    public Guid RepresentedVoterId { get; set; }
+
+    [JsonPropertyName("proxyVoterId")]
+    public Guid ProxyVoterId { get; set; }
+}
+
+public class ProxyAuthorizationResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
 }
 
 // Fingerprint Verification Models
@@ -279,6 +309,9 @@ public class FingerprintVerificationResponse
     
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
+
+    [JsonPropertyName("matchedVoterId")]
+    public Guid? MatchedVoterId { get; set; }
     
     [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }

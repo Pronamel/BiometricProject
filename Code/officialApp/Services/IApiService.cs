@@ -14,9 +14,6 @@ public interface IApiService
     Task<bool> LogoutAsync();
     string? GetAuthToken();
     string GetRealtimeHubUrl();
-    
-    // Connection & Device Management
-    Task<bool> TestConnectionAsync();
     Task<bool> SendDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo);
     Task<DeviceManagementInfo?> GetDeviceManagementInfoAsync();
     
@@ -43,6 +40,7 @@ public interface IApiService
         string firstName,
         string lastName,
         string dateOfBirth,
+        string townOfBirth,
         string addressLine1,
         string addressLine2,
         string postCode,
@@ -55,6 +53,18 @@ public interface IApiService
         string assignedPollingStationId,
         string assignedCountyId,
         byte[] fingerprintData);
+    Task<ProxyAssignmentResponse?> AssignProxyVoterAsync(
+        string representedFirstName,
+        string representedLastName,
+        string representedDateOfBirth,
+        string representedPostCode,
+        string representedTownOfBirth,
+        string proxyFirstName,
+        string proxyLastName,
+        string proxyDateOfBirth,
+        string proxyPostCode,
+        string proxyTownOfBirth,
+        byte[] scannedFingerprint);
     
     // Polling Stations
     Task<List<PollingStationOption>?> GetAllPollingStationsAsync();

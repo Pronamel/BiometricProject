@@ -414,13 +414,19 @@ static string NormalizePostcodeForSdi(string value)
     return value.Trim().ToUpperInvariant().Replace(" ", string.Empty);
 }
 
-static string BuildIdentityCanonicalString(string firstName, string lastName, DateTime dateOfBirth, string postCode)
+static string NormalizeTownOfBirthForSdi(string value)
+{
+    return string.Join(" ", value.Trim().ToUpperInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+}
+
+static string BuildIdentityCanonicalString(string firstName, string lastName, DateTime dateOfBirth, string postCode, string townOfBirth)
 {
     return string.Join("|",
         NormalizeNameForSdi(firstName),
         NormalizeNameForSdi(lastName),
         dateOfBirth.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        NormalizePostcodeForSdi(postCode));
+        NormalizePostcodeForSdi(postCode),
+        NormalizeTownOfBirthForSdi(townOfBirth));
 }
 
 static string ComputeSdiHmacSha256(string canonicalIdentity, string secret)
@@ -909,6 +915,7 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
         string.IsNullOrWhiteSpace(request.EncryptedFirstName) ||
         string.IsNullOrWhiteSpace(request.EncryptedLastName) ||
         string.IsNullOrWhiteSpace(request.EncryptedDateOfBirth) ||
+        string.IsNullOrWhiteSpace(request.EncryptedTownOfBirth) ||
         string.IsNullOrWhiteSpace(request.EncryptedAddressLine1) ||
         string.IsNullOrWhiteSpace(request.EncryptedAddressLine2) ||
         string.IsNullOrWhiteSpace(request.EncryptedPostCode) ||
@@ -971,12 +978,13 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
     if (string.IsNullOrWhiteSpace(request.FirstName) ||
         string.IsNullOrWhiteSpace(request.LastName) ||
         string.IsNullOrWhiteSpace(request.DateOfBirth) ||
-        string.IsNullOrWhiteSpace(request.PostCode))
+        string.IsNullOrWhiteSpace(request.PostCode) ||
+        string.IsNullOrWhiteSpace(request.TownOfBirth))
     {
         return Results.BadRequest(new
         {
             success = false,
-            message = "FirstName, LastName, DateOfBirth, and PostCode are required for identity indexing"
+            message = "FirstName, LastName, DateOfBirth, PostCode, and TownOfBirth are required for identity indexing"
         });
     }
 
@@ -993,7 +1001,8 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
         request.FirstName,
         request.LastName,
         parsedDateOfBirth,
-        request.PostCode);
+        request.PostCode,
+        request.TownOfBirth);
     var sdi = ComputeSdiHmacSha256(canonicalIdentity, sdiHmacSecret!);
 
     var result = await dbService.CreateVoterAsync(
@@ -1007,6 +1016,7 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
         request.EncryptedFirstName!,
         request.EncryptedLastName!,
         request.EncryptedDateOfBirth!,
+        request.EncryptedTownOfBirth!,
         request.EncryptedAddressLine1!,
         request.EncryptedAddressLine2!,
         request.EncryptedPostCode!,
@@ -1288,7 +1298,7 @@ app.MapPost("/api/voter/verify-access-code", async (HttpContext httpContext,
 //===========================================
 // API ENDPOINTS - VOTER AUTHENTICATION LOOKUP
 //===========================================
-// SDI-based voter lookup using FirstName + LastName + DateOfBirth + PostCode.
+// SDI-based voter lookup using FirstName + LastName + DateOfBirth + PostCode + TownOfBirth.
 app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, DatabaseService dbService) =>
 {
     Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ===== VOTER AUTH LOOKUP ATTEMPT =====");
@@ -1312,6 +1322,8 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
                 null,
                 null,
                 null,
+                null,
+                false,
                 null
             ));
         }
@@ -1327,30 +1339,37 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
             null,
             null,
             null,
+            null,
+            false,
             null
         ));
     }
 
     Voter? voter = null;
+    List<Voter> candidateVoters = new();
     string? matchedBy = null;
 
     string? firstName = request.FirstName;
     string? lastName = request.LastName;
     string? dateOfBirth = request.DateOfBirth;
     string? postCode = request.PostCode;
+    string? townOfBirth = request.TownOfBirth;
 
     if (string.IsNullOrWhiteSpace(firstName) ||
         string.IsNullOrWhiteSpace(lastName) ||
         string.IsNullOrWhiteSpace(dateOfBirth) ||
-        string.IsNullOrWhiteSpace(postCode))
+        string.IsNullOrWhiteSpace(postCode) ||
+        string.IsNullOrWhiteSpace(townOfBirth))
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Missing required identity fields for SDI lookup");
         return Results.BadRequest(new VoterAuthLookupResponse(
             false,
-            "FirstName, LastName, DateOfBirth, and PostCode are required.",
+            "FirstName, LastName, DateOfBirth, PostCode, and TownOfBirth are required.",
             null,
             null,
             null,
+            null,
+            false,
             null
         ));
     }
@@ -1386,6 +1405,8 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
             null,
             null,
             null,
+            null,
+            false,
             null
         ));
     }
@@ -1394,14 +1415,41 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
         firstName,
         lastName,
         parsedDob,
-        postCode);
+        postCode,
+        townOfBirth);
     var sdi = ComputeSdiHmacSha256(canonicalIdentity, sdiHmacSecret);
 
-    voter = await dbService.GetVoterBySdiAsync(sdi);
-    if (voter is not null)
+    candidateVoters = await dbService.GetVotersBySdiAsync(sdi, limit: 10);
+    if (candidateVoters.Count > 0)
     {
         matchedBy = "SDI";
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by SDI");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter candidate(s) found by SDI: {candidateVoters.Count}");
+    }
+
+    if (candidateVoters.Count == 1)
+    {
+        voter = candidateVoters[0];
+    }
+
+    if (candidateVoters.Count > 1)
+    {
+        var collisionCandidateIds = candidateVoters
+            .Select(v => v.VoterId)
+            .ToList();
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ SDI collision detected; requiring fingerprint disambiguation across {collisionCandidateIds.Count} candidates");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
+
+        return Results.BadRequest(new VoterAuthLookupResponse(
+            false,
+            "Multiple voter records matched your details. Please continue with fingerprint scan.",
+            null,
+            "Name protected",
+            null,
+            matchedBy,
+            true,
+            collisionCandidateIds
+        ));
     }
 
     // Return result
@@ -1416,7 +1464,9 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
                 null,
                 null,
                 null,
-                matchedBy
+                matchedBy,
+                false,
+                null
             ));
         }
 
@@ -1430,7 +1480,9 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
             voter.VoterId,
             fullName,
             null,
-            matchedBy
+            matchedBy,
+            false,
+            null
         ));
     }
 
@@ -1443,10 +1495,238 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
         null,
         null,
         null,
+        null,
+        false,
         null
     ));
 })
 .WithName("VoterLookupForAuth");
+
+//===========================================
+// API ENDPOINTS - PROXY AUTHORIZATION VALIDATION
+//===========================================
+app.MapPost("/api/voter/validate-proxy-authorization", async (HttpContext httpContext, DatabaseService dbService) =>
+{
+    ProxyAuthorizationRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new ProxyAuthorizationResponse(false, "Encrypted payload is required."));
+        }
+
+        request = await DecryptEnvelopePayloadAsync<ProxyAuthorizationRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt proxy authorization payload: {ex.Message}");
+        return Results.BadRequest(new ProxyAuthorizationResponse(false, "Invalid encrypted payload."));
+    }
+
+    if (request.RepresentedVoterId == Guid.Empty || request.ProxyVoterId == Guid.Empty)
+    {
+        return Results.BadRequest(new ProxyAuthorizationResponse(false, "Represented voter and proxy voter IDs are required."));
+    }
+
+    if (request.RepresentedVoterId == request.ProxyVoterId)
+    {
+        return Results.BadRequest(new ProxyAuthorizationResponse(false, "Proxy voter cannot be the same as represented voter."));
+    }
+
+    var representedVoter = await dbService.GetVoterByIdAsync(request.RepresentedVoterId);
+    if (representedVoter == null)
+    {
+        return Results.BadRequest(new ProxyAuthorizationResponse(false, "Represented voter not found."));
+    }
+
+    if (representedVoter.HasVoted)
+    {
+        return Results.BadRequest(new ProxyAuthorizationResponse(false, "Represented voter has already voted."));
+    }
+
+    var proxyVoter = await dbService.GetVoterByIdAsync(request.ProxyVoterId);
+    if (proxyVoter == null)
+    {
+        return Results.BadRequest(new ProxyAuthorizationResponse(false, "Proxy voter not found."));
+    }
+
+    if (string.IsNullOrWhiteSpace(representedVoter.ProxySdi))
+    {
+        return Results.BadRequest(new ProxyAuthorizationResponse(false, "Represented voter has no proxy authorization configured."));
+    }
+
+    var representedProxySdi = representedVoter.ProxySdi.Trim().ToLowerInvariant();
+    var actualProxySdi = (proxyVoter.Sdi ?? string.Empty).Trim().ToLowerInvariant();
+    if (!string.Equals(representedProxySdi, actualProxySdi, StringComparison.Ordinal))
+    {
+        return Results.BadRequest(new ProxyAuthorizationResponse(false, "Proxy voter is not authorized for represented voter."));
+    }
+
+    return Results.Ok(new ProxyAuthorizationResponse(true, "Proxy authorization validated."));
+})
+.RequireAuthorization(policy => policy.RequireRole("voter"))
+.WithName("ValidateProxyAuthorization");
+
+//===========================================
+// API ENDPOINTS - OFFICIAL PROXY ASSIGNMENT
+//===========================================
+app.MapPost("/api/official/assign-proxy-voter", async (HttpContext httpContext, DatabaseService dbService) =>
+{
+    AssignProxyVoterRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new AssignProxyVoterResponse(false, "Encrypted payload is required.", null, null));
+        }
+
+        request = await DecryptEnvelopePayloadAsync<AssignProxyVoterRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt assign-proxy payload: {ex.Message}");
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Invalid encrypted payload.", null, null));
+    }
+
+    if (string.IsNullOrWhiteSpace(request.RepresentedFirstName) ||
+        string.IsNullOrWhiteSpace(request.RepresentedLastName) ||
+        string.IsNullOrWhiteSpace(request.RepresentedDateOfBirth) ||
+        string.IsNullOrWhiteSpace(request.RepresentedPostCode) ||
+        string.IsNullOrWhiteSpace(request.RepresentedTownOfBirth) ||
+        string.IsNullOrWhiteSpace(request.ProxyFirstName) ||
+        string.IsNullOrWhiteSpace(request.ProxyLastName) ||
+        string.IsNullOrWhiteSpace(request.ProxyDateOfBirth) ||
+        string.IsNullOrWhiteSpace(request.ProxyPostCode) ||
+        string.IsNullOrWhiteSpace(request.ProxyTownOfBirth) ||
+        string.IsNullOrWhiteSpace(request.ScannedFingerprint))
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "All voter, proxy voter, and fingerprint fields are required.", null, null));
+    }
+
+    if (!DateTime.TryParse(request.RepresentedDateOfBirth, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var representedDob))
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Represented voter date of birth is invalid.", null, null));
+    }
+
+    if (!DateTime.TryParse(request.ProxyDateOfBirth, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var proxyDob))
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Proxy voter date of birth is invalid.", null, null));
+    }
+
+    var representedCanonicalIdentity = BuildIdentityCanonicalString(
+        request.RepresentedFirstName,
+        request.RepresentedLastName,
+        representedDob,
+        request.RepresentedPostCode,
+        request.RepresentedTownOfBirth);
+    var representedSdi = ComputeSdiHmacSha256(representedCanonicalIdentity, sdiHmacSecret!);
+
+    var proxyCanonicalIdentity = BuildIdentityCanonicalString(
+        request.ProxyFirstName,
+        request.ProxyLastName,
+        proxyDob,
+        request.ProxyPostCode,
+        request.ProxyTownOfBirth);
+    var proxySdi = ComputeSdiHmacSha256(proxyCanonicalIdentity, sdiHmacSecret!);
+
+    if (string.Equals(representedSdi, proxySdi, StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Proxy voter cannot be the same as the represented voter.", null, null));
+    }
+
+    var representedVoter = await dbService.GetVoterBySdiAsync(representedSdi);
+    if (representedVoter == null)
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Represented voter not found.", null, null));
+    }
+
+    var proxyVoter = await dbService.GetVoterBySdiAsync(proxySdi);
+    if (proxyVoter == null)
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Proxy voter not found.", null, null));
+    }
+
+    if (representedVoter.HasVoted)
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Represented voter has already voted.", null, null));
+    }
+
+    if (representedVoter.FingerprintScan == null || representedVoter.FingerprintScan.Length == 0)
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Represented voter fingerprint is missing.", null, null));
+    }
+
+    byte[] storedFingerprintBytes;
+    try
+    {
+        storedFingerprintBytes = await DecryptVoterFingerprintAsync(representedVoter);
+    }
+    catch (Exception ex)
+    {
+        var wrappedDekLength = representedVoter.WrappedDek?.Length ?? 0;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to decrypt represented voter fingerprint for voter ID {representedVoter.VoterId}: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId={representedVoter.KeyId ?? "<null>"}, WrappedDekBytes={wrappedDekLength}");
+        return Results.Json(new
+        {
+            success = false,
+            message = "Represented voter fingerprint decryption unavailable. Configure voter encryption private key.",
+            code = "VOTER_DECRYPTION_UNAVAILABLE"
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    byte[] scannedFingerprintBytes;
+    try
+    {
+        scannedFingerprintBytes = Convert.FromBase64String(request.ScannedFingerprint);
+    }
+    catch (FormatException)
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Scanned fingerprint must be valid base64.", null, null));
+    }
+
+    const double MATCH_THRESHOLD = 40.0;
+    var scannedImage = new FingerprintImage(scannedFingerprintBytes);
+    var storedImage = new FingerprintImage(storedFingerprintBytes);
+    var scannedTemplate = new FingerprintTemplate(scannedImage);
+    var storedTemplate = new FingerprintTemplate(storedImage);
+    var matcher = new FingerprintMatcher(scannedTemplate);
+    var score = matcher.Match(storedTemplate);
+
+    if (score < MATCH_THRESHOLD)
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, "Fingerprint scan is not a match for the represented voter.", null, null));
+    }
+
+    var assignResult = await dbService.AssignProxyToVoterAsync(representedVoter.VoterId, proxySdi);
+    if (!assignResult.Success)
+    {
+        return Results.BadRequest(new AssignProxyVoterResponse(false, assignResult.Message, null, null));
+    }
+
+    return Results.Ok(new AssignProxyVoterResponse(
+        true,
+        "Proxy voter assigned successfully.",
+        representedVoter.VoterId,
+        proxyVoter.VoterId));
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("AssignProxyVoter");
 
 //===========================================
 // API ENDPOINTS - VOTER-OFFICIAL LINKING
@@ -1623,6 +1903,16 @@ app.MapPost("/api/voter/cast-vote", async (CastVoteRequest request,
         return Results.BadRequest(new CastVoteResponse(
             false,
             "Vote failed: voter identity missing",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (request.ProxyVoterDatabaseId.HasValue)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote cast rejected - proxy voter context sent to personal vote endpoint");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: proxy context must use proxy vote endpoint",
             DateTime.UtcNow
         ));
     }
@@ -1837,6 +2127,326 @@ app.MapPost("/api/voter/cast-vote", async (CastVoteRequest request,
 })
 .RequireAuthorization(policy => policy.RequireRole("voter"))
 .WithName("CastVote");
+
+app.MapPost("/api/voter/cast-proxy-vote", async (HttpContext httpContext,
+    ClaimsPrincipal user,
+    ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
+    ApplicationDbContext dbContext,
+    IHubContext<VotingHub> hubContext,
+    [FromServices] ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>> countyVoteChannels) =>
+{
+    CastVoteRequest request;
+    try
+    {
+        httpContext.Request.EnableBuffering();
+        using var reader = new StreamReader(httpContext.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        httpContext.Request.Body.Position = 0;
+
+        using var json = JsonDocument.Parse(rawBody);
+        var root = json.RootElement;
+
+        if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
+        {
+            return Results.BadRequest(new CastVoteResponse(
+                false,
+                "Encrypted payload is required",
+                DateTime.UtcNow
+            ));
+        }
+
+        request = await DecryptEnvelopePayloadAsync<CastVoteRequest>(wrappedDek, encryptedPayload);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt proxy vote cast payload: {ex.Message}");
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Invalid encrypted payload",
+            DateTime.UtcNow
+        ));
+    }
+
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Proxy vote cast attempt - Voter ID: {request.VoterId}, County: {request.County}, Constituency: {request.Constituency}, StationId: {request.PollingStationId}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Proxy vote for: {request.CandidateName} - {request.PartyName} (CandidateId: {request.CandidateId})");
+
+    if (request.CandidateId == Guid.Empty || request.PollingStationId == Guid.Empty)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: candidate and station IDs are required",
+            DateTime.UtcNow
+        ));
+    }
+
+    var tokenVoterId = user.FindFirst("voterId")?.Value;
+    var tokenCounty = user.FindFirst("county")?.Value;
+    var tokenConstituency = user.FindFirst("constituency")?.Value;
+    var tokenStationId = user.FindFirst("stationId")?.Value;
+    var tokenOfficialId = user.FindFirst("officialId")?.Value;
+
+    if (!int.TryParse(tokenVoterId, out var parsedTokenVoterId) || parsedTokenVoterId != request.VoterId)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid voter token context",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (!string.Equals(tokenCounty, request.County, StringComparison.Ordinal) ||
+        !string.Equals(tokenConstituency, request.Constituency, StringComparison.Ordinal))
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid location context",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (!string.IsNullOrWhiteSpace(tokenStationId) &&
+        !string.Equals(tokenStationId, request.PollingStationId.ToString(), StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid polling station context",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (!request.VoterDatabaseId.HasValue || request.VoterDatabaseId == Guid.Empty)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: represented voter identity missing",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (!request.ProxyVoterDatabaseId.HasValue || request.ProxyVoterDatabaseId == Guid.Empty)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: proxy voter identity missing",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (request.VoterDatabaseId == request.ProxyVoterDatabaseId)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: proxy voter cannot be the same as represented voter",
+            DateTime.UtcNow
+        ));
+    }
+
+    var representedVoter = await dbContext.Voters.FirstOrDefaultAsync(v => v.VoterId == request.VoterDatabaseId.Value);
+    if (representedVoter == null)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: represented voter not found",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (representedVoter.HasVoted)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Represented voter has already voted. Please speak to an official.",
+            DateTime.UtcNow
+        ));
+    }
+
+    var proxyVoter = await dbContext.Voters.FirstOrDefaultAsync(v => v.VoterId == request.ProxyVoterDatabaseId.Value);
+    if (proxyVoter == null)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: proxy voter not found",
+            DateTime.UtcNow
+        ));
+    }
+
+    if (string.IsNullOrWhiteSpace(representedVoter.ProxySdi))
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: represented voter has no proxy authorization configured",
+            DateTime.UtcNow
+        ));
+    }
+
+    var representedProxySdi = representedVoter.ProxySdi.Trim().ToLowerInvariant();
+    var actualProxySdi = (proxyVoter.Sdi ?? string.Empty).Trim().ToLowerInvariant();
+    if (!string.Equals(representedProxySdi, actualProxySdi, StringComparison.Ordinal))
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: proxy voter is not authorized for represented voter",
+            DateTime.UtcNow
+        ));
+    }
+
+    var constituencyId = await dbContext.Constituencies
+        .Where(c => EF.Functions.ILike(c.Name, request.Constituency))
+        .Select(c => (Guid?)c.ConstituencyId)
+        .FirstOrDefaultAsync();
+
+    if (!constituencyId.HasValue)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: constituency not found",
+            DateTime.UtcNow
+        ));
+    }
+
+    var candidateExists = await dbContext.Candidates.AnyAsync(c =>
+        c.CandidateId == request.CandidateId && c.ElectionId == currentElectionId);
+
+    if (!candidateExists)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid candidate for current election",
+            DateTime.UtcNow
+        ));
+    }
+
+    var pollingStationExists = await dbContext.PollingStations.AnyAsync(ps =>
+        ps.PollingStationId == request.PollingStationId && ps.ConstituencyId == constituencyId.Value);
+
+    if (!pollingStationExists)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: invalid polling station for constituency",
+            DateTime.UtcNow
+        ));
+    }
+
+    var allOfficials = activeOfficials.ToList();
+    var officialsWithVoter = allOfficials
+        .Where(o => o.Value.ConnectedVoters.Contains(request.VoterId))
+        .ToList();
+
+    var officialsInConstituency = officialsWithVoter
+        .Where(o => o.Value.Constituency == request.Constituency)
+        .ToList();
+
+    if (officialsInConstituency.Count == 0)
+    {
+        var fallbackOfficials = allOfficials.Where(o =>
+            o.Value.Constituency == request.Constituency &&
+            (
+                (!string.IsNullOrEmpty(tokenOfficialId) && o.Value.OfficialId == tokenOfficialId) ||
+                (!string.IsNullOrEmpty(tokenStationId) && o.Value.StationId == tokenStationId)
+            ))
+            .ToList();
+
+        if (fallbackOfficials.Count > 0)
+        {
+            foreach (var kvp in fallbackOfficials)
+            {
+                if (!kvp.Value.ConnectedVoters.Contains(request.VoterId))
+                {
+                    var healed = kvp.Value with { ConnectedVoters = new List<int>(kvp.Value.ConnectedVoters) { request.VoterId } };
+                    activeOfficials[kvp.Key] = healed;
+                }
+            }
+
+            officialsInConstituency = fallbackOfficials;
+        }
+    }
+
+    if (officialsInConstituency.Count == 0)
+    {
+        return Results.BadRequest(new CastVoteResponse(
+            false,
+            "Vote failed: Voter not properly linked to official system",
+            DateTime.UtcNow
+        ));
+    }
+
+    try
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
+        representedVoter.HasVoted = true;
+        await dbContext.SaveChangesAsync();
+
+        var voteRecord = new VoteRecord
+        {
+            RecordId = Guid.NewGuid(),
+            ElectionId = currentElectionId,
+            CandidateId = request.CandidateId,
+            ConstituencyId = constituencyId.Value,
+            PollingStationId = request.PollingStationId,
+            VotedAt = DateTime.UtcNow
+        };
+
+        dbContext.VoteRecords.Add(voteRecord);
+        await dbContext.SaveChangesAsync();
+
+        await transaction.CommitAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Proxy vote cast failed - database insert error: {ex.Message}");
+        return Results.Problem(
+            detail: "Vote failed: could not persist vote record",
+            statusCode: StatusCodes.Status500InternalServerError
+        );
+    }
+
+    var voteNotification = new VoteNotification(
+        request.VoterId,
+        request.CandidateName,
+        request.PartyName,
+        DateTime.UtcNow,
+        string.Empty,
+        string.Empty,
+        request.County,
+        request.Constituency
+    );
+
+    var officialQueues = countyVoteChannels.GetOrAdd(request.County, _ => new ConcurrentDictionary<string, ConcurrentBag<VoteNotification>>());
+
+    foreach (var kvp in officialsInConstituency)
+    {
+        var thisOfficialId = kvp.Value.OfficialId;
+        var stationId = kvp.Value.StationId;
+
+        var individualNotification = voteNotification with
+        {
+            OfficialId = thisOfficialId,
+            StationId = stationId
+        };
+
+        var officialQueue = officialQueues.GetOrAdd(thisOfficialId, _ => new ConcurrentBag<VoteNotification>());
+        officialQueue.Add(individualNotification);
+        _ = hubContext.Clients.Group(RealtimeGroups.Official(thisOfficialId)).SendAsync("official.v1.voteReceived", new
+        {
+            voterId = individualNotification.VoterId,
+            candidateName = individualNotification.CandidateName,
+            partyName = individualNotification.PartyName,
+            timestamp = individualNotification.Timestamp,
+            officialId = individualNotification.OfficialId,
+            stationId = individualNotification.StationId
+        });
+    }
+
+    return Results.Ok(new CastVoteResponse(
+        true,
+        "Proxy vote successfully cast",
+        DateTime.UtcNow
+    ));
+})
+.RequireAuthorization(policy => policy.RequireRole("voter"))
+.WithName("CastProxyVote");
 
 //===========================================
 // DEVICE STATUS ENDPOINT
@@ -2577,67 +3187,189 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
             // VOTER VERIFICATION PATH
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🗳️  Processing VOTER fingerprint verification");
 
-            // Validate voter ID
-            if (string.IsNullOrEmpty(request.VoterId))
+            var hasSingleVoterId = !string.IsNullOrWhiteSpace(request.VoterId);
+            var candidateIdStrings = request.CandidateVoterIds ?? new List<string>();
+            var hasCandidateList = candidateIdStrings.Count > 0;
+
+            if (hasSingleVoterId == hasCandidateList)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing VoterId for voter verification");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid voter verification payload - expected either VoterId or CandidateVoterIds");
                 return Results.BadRequest(new { 
                     success = false, 
-                    message = "VoterId is required for voters" 
+                    message = "Provide either VoterId or CandidateVoterIds for voter verification" 
                 });
             }
 
-            // Parse VoterId as Guid
-            if (!Guid.TryParse(request.VoterId, out Guid voterGuid))
+            var candidateGuids = new List<Guid>();
+
+            if (hasSingleVoterId)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid VoterId format: {request.VoterId}");
-                return Results.BadRequest(new { 
-                    success = false, 
-                    message = "VoterId must be a valid GUID" 
-                });
+                if (!Guid.TryParse(request.VoterId, out Guid voterGuid))
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid VoterId format: {request.VoterId}");
+                    return Results.BadRequest(new {
+                        success = false,
+                        message = "VoterId must be a valid GUID"
+                    });
+                }
+
+                candidateGuids.Add(voterGuid);
+            }
+            else
+            {
+                var seen = new HashSet<Guid>();
+                foreach (var candidateId in candidateIdStrings)
+                {
+                    if (!Guid.TryParse(candidateId, out var parsedId))
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid candidate voter ID format: {candidateId}");
+                        return Results.BadRequest(new
+                        {
+                            success = false,
+                            message = "CandidateVoterIds must contain valid GUID values"
+                        });
+                    }
+
+                    if (seen.Add(parsedId))
+                    {
+                        candidateGuids.Add(parsedId);
+                    }
+                }
             }
 
-            // Fetch voter from database by VoterId
-            var voter = await dbService.GetVoterByIdAsync(voterGuid);
-            
-            if (voter == null)
+            if (candidateGuids.Count == 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Record not found - no voter with ID {request.VoterId}");
-                return Results.BadRequest(new { 
-                    success = false, 
-                    message = "Record not found" 
-                });
-            }
-
-            // Get stored fingerprint from database
-            if (voter.FingerprintScan == null || voter.FingerprintScan.Length == 0)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ No stored fingerprint found for voter ID {voter.VoterId}");
-                return Results.BadRequest(new { 
-                    success = false, 
-                    message = "No stored fingerprint on record" 
-                });
-            }
-
-            try
-            {
-                storedFingerprintBytes = await DecryptVoterFingerprintAsync(voter);
-            }
-            catch (Exception ex)
-            {
-                var wrappedDekLength = voter.WrappedDek?.Length ?? 0;
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to decrypt voter fingerprint for voter ID {voter.VoterId}: {ex.Message}");
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId={voter.KeyId ?? "<null>"}, WrappedDekBytes={wrappedDekLength}");
-                return Results.Json(new
+                return Results.BadRequest(new
                 {
                     success = false,
-                    message = "Voter fingerprint decryption unavailable. Configure voter encryption private key.",
-                    code = "VOTER_DECRYPTION_UNAVAILABLE"
-                }, statusCode: StatusCodes.Status503ServiceUnavailable);
+                    message = "No valid voter candidates provided"
+                });
             }
 
-            userIdentifier = voter.VoterId.ToString();
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter found, decrypted stored fingerprint ({storedFingerprintBytes.Length} bytes)");
+            if (candidateGuids.Count > 10)
+            {
+                return Results.BadRequest(new
+                {
+                    success = false,
+                    message = "Too many candidate voters provided"
+                });
+            }
+
+            // Decode scanned fingerprint once, then compare against all candidates.
+            var scannedFingerprintBytesForCandidates = Convert.FromBase64String(request.ScannedFingerprint);
+            var scannedImageForCandidates = new FingerprintImage(scannedFingerprintBytesForCandidates);
+            var scannedTemplateForCandidates = new FingerprintTemplate(scannedImageForCandidates);
+            var matcherForCandidates = new FingerprintMatcher(scannedTemplateForCandidates);
+
+            var candidateVoters = await dbService.GetVotersByIdsAsync(candidateGuids);
+            if (candidateVoters.Count == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Record not found - no voter records for supplied candidate IDs");
+                return Results.BadRequest(new {
+                    success = false,
+                    message = "Record not found"
+                });
+            }
+
+            var orderedCandidates = candidateGuids
+                .Select(id => candidateVoters.FirstOrDefault(v => v.VoterId == id))
+                .Where(v => v != null)
+                .Cast<Voter>()
+                .ToList();
+
+            if (orderedCandidates.Count == 0)
+            {
+                return Results.BadRequest(new
+                {
+                    success = false,
+                    message = "Record not found"
+                });
+            }
+
+            var bestScore = 0.0;
+            var bestMargin = 0.0;
+
+            foreach (var candidate in orderedCandidates)
+            {
+                if (candidate.FingerprintScan == null || candidate.FingerprintScan.Length == 0)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Candidate {candidate.VoterId} has no stored fingerprint; skipping");
+                    continue;
+                }
+
+                byte[] decryptedCandidatePrint;
+                try
+                {
+                    decryptedCandidatePrint = await DecryptVoterFingerprintAsync(candidate);
+                }
+                catch (Exception ex)
+                {
+                    var wrappedDekLength = candidate.WrappedDek?.Length ?? 0;
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Failed to decrypt voter fingerprint for candidate {candidate.VoterId}: {ex.Message}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId={candidate.KeyId ?? "<null>"}, WrappedDekBytes={wrappedDekLength}");
+                    continue;
+                }
+
+                var candidateStoredImage = new FingerprintImage(decryptedCandidatePrint);
+                var candidateStoredTemplate = new FingerprintTemplate(candidateStoredImage);
+                var candidateScore = matcherForCandidates.Match(candidateStoredTemplate);
+                var candidateIsMatch = candidateScore >= MATCH_THRESHOLD;
+                var candidateMargin = candidateIsMatch ? candidateScore - MATCH_THRESHOLD : MATCH_THRESHOLD - candidateScore;
+
+                if (candidateScore > bestScore)
+                {
+                    bestScore = candidateScore;
+                    bestMargin = candidateMargin;
+                }
+
+                if (!candidateIsMatch)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Candidate no-match - VOTER: {candidate.VoterId} (Score: {candidateScore:F2})");
+                    continue;
+                }
+
+                if (candidate.HasVoted)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ FINGERPRINT MATCHED ALREADY-VOTED VOTER: {candidate.VoterId}");
+                    return Results.BadRequest(new
+                    {
+                        success = false,
+                        isMatch = true,
+                        userType = "voter",
+                        matchedVoterId = candidate.VoterId,
+                        message = "You have already voted. Please speak to an official.",
+                        score = Math.Round(candidateScore, 2),
+                        threshold = MATCH_THRESHOLD,
+                        margin = Math.Round(candidateMargin, 2)
+                    });
+                }
+
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ FINGERPRINT MATCH - VOTER: {candidate.VoterId} (Score: {candidateScore:F2})");
+                return Results.Ok(new
+                {
+                    success = true,
+                    isMatch = true,
+                    userType = "voter",
+                    matchedVoterId = candidate.VoterId,
+                    message = "Fingerprint match",
+                    score = Math.Round(candidateScore, 2),
+                    threshold = MATCH_THRESHOLD,
+                    margin = Math.Round(candidateMargin, 2),
+                    timestamp = DateTime.Now
+                });
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ FINGERPRINT NO MATCH - VOTER candidates exhausted ({orderedCandidates.Count} checked)");
+            return Results.BadRequest(new
+            {
+                success = false,
+                isMatch = false,
+                userType = "voter",
+                message = "Fingerprint scan is not a match",
+                score = Math.Round(bestScore, 2),
+                threshold = MATCH_THRESHOLD,
+                margin = Math.Round(bestMargin, 2)
+            });
         }
 
         // COMMON FINGERPRINT COMPARISON LOGIC (applies to both official and voter)
@@ -2745,6 +3477,7 @@ record CreateVoterRequest(
     string FirstName,
     string LastName,
     string DateOfBirth,
+    string TownOfBirth,
     string AddressLine1,
     string AddressLine2,
     string PostCode,
@@ -2761,6 +3494,7 @@ record CreateVoterRequest(
     string? EncryptedFirstName,
     string? EncryptedLastName,
     string? EncryptedDateOfBirth,
+    string? EncryptedTownOfBirth,
     string? EncryptedAddressLine1,
     string? EncryptedAddressLine2,
     string? EncryptedPostCode,
@@ -2834,6 +3568,7 @@ record VoterLinkResponse(
 record CastVoteRequest(
     int VoterId,
     Guid? VoterDatabaseId,
+    Guid? ProxyVoterDatabaseId,
     string County,
     Guid PollingStationId,
     Guid CandidateId,
@@ -2900,6 +3635,7 @@ record VerifyFingerprintsRequest(
     string? Username,             // Official username for database lookup (null for voters)
     string? Password,             // Official password for authentication (null for voters)
     string? VoterId,              // Voter unique ID as string (null for officials)
+    List<string>? CandidateVoterIds, // Optional list of voter IDs for SDI collision disambiguation
     string? ScannedFingerprint    // Base64 encoded newly scanned fingerprint (PNG format)
 );
 
@@ -2909,6 +3645,7 @@ record VoterAuthLookupRequest(
     string? LastName,
     string? DateOfBirth,
     string? PostCode,
+    string? TownOfBirth,
     string? County,
     string? Constituency
 );
@@ -2919,7 +3656,40 @@ record VoterAuthLookupResponse(
     Guid? VoterId,
     string? FullName,
     byte[]? FingerprintScan,
-    string? MatchedBy
+    string? MatchedBy,
+    bool RequiresDisambiguation,
+    List<Guid>? CandidateVoterIds
+);
+
+record ProxyAuthorizationRequest(
+    Guid RepresentedVoterId,
+    Guid ProxyVoterId
+);
+
+record ProxyAuthorizationResponse(
+    bool Success,
+    string Message
+);
+
+record AssignProxyVoterRequest(
+    string RepresentedFirstName,
+    string RepresentedLastName,
+    string RepresentedDateOfBirth,
+    string RepresentedPostCode,
+    string RepresentedTownOfBirth,
+    string ProxyFirstName,
+    string ProxyLastName,
+    string ProxyDateOfBirth,
+    string ProxyPostCode,
+    string ProxyTownOfBirth,
+    string ScannedFingerprint
+);
+
+record AssignProxyVoterResponse(
+    bool Success,
+    string Message,
+    Guid? RepresentedVoterId,
+    Guid? ProxyVoterId
 );
 
 // Thread-safe token counter for unique identities

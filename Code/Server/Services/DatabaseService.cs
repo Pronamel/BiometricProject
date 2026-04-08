@@ -240,6 +240,7 @@ public class DatabaseService
         string encryptedFirstName,
         string encryptedLastName,
         string encryptedDateOfBirth,
+        string encryptedTownOfBirth,
         string encryptedAddressLine1,
         string encryptedAddressLine2,
         string encryptedPostCode,
@@ -257,6 +258,7 @@ public class DatabaseService
                 string.IsNullOrWhiteSpace(encryptedFirstName) ||
                 string.IsNullOrWhiteSpace(encryptedLastName) ||
                 string.IsNullOrWhiteSpace(encryptedDateOfBirth) ||
+                string.IsNullOrWhiteSpace(encryptedTownOfBirth) ||
                 string.IsNullOrWhiteSpace(encryptedAddressLine1) ||
                 string.IsNullOrWhiteSpace(encryptedAddressLine2) ||
                 string.IsNullOrWhiteSpace(encryptedPostCode) ||
@@ -273,13 +275,12 @@ public class DatabaseService
                 return (false, "Constituency name not found", null);
             }
 
-            // Check if a voter with this SDI already exists
-            var existingVoter = await _dbContext.Voters
-                .FirstOrDefaultAsync(v => v.Sdi == sdi);
-
-            if (existingVoter != null)
+            // SDI collisions are allowed (e.g., twins/triplets with identical identity fields).
+            var existingSdiCount = await _dbContext.Voters
+                .CountAsync(v => v.Sdi == sdi);
+            if (existingSdiCount > 0)
             {
-                return (false, "A voter with this identity information has already been registered", null);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Creating voter with non-unique SDI. Existing records: {existingSdiCount}");
             }
 
             byte[] wrappedDek;
@@ -287,6 +288,7 @@ public class DatabaseService
             byte[] encryptedFirstNameBytes;
             byte[] encryptedLastNameBytes;
             byte[] encryptedDateOfBirthBytes;
+            byte[] encryptedTownOfBirthBytes;
             byte[] encryptedAddressLine1Bytes;
             byte[] encryptedAddressLine2Bytes;
             byte[] encryptedPostCodeBytes;
@@ -299,6 +301,7 @@ public class DatabaseService
                 encryptedFirstNameBytes = Convert.FromBase64String(encryptedFirstName.Trim());
                 encryptedLastNameBytes = Convert.FromBase64String(encryptedLastName.Trim());
                 encryptedDateOfBirthBytes = Convert.FromBase64String(encryptedDateOfBirth.Trim());
+                encryptedTownOfBirthBytes = Convert.FromBase64String(encryptedTownOfBirth.Trim());
                 encryptedAddressLine1Bytes = Convert.FromBase64String(encryptedAddressLine1.Trim());
                 encryptedAddressLine2Bytes = Convert.FromBase64String(encryptedAddressLine2.Trim());
                 encryptedPostCodeBytes = Convert.FromBase64String(encryptedPostCode.Trim());
@@ -319,6 +322,7 @@ public class DatabaseService
                 FirstName = encryptedFirstNameBytes,
                 LastName = encryptedLastNameBytes,
                 DateOfBirth = encryptedDateOfBirthBytes,
+                TownOfBirth = encryptedTownOfBirthBytes,
                 AddressLine1 = encryptedAddressLine1Bytes,
                 PreviousAddress = encryptedAddressLine2Bytes,
                 Postcode = encryptedPostCodeBytes,
@@ -446,35 +450,122 @@ public class DatabaseService
     {
         try
         {
-            var normalizedSdi = sdi.Trim().ToLowerInvariant();
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voter by SDI");
-
-            var matches = await _dbContext.Voters
-                .Include(v => v.Constituency)
-                .Where(v => v.Sdi != null && v.Sdi == normalizedSdi)
-                .Take(2)
-                .ToListAsync();
-
+            var matches = await GetVotersBySdiAsync(sdi, limit: 2);
             if (matches.Count == 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with provided SDI");
                 return null;
             }
 
             if (matches.Count > 1)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Multiple voters matched same SDI; using first match for now");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Multiple voters matched same SDI; returning first match for compatibility");
             }
 
-            var voter = matches[0];
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found by SDI: ID={voter.VoterId}");
-            return voter;
+            return matches[0];
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by SDI: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return null;
+        }
+    }
+
+    public async Task<List<Voter>> GetVotersBySdiAsync(string sdi, int limit = 10)
+    {
+        try
+        {
+            var normalizedSdi = sdi.Trim().ToLowerInvariant();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voters by SDI");
+
+            var safeLimit = Math.Clamp(limit, 1, 50);
+            var matches = await _dbContext.Voters
+                .Include(v => v.Constituency)
+                .Where(v => v.Sdi != null && v.Sdi == normalizedSdi)
+                .OrderBy(v => v.RegisteredDate)
+                .ThenBy(v => v.VoterId)
+                .Take(safeLimit)
+                .ToListAsync();
+
+            if (matches.Count == 0)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with provided SDI");
+                return new List<Voter>();
+            }
+
+            if (matches.Count > 1)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  SDI collision detected. Candidate count: {matches.Count}");
+            }
+
+            return matches;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voters by SDI: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return new List<Voter>();
+        }
+    }
+
+    public async Task<List<Voter>> GetVotersByIdsAsync(IEnumerable<Guid> voterIds)
+    {
+        try
+        {
+            var ids = voterIds
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (ids.Count == 0)
+            {
+                return new List<Voter>();
+            }
+
+            var voters = await _dbContext.Voters
+                .Where(v => ids.Contains(v.VoterId))
+                .ToListAsync();
+
+            return voters;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voters by ID list: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return new List<Voter>();
+        }
+    }
+
+    public async Task<(bool Success, string Message)> AssignProxyToVoterAsync(Guid representedVoterId, string proxySdi)
+    {
+        try
+        {
+            if (representedVoterId == Guid.Empty || string.IsNullOrWhiteSpace(proxySdi))
+            {
+                return (false, "Represented voter and proxy identity are required");
+            }
+
+            var normalizedProxySdi = proxySdi.Trim().ToLowerInvariant();
+            var representedVoter = await _dbContext.Voters
+                .FirstOrDefaultAsync(v => v.VoterId == representedVoterId);
+
+            if (representedVoter == null)
+            {
+                return (false, "Represented voter not found");
+            }
+
+            representedVoter.ProxySdi = normalizedProxySdi;
+            _dbContext.Voters.Update(representedVoter);
+            await _dbContext.SaveChangesAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Proxy SDI assigned for voter {representedVoter.VoterId}");
+            return (true, "Proxy voter assigned successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error assigning proxy voter: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            return (false, "Failed to assign proxy voter");
         }
     }
 

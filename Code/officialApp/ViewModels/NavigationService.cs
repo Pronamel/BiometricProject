@@ -16,6 +16,7 @@ public interface INavigationService
     void NavigateToOfficialGenerateAccessCode();
     void NavigateToOfficialVotingPollingManager();
     void NavigateToOfficialAddVoter();
+    void NavigateToOfficialAssignProxy();
     void NavigateToView(UserControl view);
     
     // Events to notify when navigation happens
@@ -47,6 +48,7 @@ public class NavigationService : INavigationService
     private UserControl? _officialGenerateAccessCodeView;
     private UserControl? _officialVotingPollingManagerView;
     private UserControl? _officialAddVoterView;
+    private UserControl? _officialAssignProxyView;
 
     // ==========================================
     // PRIVATE FIELDS - VIEW FACTORY FUNCTIONS
@@ -59,6 +61,7 @@ public class NavigationService : INavigationService
     private Func<UserControl>? _getOfficialGenerateAccessCodeView;
     private Func<UserControl>? _getOfficialVotingPollingManagerView;
     private Func<UserControl>? _getOfficialAddVoterView;
+    private Func<UserControl>? _getOfficialAssignProxyView;
 
     // ==========================================
     // INITIALIZATION METHODS
@@ -71,7 +74,8 @@ public class NavigationService : INavigationService
         Func<UserControl> getOfficialMenuView,
         Func<UserControl> getOfficialGenerateAccessCodeView,
         Func<UserControl> getOfficialVotingPollingManagerView,
-        Func<UserControl> getOfficialAddVoterView)
+        Func<UserControl> getOfficialAddVoterView,
+        Func<UserControl> getOfficialAssignProxyView)
     {
         _getOfficialLoginView = getOfficialLoginView;
         _getOfficialAuthenticateView = getOfficialAuthenticateView;
@@ -79,6 +83,7 @@ public class NavigationService : INavigationService
         _getOfficialGenerateAccessCodeView = getOfficialGenerateAccessCodeView;
         _getOfficialVotingPollingManagerView = getOfficialVotingPollingManagerView;
         _getOfficialAddVoterView = getOfficialAddVoterView;
+        _getOfficialAssignProxyView = getOfficialAssignProxyView;
     }
 
     // ==========================================
@@ -148,6 +153,18 @@ public class NavigationService : INavigationService
 
         if (_officialAddVoterView != null)
             NavigationRequested?.Invoke(_officialAddVoterView);
+    }
+
+    public void NavigateToOfficialAssignProxy()
+    {
+        if (_officialAssignProxyView == null && _getOfficialAssignProxyView != null)
+            _officialAssignProxyView = _getOfficialAssignProxyView();
+
+        if (_officialAssignProxyView?.DataContext is OfficialAssignProxyViewModel vm)
+            vm.ResetForm();
+
+        if (_officialAssignProxyView != null)
+            NavigationRequested?.Invoke(_officialAssignProxyView);
     }
 
     public void NavigateToView(UserControl view)

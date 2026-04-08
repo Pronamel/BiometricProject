@@ -7,19 +7,19 @@ namespace SecureVoteApp.Services;
 
 public interface IServerHandler
 {
-    // Basic Server Communication
-    Task<bool> TestConnectionAsync();
-    
     // Voter Authentication & Session Management
     bool IsAuthenticated { get; }
     string? CurrentVoterId { get; }
     string? AssignedStationId { get; }
     string CurrentDeviceStatus { get; set; }
     Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
-    Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency);
+    Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string? townOfBirth, string county, string constituency);
     Task<List<Candidate>> FetchCandidatesAsync();
     Task<CastVoteResponse> CastVoteAsync(Guid candidateId, string candidateName, string partyName);
-    Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint);
+    Task<ProxyAuthorizationResponse?> ValidateProxyAuthorizationAsync(Guid representedVoterId, Guid proxyVoterId);
+    void ConfigureProxyVotingSession(Guid representedVoterId, Guid proxyVoterId);
+    void ClearProxyVotingSession();
+    Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string? voterId, byte[] scannedFingerprint, List<string>? candidateVoterIds = null);
     void Logout();
     
     // Voter Access Management

@@ -9,13 +9,16 @@ public interface IApiService
 {
     // Authentication & Session Management
     Task<VoterLinkResponse> LinkToOfficialAsync(string pollingStationCode, string county, string constituency);
-    Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string county, string constituency);
+    Task<VoterAuthLookupResponse?> LookupVoterForAuthAsync(string? firstName, string? lastName, string? dateOfBirth, string? postCode, string? townOfBirth, string county, string constituency);
     
     // Candidates
     Task<List<Candidate>> FetchCandidatesAsync();
     
     // Vote Casting
     Task<CastVoteResponse> CastVoteAsync(Guid candidateId, string candidateName, string partyName);
+    Task<ProxyAuthorizationResponse?> ValidateProxyAuthorizationAsync(Guid representedVoterId, Guid proxyVoterId);
+    void ConfigureProxyVotingSession(Guid representedVoterId, Guid proxyVoterId);
+    void ClearProxyVotingSession();
     
     // Voter State
     bool IsAuthenticated { get; }
@@ -31,9 +34,6 @@ public interface IApiService
     Task LogoutAsync();
     void Logout();
     
-    // Connection Testing
-    Task<bool> TestConnectionAsync();
-    
     // Voter Access Management
     Task<bool> RequestAccessAsync(string? deviceName = null);
     
@@ -46,5 +46,5 @@ public interface IApiService
     Task<List<VoterCommandResponse>> GetPendingDeviceCommandsAsync();
     
     // Fingerprint Verification
-    Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string voterId, byte[] scannedFingerprint);
+    Task<FingerprintVerificationResponse?> VerifyFingerprintAsync(string? voterId, byte[] scannedFingerprint, List<string>? candidateVoterIds = null);
 }

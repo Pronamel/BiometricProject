@@ -6,7 +6,12 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="officialApp.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="Official Administration">
+        Title="Official Administration"
+        Width="1600"
+        Height="784"
+        MinWidth="1280"
+        MinHeight="640"
+        Background="#f6f2e6">
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
@@ -14,7 +19,7 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Grid>
+    <Grid Background="#f6f2e6">
         <Grid.RowDefinitions> 
             <RowDefinition Height="70"/>
             <RowDefinition Height="*"/>
@@ -30,7 +35,8 @@
         </Grid>
 
         <!-- Container for the current view -->
-        <ContentControl Grid.Row="1" 
+        <ContentControl Grid.Row="1"
+                        Background="#f6f2e6"
                         Content="{Binding CurrentView}"/>
     </Grid>
 </Window>

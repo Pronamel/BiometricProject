@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -462,19 +463,6 @@ public class ApiService : IApiService
         request.Content = content;
         AddAuthorizationHeader(request);
         return await _httpClient.SendAsync(request);
-    }
-
-    public async Task<bool> TestConnectionAsync()
-    {
-        try
-        {
-            var response = await _httpClient.GetAsync($"{_baseUrl}/securevote");
-            return response.IsSuccessStatusCode;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     //--------------------------------------------
@@ -959,6 +947,7 @@ public class ApiService : IApiService
         string firstName,
         string lastName,
         string dateOfBirth,
+        string townOfBirth,
         string addressLine1,
         string addressLine2,
         string postCode,
@@ -990,6 +979,7 @@ public class ApiService : IApiService
             if (string.IsNullOrWhiteSpace(firstName) ||
                 string.IsNullOrWhiteSpace(lastName) ||
                 string.IsNullOrWhiteSpace(dateOfBirth) ||
+                string.IsNullOrWhiteSpace(townOfBirth) ||
                 string.IsNullOrWhiteSpace(addressLine1) ||
                 string.IsNullOrWhiteSpace(postCode) ||
                 string.IsNullOrWhiteSpace(county) ||
@@ -1012,6 +1002,7 @@ public class ApiService : IApiService
             string? encryptedFirstName = null;
             string? encryptedLastName = null;
             string? encryptedDateOfBirth = null;
+            string? encryptedTownOfBirth = null;
             string? encryptedAddressLine1 = null;
             string? encryptedAddressLine2 = null;
             string? encryptedPostCode = null;
@@ -1051,6 +1042,7 @@ public class ApiService : IApiService
                 encryptedFirstName = EncryptStringToBase64(firstName, dek);
                 encryptedLastName = EncryptStringToBase64(lastName, dek);
                 encryptedDateOfBirth = EncryptStringToBase64(isoDateOfBirth, dek);
+                encryptedTownOfBirth = EncryptStringToBase64(townOfBirth, dek);
                 encryptedAddressLine1 = EncryptStringToBase64(addressLine1, dek);
                 encryptedAddressLine2 = EncryptStringToBase64(addressLine2 ?? string.Empty, dek);
                 encryptedPostCode = EncryptStringToBase64(postCode, dek);
@@ -1072,6 +1064,7 @@ public class ApiService : IApiService
                 firstName,
                 lastName,
                 dateOfBirth = isoDateOfBirth,
+                townOfBirth,
                 addressLine1 = string.Empty,
                 addressLine2 = string.Empty,
                 postCode,
@@ -1088,6 +1081,7 @@ public class ApiService : IApiService
                 encryptedFirstName,
                 encryptedLastName,
                 encryptedDateOfBirth,
+                encryptedTownOfBirth,
                 encryptedAddressLine1,
                 encryptedAddressLine2,
                 encryptedPostCode,
@@ -1183,6 +1177,159 @@ public class ApiService : IApiService
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error Message: {ex.Message}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ========== CREATE VOTER REQUEST FAILED WITH EXCEPTION ==========\n");
             return (false, $"Error: {ex.Message}");;
+        }
+    }
+
+    public async Task<ProxyAssignmentResponse?> AssignProxyVoterAsync(
+        string representedFirstName,
+        string representedLastName,
+        string representedDateOfBirth,
+        string representedPostCode,
+        string representedTownOfBirth,
+        string proxyFirstName,
+        string proxyLastName,
+        string proxyDateOfBirth,
+        string proxyPostCode,
+        string proxyTownOfBirth,
+        byte[] scannedFingerprint)
+    {
+        try
+        {
+            if (!IsAuthenticated)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Assign proxy request rejected: official is not authenticated");
+                return new ProxyAssignmentResponse
+                {
+                    Success = false,
+                    Message = "Official is not authenticated"
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(representedFirstName) ||
+                string.IsNullOrWhiteSpace(representedLastName) ||
+                string.IsNullOrWhiteSpace(representedDateOfBirth) ||
+                string.IsNullOrWhiteSpace(representedPostCode) ||
+                string.IsNullOrWhiteSpace(representedTownOfBirth) ||
+                string.IsNullOrWhiteSpace(proxyFirstName) ||
+                string.IsNullOrWhiteSpace(proxyLastName) ||
+                string.IsNullOrWhiteSpace(proxyDateOfBirth) ||
+                string.IsNullOrWhiteSpace(proxyPostCode) ||
+                string.IsNullOrWhiteSpace(proxyTownOfBirth) ||
+                scannedFingerprint == null ||
+                scannedFingerprint.Length == 0)
+            {
+                return new ProxyAssignmentResponse
+                {
+                    Success = false,
+                    Message = "All voter, proxy voter, and fingerprint fields are required"
+                };
+            }
+
+            if (!DateTime.TryParseExact(
+                    representedDateOfBirth,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsedRepresentedDob))
+            {
+                return new ProxyAssignmentResponse
+                {
+                    Success = false,
+                    Message = "Represented voter date of birth must be in yyyy-MM-dd format"
+                };
+            }
+
+            if (!DateTime.TryParseExact(
+                    proxyDateOfBirth,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsedProxyDob))
+            {
+                return new ProxyAssignmentResponse
+                {
+                    Success = false,
+                    Message = "Proxy voter date of birth must be in yyyy-MM-dd format"
+                };
+            }
+
+            var request = new
+            {
+                representedFirstName,
+                representedLastName,
+                representedDateOfBirth = parsedRepresentedDob.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                representedPostCode,
+                representedTownOfBirth,
+                proxyFirstName,
+                proxyLastName,
+                proxyDateOfBirth = parsedProxyDob.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                proxyPostCode,
+                proxyTownOfBirth,
+                scannedFingerprint = Convert.ToBase64String(scannedFingerprint)
+            };
+
+            var envelope = await BuildEncryptedEnvelopeAsync(request);
+            if (!envelope.Success)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Assign proxy encryption key unavailable");
+                return new ProxyAssignmentResponse
+                {
+                    Success = false,
+                    Message = "Encryption key unavailable"
+                };
+            }
+
+            var encryptedRequest = new
+            {
+                wrappedDek = envelope.WrappedDek,
+                encryptedPayload = envelope.EncryptedPayload
+            };
+
+            var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📤 Assigning proxy voter for represented voter: {representedFirstName} {representedLastName}");
+            var response = await SendAuthenticatedPostAsync("/api/official/assign-proxy-voter", content);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responsePayload = JsonSerializer.Deserialize<ProxyAssignmentResponse>(responseBody, _jsonOptions);
+                return responsePayload ?? new ProxyAssignmentResponse
+                {
+                    Success = true,
+                    Message = "Proxy voter assigned successfully"
+                };
+            }
+
+            string errorMessage = "Failed to assign proxy voter";
+            try
+            {
+                using var jsonDoc = JsonDocument.Parse(responseBody);
+                if (jsonDoc.RootElement.TryGetProperty("message", out var messageProp))
+                {
+                    errorMessage = messageProp.GetString() ?? errorMessage;
+                }
+            }
+            catch
+            {
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Assign proxy voter failed: {response.StatusCode} - {responseBody}");
+            return new ProxyAssignmentResponse
+            {
+                Success = false,
+                Message = errorMessage
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error assigning proxy voter: {ex.Message}");
+            return new ProxyAssignmentResponse
+            {
+                Success = false,
+                Message = $"Error: {ex.Message}"
+            };
         }
     }
 }

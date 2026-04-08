@@ -4,6 +4,7 @@ using SecureVoteApp.Views.VoterUI;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using SecureVoteApp.Services;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SecureVoteApp.ViewModels;
@@ -35,6 +36,8 @@ public partial class MainWindowViewModel : ViewModelBase
     // Navigation service
     private readonly INavigationService _navigationService;
     private readonly IServerHandler _serverHandler;
+    private readonly DeviceLockState _deviceLockState;
+    private CancellationTokenSource? _disconnectNavigationCancellation;
 
 
 
@@ -51,10 +54,12 @@ public partial class MainWindowViewModel : ViewModelBase
         AuthenticateUserViewModel authenticateUserViewModel,
         BallotPaperViewModel ballotPaperViewModel,
         INavigationService navigationService,
-        IServerHandler serverHandler)
+        IServerHandler serverHandler,
+        DeviceLockState deviceLockState)
     {
         _navigationService = navigationService;
         _serverHandler = serverHandler;
+        _deviceLockState = deviceLockState;
         
         // Subscribe to navigation events
         _navigationService.NavigationRequested += OnNavigationRequested;
@@ -85,6 +90,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // If the realtime channel dies (e.g., server crash), force UI back to login.
         _serverHandler.ConnectionStatusChanged += OnServerConnectionStatusChanged;
+        _deviceLockState.LockStateChanged += OnDeviceLockStateChanged;
     }
 
 
@@ -103,21 +109,76 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (isConnected)
         {
+            _disconnectNavigationCancellation?.Cancel();
+            _disconnectNavigationCancellation?.Dispose();
+            _disconnectNavigationCancellation = null;
+            return;
+        }
+
+        if (CurrentView == _voterLoginView)
+        {
+            return;
+        }
+
+        // Require a sustained disconnect before forcing navigation, so transient reconnects do not interrupt voting.
+        _disconnectNavigationCancellation?.Cancel();
+        _disconnectNavigationCancellation?.Dispose();
+        _disconnectNavigationCancellation = new CancellationTokenSource();
+        var cancellationToken = _disconnectNavigationCancellation.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(25), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (CurrentView == _voterLoginView)
+                {
+                    return;
+                }
+
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Server disconnected for 25s. Returning to voter login.");
+                _navigationService.NavigateToVoterLogin();
+
+                // Run logout off the UI thread so a dead server cannot freeze the window.
+                _ = Task.Run(() => _serverHandler.Logout());
+            });
+        }, cancellationToken);
+    }
+
+    private void OnDeviceLockStateChanged(bool isLocked)
+    {
+        if (!isLocked)
+        {
             return;
         }
 
         Dispatcher.UIThread.Post(() =>
         {
+            // Authentication view handles locked state in-place by disabling its controls.
+            if (CurrentView == _authenticateUserView)
+            {
+                return;
+            }
+
             if (CurrentView == _voterLoginView)
             {
                 return;
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Server disconnected. Returning to voter login.");
-            _navigationService.NavigateToVoterLogin();
-
-            // Run logout off the UI thread so a dead server cannot freeze the window.
-            _ = Task.Run(() => _serverHandler.Logout());
+            _ = _navigationService.NavigateToVoterLogin();
         });
     }
 }

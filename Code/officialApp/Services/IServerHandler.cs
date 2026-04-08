@@ -7,8 +7,6 @@ namespace officialApp.Services;
 
 public interface IServerHandler
 {
-    // Basic Server Communication
-    Task<bool> TestConnectionAsync();
     bool IsAuthenticated { get; }
 
     Task<OfficialLoginResponse?> LoginAsync(string username, string password);
@@ -24,6 +22,7 @@ public interface IServerHandler
         string firstName,
         string lastName,
         string dateOfBirth,
+        string townOfBirth,
         string addressLine1,
         string addressLine2,
         string postCode,
@@ -36,6 +35,18 @@ public interface IServerHandler
         string pollingStationId,
         string county,
         byte[] fingerprintData);
+    Task<ProxyAssignmentResponse?> AssignProxyVoterAsync(
+        string representedFirstName,
+        string representedLastName,
+        string representedDateOfBirth,
+        string representedPostCode,
+        string representedTownOfBirth,
+        string proxyFirstName,
+        string proxyLastName,
+        string proxyDateOfBirth,
+        string proxyPostCode,
+        string proxyTownOfBirth,
+        byte[] scannedFingerprint);
     Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint);
     Task<bool> SetAccessCodeAsync(string accessCode);
     Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request);

@@ -6,7 +6,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SecureVoteApp.Services;
 using SecureVoteApp.Models;
-using System.Net.Http;
 using Avalonia.Threading;
 
 namespace SecureVoteApp.ViewModels;
@@ -28,9 +27,6 @@ public partial class VoterLoginViewModel : ViewModelBase
     
     [ObservableProperty]
     private string statusMessage = "";
-
-    [ObservableProperty]
-    private string serverStatus = "Server status: Not tested";
     
     [ObservableProperty]
     private bool isConnecting = false;
@@ -103,40 +99,6 @@ public partial class VoterLoginViewModel : ViewModelBase
     // ==========================================
     // COMMANDS
     // ==========================================
-
-    [RelayCommand]
-    private async Task TestConnection()
-    {
-        if (IsConnecting) return;
-        
-        try
-        {
-            IsConnecting = true;
-            ServerStatus = "Testing connection...";
-            
-            // Test connection to server
-            using var client = new HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(3);
-            var response = await client.GetAsync("http://localhost:5000/securevote");
-            
-            if (response.IsSuccessStatusCode)
-            {
-                ServerStatus = "✅ Connected to local server (localhost:5000)";
-            }
-            else
-            {
-                ServerStatus = "❌ Server connection failed";
-            }
-        }
-        catch (Exception ex)
-        {
-            ServerStatus = $"❌ Error: {ex.Message}";
-        }
-        finally
-        {
-            IsConnecting = false;
-        }
-    }
 
     [RelayCommand]
     private async Task Continue()
@@ -240,19 +202,18 @@ public partial class VoterLoginViewModel : ViewModelBase
         switch (commandType)
         {
             case "lock_device":
-                _deviceLockState.IsLocked = true;
+                _deviceLockState.SetLocked(true);
                 _serverHandler.CurrentDeviceStatus = "Locked by official";
                 await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     StatusMessage = "🔒 Device locked by official";
-                    _ = _navigationService.NavigateToVoterLogin();
                 });
                 break;
 
             case "unlock_device":
-                _deviceLockState.IsLocked = false;
+                _deviceLockState.SetLocked(false);
                 _serverHandler.CurrentDeviceStatus = "Unlocked by official";
                 await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
 
