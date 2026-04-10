@@ -37,6 +37,9 @@ public partial class BallotPaperViewModel : ViewModelBase
     [ObservableProperty]
     private string voteStatus = "";
 
+    [ObservableProperty]
+    private bool showVoteCastPopup = false;
+
 
     // ==========================================
     // STATIC PROPERTIES - VOTE TRACKING
@@ -244,8 +247,10 @@ public partial class BallotPaperViewModel : ViewModelBase
                 _serverHandler.CurrentDeviceStatus = $"Status 5: Vote cast for {SelectedCandidateName}";
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status updated: {_serverHandler.CurrentDeviceStatus}");
                 await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
-                
-                await Task.Delay(1000);
+
+                ShowVoteCastPopup = true;
+                await Task.Delay(3000);
+                ShowVoteCastPopup = false;
                 ClearSelection();
                 await _navigationService.NavigateToPersonalOrProxy();
             }

@@ -1181,7 +1181,9 @@ app.MapPost("/api/official/set-access-code", async (HttpContext httpContext, Cla
         return Results.BadRequest(new { success = false, message = "Station ID not found in authentication token" });
     }
     
-    if (string.IsNullOrEmpty(request.AccessCode))
+    var requestedAccessCode = request.AccessCode?.Trim();
+
+    if (string.IsNullOrEmpty(requestedAccessCode))
     {
         return Results.BadRequest(new { success = false, message = "Access code hash is required" });
     }
@@ -1195,9 +1197,27 @@ app.MapPost("/api/official/set-access-code", async (HttpContext httpContext, Cla
         {
             return Results.NotFound(new { success = false, message = "Polling station not found" });
         }
+
+        // SELECT existing polling stations and check PollingStationCode collision.
+        var existingStationWithSameCode = await dbContext.PollingStations
+            .Where(s => s.PollingStationId != station.PollingStationId)
+            .Select(s => new
+            {
+                s.PollingStationId,
+                s.PollingStationCode,
+                s.ConstituencyId,
+                s.County
+            })
+            .FirstOrDefaultAsync(s => s.PollingStationCode == requestedAccessCode);
+
+        if (existingStationWithSameCode != null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official {officialId} attempted duplicate access code for station {stationId}. Existing station: {existingStationWithSameCode.PollingStationId} ({existingStationWithSameCode.County}/{existingStationWithSameCode.ConstituencyId})");
+            return Results.Conflict(new { success = false, message = "Code already exists" });
+        }
         
         // Store the pre-hashed code directly from the app
-        station.PollingStationCode = request.AccessCode;
+        station.PollingStationCode = requestedAccessCode;
         
         await dbContext.SaveChangesAsync();
 
@@ -1206,7 +1226,7 @@ app.MapPost("/api/official/set-access-code", async (HttpContext httpContext, Cla
             !string.IsNullOrEmpty(county) &&
             !string.IsNullOrEmpty(constituency))
         {
-            officialPollingStationHashes[officialId] = (county, constituency, request.AccessCode);
+            officialPollingStationHashes[officialId] = (county, constituency, requestedAccessCode);
         }
         
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official {officialId} set access code for station {stationId}");

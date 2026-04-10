@@ -141,6 +141,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     {
         if (scanResult == true)
         {
+            scannAttempts = 0;
             SetImageSource("fingerPrintCorrect.png");
             SetStatusMessage("Authentication successful. You may proceed to vote.");
             VoterStatusMessage = "✅ Voter Found"; // Show green success message
@@ -193,6 +194,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
 
     private async Task CompareFingerprints()
     {
+        bool apiResponded = false;
         try
         {
             if (_capturedFingerprintData == null || _capturedFingerprintData.Length == 0)
@@ -246,6 +248,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             Console.WriteLine($"[AuthenticateUserViewModel] VoterId: {(string.IsNullOrWhiteSpace(voterId) ? "<collision-mode>" : voterId)}");
             Console.WriteLine($"[AuthenticateUserViewModel] Candidate IDs: {_candidateVoterIds?.Count ?? 0}");
             var verificationResult = await _serverHandler.VerifyFingerprintAsync(voterId, scannedImagePng, _candidateVoterIds);
+            apiResponded = true;
 
             if (verificationResult == null)
             {
@@ -301,6 +304,25 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             Console.WriteLine($"[AuthenticateUserViewModel] Stack: {ex.StackTrace}");
             validFingerPrintScan = false;
         }
+        finally
+        {
+            if (apiResponded)
+            {
+                ScrubCapturedFingerprint();
+            }
+        }
+    }
+
+    private void ScrubCapturedFingerprint()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _capturedFingerprintData = null;
+            _capturedFingerprintWidth = 0;
+            _capturedFingerprintHeight = 0;
+            PreviewImage = null;
+            QualityScore = 0;
+        }, DispatcherPriority.Input);
     }
 
     private byte[]? ConvertGrayscaleToImageData(byte[] grayscaleData, uint width, uint height)
@@ -394,9 +416,16 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             {
                 StatusMessage = "Device locked. Authentication controls are disabled until an official unlocks this device.";
             }
-            else if (StatusMessage.Contains("Device locked", StringComparison.OrdinalIgnoreCase))
+            else
             {
-                StatusMessage = "Device unlocked. Authentication controls are enabled.";
+                scannAttempts = 0;
+                validFingerPrintScan = false;
+                _lockDueToAlreadyVoted = false;
+
+                if (StatusMessage.Contains("Device locked", StringComparison.OrdinalIgnoreCase))
+                {
+                    StatusMessage = "Device unlocked. Authentication controls are enabled.";
+                }
             }
         });
     }
@@ -611,9 +640,6 @@ public partial class AuthenticateUserViewModel : ViewModelBase
                             Console.WriteLine("[AuthenticateUserViewModel] ❌ ERROR: NavigationService is null");
                             CleanupCapture();
                         }
-
-                        // Keep scan data in memory only for the shortest possible time.
-                        _capturedFingerprintData = null;
                     });
                 }
                 else

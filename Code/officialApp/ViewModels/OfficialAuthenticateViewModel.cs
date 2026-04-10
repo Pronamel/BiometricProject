@@ -117,6 +117,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
         }
         else if (scanResult == true)
         {
+            scannAttempts = 0;
             SetImageSource("fingerPrintCorrect.png");
             SetStatusMessage("Authentication successful. Welcome, Official.");
             await Task.Delay(750);
@@ -213,6 +214,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
 
     private async Task CompareFingerprints()
     {
+        bool apiResponded = false;
         try
         {
             if (_capturedFingerprintData == null || _capturedFingerprintData.Length == 0)
@@ -250,6 +252,7 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
             // The server will fetch the stored fingerprint from the database and compare
             Console.WriteLine("[OfficialAuthenticateViewModel] Calling /api/verify-prints endpoint...");
             var verificationResult = await _serverHandler.VerifyFingerprintAsync(Username, Password, scannedImagePng);
+            apiResponded = true;
 
             if (verificationResult == null || !verificationResult.Success)
             {
@@ -282,6 +285,25 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
             Console.WriteLine($"[OfficialAuthenticateViewModel] Stack: {ex.StackTrace}");
             validFingerPrintScan = false;
         }
+        finally
+        {
+            if (apiResponded)
+            {
+                ScrubCapturedFingerprint();
+            }
+        }
+    }
+
+    private void ScrubCapturedFingerprint()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _capturedFingerprintData = null;
+            _capturedFingerprintWidth = 0;
+            _capturedFingerprintHeight = 0;
+            PreviewImage = null;
+            QualityScore = 0;
+        }, DispatcherPriority.Input);
     }
 
     // ==========================================

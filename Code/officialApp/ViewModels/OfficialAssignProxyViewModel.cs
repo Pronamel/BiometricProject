@@ -166,6 +166,7 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
     [RelayCommand]
     private async Task AssignProxy()
     {
+        bool apiResponded = false;
         if (_capturedFingerprintData == null || _capturedFingerprintData.Length == 0)
         {
             StatusMessage = "Please scan the represented voter fingerprint first";
@@ -228,6 +229,7 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
                 ProxyPostCode,
                 ProxyTownOfBirth,
                 pngFingerprintData);
+            apiResponded = true;
 
             if (result?.Success == true)
             {
@@ -247,6 +249,23 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
             StatusMessage = $"Error: {ex.Message}";
             StatusColor = "#e74c3c";
         }
+        finally
+        {
+            if (apiResponded)
+            {
+                ScrubCapturedFingerprint();
+            }
+        }
+    }
+
+    private void ScrubCapturedFingerprint()
+    {
+        _capturedFingerprintData = null;
+        _capturedFingerprintWidth = 0;
+        _capturedFingerprintHeight = 0;
+        PreviewImage = null;
+        QualityScore = 0;
+        CaptureStatusMessage = "Ready to scan";
     }
 
     private void ClearAssignmentFormFields()

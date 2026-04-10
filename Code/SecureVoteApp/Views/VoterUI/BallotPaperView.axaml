@@ -96,5 +96,24 @@
                 </ItemsControl>
             </ScrollViewer>
         </Grid>
+
+        <Border IsVisible="{Binding ShowVoteCastPopup}"
+                Grid.RowSpan="2"
+                Background="#80000000"
+                ZIndex="100">
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="#2E7D32"
+                    CornerRadius="12"
+                    Padding="26,18"
+                    MinWidth="320">
+                <TextBlock Text="Vote has been cast"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           Foreground="White"/>
+            </Border>
+        </Border>
     </Grid>
 </UserControl>

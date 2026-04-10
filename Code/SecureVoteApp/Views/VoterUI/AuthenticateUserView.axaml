@@ -41,6 +41,20 @@
                     HorizontalAlignment="Center"/>
             </Panel>
 
+            <TextBlock Text="{Binding CaptureStatusMessage}"
+                       FontSize="14"
+                       Foreground="#333"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Width="320"/>
+
+            <ProgressBar IsIndeterminate="True"
+                         IsVisible="{Binding IsCapturing}"
+                         Width="250"
+                         Height="8"
+                         HorizontalAlignment="Center"/>
+
             <!-- Image and Scan Instructions Side by Side -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="30" Margin="-20,0,0,0">
                 <Image Source="{Binding ImageSource}"

@@ -15,15 +15,13 @@
     <Grid Background="#f6f2e6" RowDefinitions="Auto,*" Margin="20">
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
             <Button Grid.Column="0"
-                    Content="Back"
+                    Content="← Back"
                     Command="{Binding BackCommand}"
-                    Width="100"
-                    Height="40"
-                    Background="#c0c0c0"
+                    Padding="10,5"
+                    VerticalAlignment="Center"
+                    Background="#E0E0E0"
                     Foreground="Black"
-                    HorizontalAlignment="Left"
-                    BorderThickness="2"
-                    BorderBrush="Black"/>
+                    HorizontalAlignment="Left"/>
 
             <TextBlock Grid.Column="1"
                        Text="Assign Proxy Voter"

@@ -193,6 +193,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     [RelayCommand]
     private async Task Submit()
     {
+        bool apiResponded = false;
         if (_capturedFingerprintData == null || _capturedFingerprintData.Length == 0)
         {
             StatusMessage = "Please capture a fingerprint";
@@ -259,8 +260,19 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                     SelectedConstituency,
                     pngFingerprintData)
                 : (false, string.Empty);
+            apiResponded = IsCreateVoterMode;
 
-            bool submitSuccess = IsCreateVoterMode ? voterSuccess : await CreateOfficialWithPollingStation(pngFingerprintData);
+            bool submitSuccess;
+            if (IsCreateVoterMode)
+            {
+                submitSuccess = voterSuccess;
+            }
+            else
+            {
+                var (officialSuccess, officialApiResponded) = await CreateOfficialWithPollingStation(pngFingerprintData);
+                submitSuccess = officialSuccess;
+                apiResponded = officialApiResponded;
+            }
 
             if (submitSuccess)
             {
@@ -290,9 +302,16 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             StatusColor = "#e74c3c";
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Exception during upload: {ex.Message}");
         }
+        finally
+        {
+            if (apiResponded)
+            {
+                ScrubCapturedFingerprint();
+            }
+        }
     }
 
-    private async Task<bool> CreateOfficialWithPollingStation(byte[] fingerprintData)
+    private async Task<(bool Success, bool ApiResponded)> CreateOfficialWithPollingStation(byte[] fingerprintData)
     {
         try
         {
@@ -301,7 +320,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 StatusMessage = "No polling station selected";
                 StatusColor = "#e74c3c";
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No polling station selected");
-                return false;
+                return (false, false);
             }
 
             // Find the selected polling station by display name
@@ -313,7 +332,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 StatusMessage = "Selected polling station not found";
                 StatusColor = "#e74c3c";
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Selected polling station not found: {SelectedPollingStation}");
-                return false;
+                return (false, false);
             }
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🏛️  Creating official with polling station:");
@@ -325,7 +344,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 StatusMessage = "Selected polling station has no county assigned";
                 StatusColor = "#e74c3c";
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ County is not assigned to polling station");
-                return false;
+                return (false, false);
             }
 
             // Call the API with extracted polling station data
@@ -342,15 +361,25 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 StatusColor = "#e74c3c";
             }
 
-            return success;
+            return (success, true);
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error creating official: {ex.Message}";
             StatusColor = "#e74c3c";
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Exception in CreateOfficialWithPollingStation: {ex.Message}");
-            return false;
+            return (false, false);
         }
+    }
+
+    private void ScrubCapturedFingerprint()
+    {
+        _capturedFingerprintData = null;
+        _capturedFingerprintWidth = 0;
+        _capturedFingerprintHeight = 0;
+        PreviewImage = null;
+        QualityScore = 0;
+        CaptureStatusMessage = "Ready to scan";
     }
 
     [RelayCommand]

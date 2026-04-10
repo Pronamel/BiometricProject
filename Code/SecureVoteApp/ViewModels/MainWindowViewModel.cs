@@ -149,7 +149,15 @@ public partial class MainWindowViewModel : ViewModelBase
                     return;
                 }
 
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Server disconnected for 25s. Returning to voter login.");
+                // Keep the voter in-flow when realtime is down but auth is still valid.
+                // Fallback polling can continue to deliver commands while the hub reconnects.
+                if (_serverHandler.IsAuthenticated)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Realtime disconnected for 25s, but session is still authenticated. Staying on current view.");
+                    return;
+                }
+
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Server disconnected for 25s and session is no longer authenticated. Returning to voter login.");
                 _navigationService.NavigateToVoterLogin();
 
                 // Run logout off the UI thread so a dead server cannot freeze the window.
