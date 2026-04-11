@@ -56,9 +56,9 @@ public class VoterRealtimeService : IVoterRealtimeService
                 .WithAutomaticReconnect()
                 .Build();
 
-            _hubConnection.HandshakeTimeout = TimeSpan.FromSeconds(30);
-            _hubConnection.ServerTimeout = TimeSpan.FromSeconds(60);
-            _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            _hubConnection.HandshakeTimeout = TimeSpan.FromSeconds(15);
+            _hubConnection.ServerTimeout = TimeSpan.FromSeconds(16);
+            _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(4);
 
             RegisterHandlers(_hubConnection);
         }
@@ -67,6 +67,30 @@ public class VoterRealtimeService : IVoterRealtimeService
         await _hubConnection.StartAsync();
         ConnectionStateChanged?.Invoke("Connected");
         return true;
+    }
+
+    public async Task<bool> SendDeviceStatusAsync(string deviceId, string status, CancellationToken cancellationToken = default)
+    {
+        if (_hubConnection == null || _hubConnection.State != HubConnectionState.Connected)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(deviceId) || string.IsNullOrWhiteSpace(status))
+        {
+            return false;
+        }
+
+        try
+        {
+            await _hubConnection.InvokeAsync("UpdateDeviceStatus", deviceId, status, cancellationToken);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ConnectionStateChanged?.Invoke($"Status send failed: {ex.Message}");
+            return false;
+        }
     }
 
     public async Task DisconnectAsync()

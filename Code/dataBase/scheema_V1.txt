@@ -17,7 +17,6 @@ CREATE TABLE constituencies (
 CREATE TABLE voters (
     voter_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     national_id VARCHAR(20),  -- Encrypted
-    electoral_roll_number UUID,
     constituency_id UUID NOT NULL,
     ward_id UUID,  -- For future local elections
     
@@ -26,10 +25,8 @@ CREATE TABLE voters (
     last_name VARCHAR(50),  -- Encrypted
     date_of_birth DATE,  -- Encrypted
     town_of_birth VARCHAR(100),  -- Encrypted
-    
+
     -- Address (encrypted)
-    address_line1 VARCHAR(100),  -- Encrypted
-    previous_address VARCHAR(100),  -- Encrypted
     postcode VARCHAR(10),  -- Encrypted
     
     -- Biometric (encrypted)
@@ -80,7 +77,6 @@ CREATE TABLE polling_stations (
     
     -- Capacity tracking
     invalid_votes INT DEFAULT 0,
-    total_votes INT DEFAULT 0,
     expected_votes INT DEFAULT 0,
     
     -- Foreign keys

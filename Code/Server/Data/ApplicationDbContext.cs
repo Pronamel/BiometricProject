@@ -45,10 +45,6 @@ namespace Server.Data
                 .HasColumnType("bytea");
 
             modelBuilder.Entity<Voter>()
-                .Property(v => v.ElectoralRollNumber)
-                .HasColumnType("bytea");
-
-            modelBuilder.Entity<Voter>()
                 .Property(v => v.FirstName)
                 .HasColumnType("bytea");
 
@@ -64,14 +60,6 @@ namespace Server.Data
                 .Property(v => v.TownOfBirth)
                 .HasColumnType("bytea")
                 .IsRequired(false);
-
-            modelBuilder.Entity<Voter>()
-                .Property(v => v.AddressLine1)
-                .HasColumnType("bytea");
-
-            modelBuilder.Entity<Voter>()
-                .Property(v => v.PreviousAddress)
-                .HasColumnType("bytea");
 
             modelBuilder.Entity<Voter>()
                 .Property(v => v.Postcode)

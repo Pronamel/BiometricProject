@@ -17,18 +17,6 @@
 
     <Grid Background="#f6f2e6">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-            <!-- Start Scanning Button -->
-            <Button Content="Start Scanning"
-                    Background="Purple"
-                    Foreground="White"
-                    Width="150"
-                    Height="40"
-                    FontSize="14"
-                    FontWeight="Bold"
-                    HorizontalAlignment="Center"
-                    Command="{Binding StartScanningCommand}"
-                    IsEnabled="{Binding !IsCapturing}"/>
-
             <!-- Live Preview Image -->
             <Panel Background="Black" 
                    Width="250"
@@ -47,7 +35,14 @@
                        HorizontalAlignment="Center"
                        TextAlignment="Center"
                        TextWrapping="Wrap"
-                       Width="320"/>
+                       Width="320"
+                       IsVisible="{Binding !IsCooldownActive}"/>
+
+            <TextBlock Text="{Binding CooldownSecondsRemaining, StringFormat='Scanner cooldown: {0}s'}"
+                       FontSize="13"
+                       Foreground="#7A2E0E"
+                       HorizontalAlignment="Center"
+                       IsVisible="{Binding IsCooldownActive}"/>
 
             <ProgressBar IsIndeterminate="True"
                          IsVisible="{Binding IsCapturing}"

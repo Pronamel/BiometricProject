@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -37,12 +38,6 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
     [ObservableProperty]
     private string townOfBirth = string.Empty;
-
-    [ObservableProperty]
-    private string addressLine1 = string.Empty;
-
-    [ObservableProperty]
-    private string addressLine2 = string.Empty;
 
     [ObservableProperty]
     private string postCode = string.Empty;
@@ -86,6 +81,12 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     [ObservableProperty]
     private string captureStatusMessage = "Ready to scan";
 
+    [ObservableProperty]
+    private bool isCooldownActive;
+
+    [ObservableProperty]
+    private int cooldownSecondsRemaining;
+
     private readonly INavigationService _navigationService;
     private readonly IServerHandler _serverHandler;
 
@@ -113,6 +114,11 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     private uint _capturedFingerprintWidth = 0;
     private uint _capturedFingerprintHeight = 0;
     private const int QUALITY_THRESHOLD = 10;
+    private const int SCANNER_COOLDOWN_SECONDS = 5;
+    private bool _scannerSessionActive;
+    private bool _eventHandlersAttached;
+    private bool _isProcessingFingerprint;
+    private CancellationTokenSource? _cooldownCts;
 
     public OfficialAddVoterViewModel(IServerHandler serverHandler, INavigationService navigationService, IScannerService scannerService)
     {
@@ -210,7 +216,6 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(LastName) ||
                 string.IsNullOrWhiteSpace(formattedDateOfBirth) ||
                 string.IsNullOrWhiteSpace(TownOfBirth) ||
-                string.IsNullOrWhiteSpace(AddressLine1) ||
                 string.IsNullOrWhiteSpace(PostCode) ||
                 string.IsNullOrWhiteSpace(SelectedCounty) ||
                 string.IsNullOrWhiteSpace(SelectedConstituency))
@@ -253,8 +258,6 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                     LastName,
                     formattedDateOfBirth!,
                     TownOfBirth,
-                    AddressLine1,
-                    AddressLine2,
                     PostCode,
                     SelectedCounty,
                     SelectedConstituency,
@@ -385,6 +388,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     [RelayCommand]
     private void Cancel()
     {
+        DeactivateScanner();
         _navigationService.NavigateToOfficialMenu();
     }
 
@@ -395,8 +399,6 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         LastName = string.Empty;
         SelectedDateOfBirth = null;
         TownOfBirth = string.Empty;
-        AddressLine1 = string.Empty;
-        AddressLine2 = string.Empty;
         PostCode = string.Empty;
         SelectedCounty = string.Empty;
         SelectedConstituency = string.Empty;
@@ -447,10 +449,69 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void StartScanning()
+    private async Task StartScanning()
+    {
+        await ActivateScannerAsync();
+    }
+
+    [RelayCommand]
+    private async Task ReCapture()
+    {
+        _capturedFingerprintData = null;
+        _capturedFingerprintWidth = 0;
+        _capturedFingerprintHeight = 0;
+        PreviewImage = null;
+        QualityScore = 0;
+
+        if (!_scannerSessionActive)
+        {
+            await ActivateScannerAsync();
+            return;
+        }
+
+        if (IsCapturing)
+        {
+            return;
+        }
+
+        CaptureStatusMessage = "Rescanning... Place finger on scanner...";
+        await StartScanningInternalAsync();
+    }
+
+    public async Task ActivateScannerAsync()
+    {
+        if (_scannerSessionActive)
+        {
+            return;
+        }
+
+        _scannerSessionActive = true;
+        _isProcessingFingerprint = false;
+        _capturedFingerprintData = null;
+        _capturedFingerprintWidth = 0;
+        _capturedFingerprintHeight = 0;
+        IsCooldownActive = false;
+        CooldownSecondsRemaining = 0;
+        CaptureStatusMessage = "Place finger on scanner...";
+
+        await StartScanningInternalAsync();
+    }
+
+    public void DeactivateScanner()
+    {
+        _scannerSessionActive = false;
+        _isProcessingFingerprint = false;
+        _cooldownCts?.Cancel();
+        _cooldownCts = null;
+        IsCooldownActive = false;
+        CooldownSecondsRemaining = 0;
+        CleanupCapture(closeDevice: true);
+    }
+
+    private async Task StartScanningInternalAsync()
     {
         Console.WriteLine("[OfficialAddVoterViewModel] Start scanning command triggered");
-        
+
         try
         {
             if (IsCapturing)
@@ -469,17 +530,21 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
 
             Console.WriteLine("[OfficialAddVoterViewModel] ✓ Device opened");
 
-            // Subscribe to events
-            _scannerService.PreviewImageAvailable += OnPreviewImageAvailable;
-            _scannerService.FingerprintCaptured += OnFingerprintCaptured;
-            _scannerService.ErrorOccurred += OnScannerError;
+            // Subscribe to events once for this view session
+            if (!_eventHandlersAttached)
+            {
+                _scannerService.PreviewImageAvailable += OnPreviewImageAvailable;
+                _scannerService.FingerprintCaptured += OnFingerprintCaptured;
+                _scannerService.ErrorOccurred += OnScannerError;
+                _eventHandlersAttached = true;
+            }
 
             // Start capture
             if (!_scannerService.StartCapture())
             {
                 CaptureStatusMessage = "Failed to start capture";
                 Console.WriteLine("[OfficialAddVoterViewModel] ❌ Failed to start capture");
-                CleanupCapture();
+                CleanupCapture(closeDevice: true);
                 return;
             }
 
@@ -493,6 +558,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
             Console.WriteLine($"[OfficialAddVoterViewModel] ❌ Error starting scan: {ex.Message}");
             CaptureStatusMessage = $"Error: {ex.Message}";
             IsCapturing = false;
+            await Task.CompletedTask;
         }
     }
 
@@ -540,8 +606,15 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         }
     }
 
-    private void OnFingerprintCaptured(object? sender, ScannerEventArgs args)
+    private async void OnFingerprintCaptured(object? sender, ScannerEventArgs args)
     {
+        if (_isProcessingFingerprint)
+        {
+            return;
+        }
+
+        _isProcessingFingerprint = true;
+
         try
         {
             Console.WriteLine($"[OfficialAddVoterViewModel] Fingerprint captured: Success={args.IsSuccess}, Quality={args.QualityScore}");
@@ -551,7 +624,7 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 _capturedFingerprintData = args.ImageData;
             }
 
-            Dispatcher.UIThread.InvokeAsync(() =>
+            _ = Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (args.IsSuccess)
                 {
@@ -563,14 +636,34 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                     CaptureStatusMessage = "Capture failed or incomplete";
                     Console.WriteLine("[OfficialAddVoterViewModel] ❌ Capture was not successful");
                 }
+            }, DispatcherPriority.Input);
 
-                CleanupCapture();
+            CleanupCapture(closeDevice: false);
+
+            _cooldownCts?.Cancel();
+            IsCooldownActive = false;
+            CooldownSecondsRemaining = 0;
+
+            _ = Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (args.IsSuccess)
+                {
+                    CaptureStatusMessage = "Fingerprint captured. Review and click Submit or Recapture.";
+                }
+                else
+                {
+                    CaptureStatusMessage = "Capture failed. Click Recapture to try again.";
+                }
             }, DispatcherPriority.Input);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[OfficialAddVoterViewModel] ❌ Error in capture handler: {ex.Message}");
-            CleanupCapture();
+            CleanupCapture(closeDevice: false);
+        }
+        finally
+        {
+            _isProcessingFingerprint = false;
         }
     }
 
@@ -581,18 +674,51 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             CaptureStatusMessage = $"Error: {errorMessage}";
-            CleanupCapture();
+            CleanupCapture(closeDevice: false);
         }, DispatcherPriority.Input);
     }
 
-    private void CleanupCapture()
+    private async Task StartCooldownAndResumeAsync()
+    {
+        _cooldownCts?.Cancel();
+        _cooldownCts = new CancellationTokenSource();
+        var token = _cooldownCts.Token;
+
+        IsCooldownActive = true;
+
+        try
+        {
+            for (int i = SCANNER_COOLDOWN_SECONDS; i >= 1; i--)
+            {
+                CooldownSecondsRemaining = i;
+                CaptureStatusMessage = $"Scanner cooldown: {i}s";
+                await Task.Delay(1000, token);
+            }
+
+            if (!_scannerSessionActive || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            IsCooldownActive = false;
+            CooldownSecondsRemaining = 0;
+            CaptureStatusMessage = "Place finger on scanner...";
+            await StartScanningInternalAsync();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        finally
+        {
+            IsCooldownActive = false;
+            CooldownSecondsRemaining = 0;
+        }
+    }
+
+    private void CleanupCapture(bool closeDevice)
     {
         try
         {
-            _scannerService.PreviewImageAvailable -= OnPreviewImageAvailable;
-            _scannerService.FingerprintCaptured -= OnFingerprintCaptured;
-            _scannerService.ErrorOccurred -= OnScannerError;
-
             try
             {
                 _scannerService.StopCapture();
@@ -602,13 +728,24 @@ public partial class OfficialAddVoterViewModel : ViewModelBase
                 Console.WriteLine($"[OfficialAddVoterViewModel] ⚠️ StopCapture access violation: {ex.Message}");
             }
 
-            try
+            if (closeDevice)
             {
-                _scannerService.CloseDevice();
-            }
-            catch (AccessViolationException ex)
-            {
-                Console.WriteLine($"[OfficialAddVoterViewModel] ⚠️ CloseDevice access violation: {ex.Message}");
+                if (_eventHandlersAttached)
+                {
+                    _scannerService.PreviewImageAvailable -= OnPreviewImageAvailable;
+                    _scannerService.FingerprintCaptured -= OnFingerprintCaptured;
+                    _scannerService.ErrorOccurred -= OnScannerError;
+                    _eventHandlersAttached = false;
+                }
+
+                try
+                {
+                    _scannerService.CloseDevice();
+                }
+                catch (AccessViolationException ex)
+                {
+                    Console.WriteLine($"[OfficialAddVoterViewModel] ⚠️ CloseDevice access violation: {ex.Message}");
+                }
             }
 
             Dispatcher.UIThread.InvokeAsync(() =>

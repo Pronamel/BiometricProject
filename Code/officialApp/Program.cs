@@ -59,6 +59,8 @@ class Program
         services.AddSingleton<OfficialVotingPollingManagerViewModel>();
         services.AddSingleton<OfficialAddVoterViewModel>();
         services.AddSingleton<OfficialAssignProxyViewModel>();
+        services.AddSingleton<ElectionStatisticsViewModel>();
+        services.AddSingleton<OfficialDuplicateFingerprintScanViewModel>();
         services.AddSingleton<MainWindowViewModel>();
     }
 }

@@ -17,6 +17,8 @@ public interface INavigationService
     void NavigateToOfficialVotingPollingManager();
     void NavigateToOfficialAddVoter();
     void NavigateToOfficialAssignProxy();
+    void NavigateToElectionStatistics();
+    void NavigateToOfficialDuplicateFingerprintScan();
     void NavigateToView(UserControl view);
     
     // Events to notify when navigation happens
@@ -49,6 +51,8 @@ public class NavigationService : INavigationService
     private UserControl? _officialVotingPollingManagerView;
     private UserControl? _officialAddVoterView;
     private UserControl? _officialAssignProxyView;
+    private UserControl? _electionStatisticsView;
+    private UserControl? _officialDuplicateFingerprintScanView;
 
     // ==========================================
     // PRIVATE FIELDS - VIEW FACTORY FUNCTIONS
@@ -62,6 +66,8 @@ public class NavigationService : INavigationService
     private Func<UserControl>? _getOfficialVotingPollingManagerView;
     private Func<UserControl>? _getOfficialAddVoterView;
     private Func<UserControl>? _getOfficialAssignProxyView;
+    private Func<UserControl>? _getElectionStatisticsView;
+    private Func<UserControl>? _getOfficialDuplicateFingerprintScanView;
 
     // ==========================================
     // INITIALIZATION METHODS
@@ -75,7 +81,9 @@ public class NavigationService : INavigationService
         Func<UserControl> getOfficialGenerateAccessCodeView,
         Func<UserControl> getOfficialVotingPollingManagerView,
         Func<UserControl> getOfficialAddVoterView,
-        Func<UserControl> getOfficialAssignProxyView)
+        Func<UserControl> getOfficialAssignProxyView,
+        Func<UserControl> getElectionStatisticsView,
+        Func<UserControl> getOfficialDuplicateFingerprintScanView)
     {
         _getOfficialLoginView = getOfficialLoginView;
         _getOfficialAuthenticateView = getOfficialAuthenticateView;
@@ -84,6 +92,8 @@ public class NavigationService : INavigationService
         _getOfficialVotingPollingManagerView = getOfficialVotingPollingManagerView;
         _getOfficialAddVoterView = getOfficialAddVoterView;
         _getOfficialAssignProxyView = getOfficialAssignProxyView;
+        _getElectionStatisticsView = getElectionStatisticsView;
+        _getOfficialDuplicateFingerprintScanView = getOfficialDuplicateFingerprintScanView;
     }
 
     // ==========================================
@@ -94,6 +104,9 @@ public class NavigationService : INavigationService
     {
         if (_officialLoginView == null && _getOfficialLoginView != null)
             _officialLoginView = _getOfficialLoginView();
+
+        if (_officialLoginView?.DataContext is OfficialLoginViewModel vm)
+            vm.ResetLoginState();
             
         if (_officialLoginView != null)
             NavigationRequested?.Invoke(_officialLoginView);
@@ -120,6 +133,14 @@ public class NavigationService : INavigationService
     {
         if (_officialMenuView == null && _getOfficialMenuView != null)
             _officialMenuView = _getOfficialMenuView();
+
+        // Keep polling manager realtime feed warm in the background so device templates
+        // are already populated when manager view is opened.
+        if (_officialVotingPollingManagerView == null && _getOfficialVotingPollingManagerView != null)
+            _officialVotingPollingManagerView = _getOfficialVotingPollingManagerView();
+
+        if (_officialVotingPollingManagerView?.DataContext is OfficialVotingPollingManagerViewModel pollingVm)
+            _ = pollingVm.WarmupRealtimeAsync();
 
         if (_officialMenuView != null)
             NavigationRequested?.Invoke(_officialMenuView);
@@ -165,6 +186,27 @@ public class NavigationService : INavigationService
 
         if (_officialAssignProxyView != null)
             NavigationRequested?.Invoke(_officialAssignProxyView);
+    }
+
+    public void NavigateToElectionStatistics()
+    {
+        if (_electionStatisticsView == null && _getElectionStatisticsView != null)
+            _electionStatisticsView = _getElectionStatisticsView();
+
+        if (_electionStatisticsView?.DataContext is ElectionStatisticsViewModel vm)
+            _ = vm.ActivateAsync();
+
+        if (_electionStatisticsView != null)
+            NavigationRequested?.Invoke(_electionStatisticsView);
+    }
+
+    public void NavigateToOfficialDuplicateFingerprintScan()
+    {
+        if (_officialDuplicateFingerprintScanView == null && _getOfficialDuplicateFingerprintScanView != null)
+            _officialDuplicateFingerprintScanView = _getOfficialDuplicateFingerprintScanView();
+
+        if (_officialDuplicateFingerprintScanView != null)
+            NavigationRequested?.Invoke(_officialDuplicateFingerprintScanView);
     }
 
     public void NavigateToView(UserControl view)

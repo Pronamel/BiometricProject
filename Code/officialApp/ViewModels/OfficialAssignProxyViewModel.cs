@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Media.Imaging;
@@ -75,10 +76,21 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
     [ObservableProperty]
     private string captureStatusMessage = "Ready to scan";
 
+    [ObservableProperty]
+    private bool isCooldownActive;
+
+    [ObservableProperty]
+    private int cooldownSecondsRemaining;
+
     private byte[]? _capturedFingerprintData;
     private uint _capturedFingerprintWidth;
     private uint _capturedFingerprintHeight;
     private const int QUALITY_THRESHOLD = 10;
+    private const int SCANNER_COOLDOWN_SECONDS = 5;
+    private bool _scannerSessionActive;
+    private bool _eventHandlersAttached;
+    private bool _isProcessingFingerprint;
+    private CancellationTokenSource? _cooldownCts;
 
     public OfficialAssignProxyViewModel(
         INavigationService navigationService,
@@ -93,10 +105,7 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
 
     public void ResetForm()
     {
-        if (IsCapturing)
-        {
-            CleanupCapture();
-        }
+        DeactivateScanner();
 
         RepresentedFirstName = string.Empty;
         RepresentedLastName = string.Empty;
@@ -119,11 +128,71 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
     [RelayCommand]
     private void Back()
     {
+        DeactivateScanner();
         _navigationService.NavigateToOfficialMenu();
     }
 
     [RelayCommand]
-    private void StartScanning()
+    private async Task StartScanning()
+    {
+        await ActivateScannerAsync();
+    }
+
+    [RelayCommand]
+    private async Task ReCapture()
+    {
+        _capturedFingerprintData = null;
+        _capturedFingerprintWidth = 0;
+        _capturedFingerprintHeight = 0;
+        PreviewImage = null;
+        QualityScore = 0;
+
+        if (!_scannerSessionActive)
+        {
+            await ActivateScannerAsync();
+            return;
+        }
+
+        if (IsCapturing)
+        {
+            return;
+        }
+
+        CaptureStatusMessage = "Rescanning... Place the represented voter finger on the scanner...";
+        await StartScanningInternalAsync();
+    }
+
+    public async Task ActivateScannerAsync()
+    {
+        if (_scannerSessionActive)
+        {
+            return;
+        }
+
+        _scannerSessionActive = true;
+        _isProcessingFingerprint = false;
+        _capturedFingerprintData = null;
+        _capturedFingerprintWidth = 0;
+        _capturedFingerprintHeight = 0;
+        IsCooldownActive = false;
+        CooldownSecondsRemaining = 0;
+        CaptureStatusMessage = "Place the represented voter finger on the scanner...";
+
+        await StartScanningInternalAsync();
+    }
+
+    public void DeactivateScanner()
+    {
+        _scannerSessionActive = false;
+        _isProcessingFingerprint = false;
+        _cooldownCts?.Cancel();
+        _cooldownCts = null;
+        IsCooldownActive = false;
+        CooldownSecondsRemaining = 0;
+        CleanupCapture(closeDevice: true);
+    }
+
+    private async Task StartScanningInternalAsync()
     {
         try
         {
@@ -138,14 +207,18 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
                 return;
             }
 
-            _scannerService.PreviewImageAvailable += OnPreviewImageAvailable;
-            _scannerService.FingerprintCaptured += OnFingerprintCaptured;
-            _scannerService.ErrorOccurred += OnScannerError;
+            if (!_eventHandlersAttached)
+            {
+                _scannerService.PreviewImageAvailable += OnPreviewImageAvailable;
+                _scannerService.FingerprintCaptured += OnFingerprintCaptured;
+                _scannerService.ErrorOccurred += OnScannerError;
+                _eventHandlersAttached = true;
+            }
 
             if (!_scannerService.StartCapture())
             {
                 CaptureStatusMessage = "Failed to start capture";
-                CleanupCapture();
+                CleanupCapture(closeDevice: true);
                 return;
             }
 
@@ -160,6 +233,7 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
         {
             CaptureStatusMessage = $"Error: {ex.Message}";
             IsCapturing = false;
+            await Task.CompletedTask;
         }
     }
 
@@ -341,8 +415,15 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
         }
     }
 
-    private void OnFingerprintCaptured(object? sender, ScannerEventArgs args)
+    private async void OnFingerprintCaptured(object? sender, ScannerEventArgs args)
     {
+        if (_isProcessingFingerprint)
+        {
+            return;
+        }
+
+        _isProcessingFingerprint = true;
+
         try
         {
             if (args.IsSuccess)
@@ -352,19 +433,39 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
                 _capturedFingerprintHeight = args.Height;
             }
 
-            Dispatcher.UIThread.InvokeAsync(() =>
+            _ = Dispatcher.UIThread.InvokeAsync(() =>
             {
                 CaptureStatusMessage = args.IsSuccess
                     ? "Fingerprint captured"
                     : "Capture failed or incomplete";
+            }, DispatcherPriority.Input);
 
-                CleanupCapture();
+            CleanupCapture(closeDevice: false);
+
+            _cooldownCts?.Cancel();
+            IsCooldownActive = false;
+            CooldownSecondsRemaining = 0;
+
+            _ = Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (args.IsSuccess)
+                {
+                    CaptureStatusMessage = "Fingerprint captured. Review and click Assign Proxy Voter or Recapture.";
+                }
+                else
+                {
+                    CaptureStatusMessage = "Capture failed. Click Recapture to try again.";
+                }
             }, DispatcherPriority.Input);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[OfficialAssignProxyViewModel] Capture handler error: {ex.Message}");
-            CleanupCapture();
+            CleanupCapture(closeDevice: false);
+        }
+        finally
+        {
+            _isProcessingFingerprint = false;
         }
     }
 
@@ -373,18 +474,14 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             CaptureStatusMessage = $"Error: {errorMessage}";
-            CleanupCapture();
+            CleanupCapture(closeDevice: false);
         }, DispatcherPriority.Input);
     }
 
-    private void CleanupCapture()
+    private void CleanupCapture(bool closeDevice)
     {
         try
         {
-            _scannerService.PreviewImageAvailable -= OnPreviewImageAvailable;
-            _scannerService.FingerprintCaptured -= OnFingerprintCaptured;
-            _scannerService.ErrorOccurred -= OnScannerError;
-
             try
             {
                 _scannerService.StopCapture();
@@ -394,13 +491,24 @@ public partial class OfficialAssignProxyViewModel : ViewModelBase
                 Console.WriteLine($"[OfficialAssignProxyViewModel] StopCapture access violation: {ex.Message}");
             }
 
-            try
+            if (closeDevice)
             {
-                _scannerService.CloseDevice();
-            }
-            catch (AccessViolationException ex)
-            {
-                Console.WriteLine($"[OfficialAssignProxyViewModel] CloseDevice access violation: {ex.Message}");
+                if (_eventHandlersAttached)
+                {
+                    _scannerService.PreviewImageAvailable -= OnPreviewImageAvailable;
+                    _scannerService.FingerprintCaptured -= OnFingerprintCaptured;
+                    _scannerService.ErrorOccurred -= OnScannerError;
+                    _eventHandlersAttached = false;
+                }
+
+                try
+                {
+                    _scannerService.CloseDevice();
+                }
+                catch (AccessViolationException ex)
+                {
+                    Console.WriteLine($"[OfficialAssignProxyViewModel] CloseDevice access violation: {ex.Message}");
+                }
             }
 
             Dispatcher.UIThread.InvokeAsync(() =>

@@ -36,3 +36,27 @@ public class DeviceStatus
     [JsonPropertyName("constituency")]
     public string Constituency { get; set; } = "";
 }
+
+public class DevicePresenceUpdate
+{
+    [JsonPropertyName("voterId")]
+    public int VoterId { get; set; }
+
+    [JsonPropertyName("deviceId")]
+    public string DeviceId { get; set; } = "";
+
+    [JsonPropertyName("state")]
+    public string State { get; set; } = "";
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "";
+
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; }
+
+    [JsonPropertyName("county")]
+    public string County { get; set; } = "";
+
+    [JsonPropertyName("constituency")]
+    public string Constituency { get; set; } = "";
+}

@@ -88,16 +88,6 @@
                             <TextBox Text="{Binding TownOfBirth}" Height="40" FontSize="14" Padding="10"/>
                         </StackPanel>
 
-                        <StackPanel Spacing="5">
-                            <TextBlock Text="Address Line 1 (e.g., 123 High Street)" Foreground="black" FontSize="14"/>
-                            <TextBox Text="{Binding AddressLine1}" Height="40" FontSize="14" Padding="10"/>
-                        </StackPanel>
-
-                        <StackPanel Spacing="5">
-                            <TextBlock Text="Address Line 2 (e.g., Flat 5)" Foreground="black" FontSize="14"/>
-                            <TextBox Text="{Binding AddressLine2}" Height="40" FontSize="14" Padding="10"/>
-                        </StackPanel>
-
                         <Grid ColumnDefinitions="*,2*" ColumnSpacing="24">
                             <StackPanel Grid.Column="0" Spacing="5">
                                 <TextBlock Text="Post Code (e.g., SW1A 1AA)" Foreground="black" FontSize="14"/>
@@ -169,17 +159,6 @@
                 <StackPanel Grid.Column="1" Spacing="10">
                     <TextBlock Text="Fingerprint Capture" FontSize="16" FontWeight="Bold" Foreground="black" HorizontalAlignment="Center" TextAlignment="Center"/>
 
-                    <Button Content="Start Scanning"
-                            Background="Blue"
-                            Foreground="White"
-                            Width="150"
-                            Height="40"
-                            FontSize="14"
-                            FontWeight="Bold"
-                            HorizontalAlignment="Center"
-                            Command="{Binding StartScanningCommand}"
-                            IsEnabled="{Binding !IsCapturing}"/>
-
                     <Panel Background="Black"
                            Width="250"
                            Height="250"
@@ -197,7 +176,15 @@
                                HorizontalAlignment="Center"
                                TextAlignment="Center"
                                TextWrapping="Wrap"
-                               Width="280"/>
+                               Width="280"
+                               IsVisible="{Binding !IsCooldownActive}"/>
+
+                    <TextBlock Text="{Binding CooldownSecondsRemaining, StringFormat='Scanner cooldown: {0}s'}"
+                               FontSize="12"
+                               Foreground="#e67e22"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center"
+                               IsVisible="{Binding IsCooldownActive}"/>
 
                     <ProgressBar IsIndeterminate="True"
                                  IsVisible="{Binding IsCapturing}"
@@ -217,15 +204,16 @@
                             <TextBlock Text="Submit" Foreground="white"/>
                         </Button>
 
-                        <Button 
-                            Command="{Binding CancelCommand}"
-                            Background="#e74c3c"
+                        <Button
+                            Command="{Binding ReCaptureCommand}"
+                            Background="#d97509"
                             Width="120"
                             Height="50"
                             BorderThickness="2"
                             BorderBrush="Black"
-                            FontSize="16">
-                            <TextBlock Text="Cancel" Foreground="white"/>
+                            FontSize="16"
+                            IsEnabled="{Binding !IsCapturing}">
+                            <TextBlock Text="Recapture" Foreground="white"/>
                         </Button>
                     </StackPanel>
 

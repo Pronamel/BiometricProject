@@ -86,8 +86,6 @@ public class ServerHandler : IServerHandler
         string lastName,
         string dateOfBirth,
         string townOfBirth,
-        string addressLine1,
-        string addressLine2,
         string postCode,
         string county,
         string constituency,
@@ -98,8 +96,6 @@ public class ServerHandler : IServerHandler
             lastName,
             dateOfBirth,
             townOfBirth,
-            addressLine1,
-            addressLine2,
             postCode,
             county,
             constituency,
@@ -149,6 +145,12 @@ public class ServerHandler : IServerHandler
 
     public Task<PollingStationVoteCountResponse?> GetPollingStationVoteCountAsync()
         => _apiService.GetPollingStationVoteCountAsync();
+
+    public Task<ElectionStatistics?> GetElectionStatisticsAsync()
+        => _apiService.GetElectionStatisticsAsync();
+
+    public Task<DuplicateFingerprintScanResponse?> ScanDuplicateVoterFingerprintsAsync()
+        => _apiService.ScanDuplicateVoterFingerprintsAsync();
     
     public async Task<bool> UpdateDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo)
     {

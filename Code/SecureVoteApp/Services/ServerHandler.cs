@@ -10,6 +10,7 @@ public class ServerHandler : IServerHandler
 {
     private readonly IApiService _apiService;
     private readonly IVoterRealtimeService _realtimeService;
+    private static readonly TimeSpan DeviceStatusHeartbeatInterval = TimeSpan.FromSeconds(3);
     private CancellationTokenSource? _listeningCancellation;
     private bool _isListening;
     private Action<VoterCommandResponse>? _externalCommandHandler;
@@ -208,10 +209,23 @@ public class ServerHandler : IServerHandler
 
             _fallbackPollingTask = Task.Run(async () =>
             {
+                var lastHeartbeatUtc = DateTime.MinValue;
+
                 while (_isListening && _listeningCancellation != null && !_listeningCancellation.Token.IsCancellationRequested)
                 {
                     try
                     {
+                        // Keep official dashboard presence/status fresh even when no user actions occur.
+                        if (DateTime.UtcNow - lastHeartbeatUtc >= DeviceStatusHeartbeatInterval)
+                        {
+                            string heartbeatStatus = string.IsNullOrWhiteSpace(CurrentDeviceStatus)
+                                ? "Connected - Ready"
+                                : CurrentDeviceStatus;
+
+                            await SendDeviceStatusAsync(heartbeatStatus);
+                            lastHeartbeatUtc = DateTime.UtcNow;
+                        }
+
                         // Realtime is primary. Poll fallback only when realtime is down.
                         if (!_realtimeService.IsConnected)
                         {
@@ -288,6 +302,27 @@ public class ServerHandler : IServerHandler
         }
     }
 
-    public Task<bool> SendDeviceStatusAsync(string status)
-        => _apiService.SendDeviceStatusAsync(status);
+    public async Task<bool> SendDeviceStatusAsync(string status)
+    {
+        try
+        {
+            if (_realtimeService.IsConnected &&
+                !string.IsNullOrWhiteSpace(_apiService.DeviceId) &&
+                !string.IsNullOrWhiteSpace(status))
+            {
+                var sentViaRealtime = await _realtimeService.SendDeviceStatusAsync(_apiService.DeviceId, status);
+                if (sentViaRealtime)
+                {
+                    return true;
+                }
+            }
+
+            return await _apiService.SendDeviceStatusAsync(status);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Status send error: {ex.Message}");
+            return false;
+        }
+    }
 }

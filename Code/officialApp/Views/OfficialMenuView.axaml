@@ -23,11 +23,11 @@
                    FontSize="18"
                    FontWeight="Bold"/>
 
-        <!-- Four menu tiles arranged in a compact grid -->
+        <!-- Six menu tiles arranged in a 2x3 grid -->
         <Grid Grid.Row="1"
               HorizontalAlignment="Center"
               VerticalAlignment="Center"
-              ColumnDefinitions="Auto,Auto"
+              ColumnDefinitions="Auto,Auto,Auto"
               RowDefinitions="Auto,Auto"
               ColumnSpacing="30"
               RowSpacing="30">
@@ -67,6 +67,23 @@
             </Button>
 
             <Button
+                Grid.Row="0"
+                Grid.Column="2"
+                Command="{Binding StatisticsCommand}"
+                Background="#d97509"  
+                Width="140"
+                Height="110" 
+                BorderThickness="2"
+                BorderBrush="Black"
+                FontSize="18">
+                <StackPanel>
+                    <TextBlock Text="Election" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Statistics" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Dashboard" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                </StackPanel>
+            </Button>
+
+            <Button
                 Grid.Row="1"
                 Grid.Column="0"
                 Command="{Binding ReportsCommand}"
@@ -96,6 +113,23 @@
                     <TextBlock Text="Assign" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
                     <TextBlock Text="Proxy" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
                     <TextBlock Text="Voter" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                </StackPanel>
+            </Button>
+
+            <Button
+                Grid.Row="1"
+                Grid.Column="2"
+                Command="{Binding DuplicateFingerprintScanCommand}"
+                Background="#6b4423"
+                Width="140"
+                Height="110"
+                BorderThickness="2"
+                BorderBrush="Black"
+                FontSize="18">
+                <StackPanel>
+                    <TextBlock Text="Duplicate" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Print" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+                    <TextBlock Text="Scan" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
                 </StackPanel>
             </Button>
         </Grid>

@@ -26,6 +26,7 @@ public class VotingHub : Hub
         }
 
         var role = user.FindFirst(ClaimTypes.Role)?.Value ?? user.FindFirst("role")?.Value;
+        var stationId = user.FindFirst("station")?.Value;
         var county = user.FindFirst("county")?.Value;
         var constituency = user.FindFirst("constituency")?.Value;
 
@@ -54,11 +55,12 @@ public class VotingHub : Hub
             }
 
             await Groups.AddToGroupAsync(Context.ConnectionId, RealtimeGroups.Official(officialId));
-            _registry.Add(new Server.Services.ConnectionInfo(Context.ConnectionId, "official", officialId, county, constituency, null));
+            _registry.Add(new Server.Services.ConnectionInfo(Context.ConnectionId, "official", officialId, officialId, stationId, county, constituency, null));
         }
         else if (role.Equals("voter", StringComparison.OrdinalIgnoreCase))
         {
             var voterId = user.FindFirst("voterId")?.Value;
+            var officialId = user.FindFirst("officialId")?.Value;
             if (string.IsNullOrWhiteSpace(voterId))
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Voter connection aborted: missing voterId claim");
@@ -71,9 +73,23 @@ public class VotingHub : Hub
             if (!string.IsNullOrWhiteSpace(deviceId))
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, RealtimeGroups.VoterDevice(voterId, deviceId));
+
+                if (!string.IsNullOrWhiteSpace(officialId) && int.TryParse(voterId, out var parsedVoterId))
+                {
+                    await Clients.Group(RealtimeGroups.Official(officialId)).SendAsync("official.v1.devicePresenceChanged", new
+                    {
+                        voterId = parsedVoterId,
+                        deviceId,
+                        state = "online",
+                        status = "Connected",
+                        timestamp = DateTime.UtcNow,
+                        county,
+                        constituency
+                    });
+                }
             }
 
-            _registry.Add(new Server.Services.ConnectionInfo(Context.ConnectionId, "voter", voterId, county, constituency, deviceId));
+            _registry.Add(new Server.Services.ConnectionInfo(Context.ConnectionId, "voter", voterId, officialId, stationId, county, constituency, deviceId));
         }
         else
         {
@@ -89,7 +105,66 @@ public class VotingHub : Hub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VotingHub] Connection disconnected: {Context.ConnectionId}. Reason: {exception?.Message ?? "normal close"}");
-        _registry.Remove(Context.ConnectionId, out _);
+
+        if (_registry.Remove(Context.ConnectionId, out var disconnectedInfo) &&
+            disconnectedInfo != null &&
+            disconnectedInfo.Role.Equals("voter", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(disconnectedInfo.DeviceId) &&
+            !string.IsNullOrWhiteSpace(disconnectedInfo.OfficialId) &&
+            int.TryParse(disconnectedInfo.UserId, out var parsedVoterId))
+        {
+            await Clients.Group(RealtimeGroups.Official(disconnectedInfo.OfficialId)).SendAsync("official.v1.devicePresenceChanged", new
+            {
+                voterId = parsedVoterId,
+                deviceId = disconnectedInfo.DeviceId,
+                state = "offline",
+                status = "Disconnected",
+                timestamp = DateTime.UtcNow,
+                county = disconnectedInfo.County,
+                constituency = disconnectedInfo.Constituency
+            });
+        }
+
         await base.OnDisconnectedAsync(exception);
+    }
+
+    public async Task UpdateDeviceStatus(string deviceId, string status)
+    {
+        var user = Context.User;
+        if (user == null)
+        {
+            return;
+        }
+
+        var role = user.FindFirst(ClaimTypes.Role)?.Value ?? user.FindFirst("role")?.Value;
+        if (!string.Equals(role, "voter", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var voterId = user.FindFirst("voterId")?.Value;
+        var officialId = user.FindFirst("officialId")?.Value;
+        var county = user.FindFirst("county")?.Value;
+        var constituency = user.FindFirst("constituency")?.Value;
+
+        if (!int.TryParse(voterId, out var parsedVoterId) ||
+            string.IsNullOrWhiteSpace(deviceId) ||
+            string.IsNullOrWhiteSpace(status) ||
+            string.IsNullOrWhiteSpace(officialId) ||
+            string.IsNullOrWhiteSpace(county) ||
+            string.IsNullOrWhiteSpace(constituency))
+        {
+            return;
+        }
+
+        await Clients.Group(RealtimeGroups.Official(officialId)).SendAsync("official.v1.deviceStatusReceived", new
+        {
+            voterId = parsedVoterId,
+            deviceId,
+            status,
+            timestamp = DateTime.UtcNow,
+            county,
+            constituency
+        });
     }
 }

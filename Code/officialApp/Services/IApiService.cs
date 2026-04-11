@@ -41,8 +41,6 @@ public interface IApiService
         string lastName,
         string dateOfBirth,
         string townOfBirth,
-        string addressLine1,
-        string addressLine2,
         string postCode,
         string county,
         string constituency,
@@ -69,4 +67,10 @@ public interface IApiService
     // Polling Stations
     Task<List<PollingStationOption>?> GetAllPollingStationsAsync();
     Task<PollingStationVoteCountResponse?> GetPollingStationVoteCountAsync();
+    
+    // Election Statistics
+    Task<ElectionStatistics?> GetElectionStatisticsAsync();
+
+    // Voter duplicate detection
+    Task<DuplicateFingerprintScanResponse?> ScanDuplicateVoterFingerprintsAsync();
 }

@@ -1,0 +1,321 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:officialApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
+            x:Class="officialApp.Views.ElectionStatisticsView"
+            x:Name="Root"
+            x:DataType="vm:ElectionStatisticsViewModel">
+
+    <Design.DataContext>
+        <vm:ElectionStatisticsViewModel/>
+    </Design.DataContext>
+
+    <Grid Background="#f6f2e6" RowDefinitions="Auto,*,Auto">
+        
+        <!-- Header -->
+        <StackPanel Grid.Row="0" 
+                   Orientation="Vertical"
+                   Margin="20,16,20,20"
+                   Spacing="5">
+            <TextBlock Text="Election Statistics Dashboard"
+                      Foreground="black"
+                      FontSize="24"
+                      FontWeight="Bold"/>
+            <TextBlock Text="{Binding ConstituencyName}"
+                      Foreground="#666666"
+                      FontSize="14"/>
+        </StackPanel>
+
+        <!-- Main Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Orientation="Vertical" Spacing="20" Margin="20">
+                
+                <!-- Key Statistics Cards -->
+                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="15" RowSpacing="15">
+                    
+                    <!-- Total Votes Card -->
+                    <Border Grid.Row="0" Grid.Column="0"
+                           Background="#d97509"
+                           BorderThickness="2"
+                           BorderBrush="Black"
+                           CornerRadius="8"
+                           Padding="15">
+                        <StackPanel Orientation="Vertical" Spacing="8">
+                            <TextBlock Text="Total Votes"
+                                      Foreground="white"
+                                      FontSize="12"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="{Binding TotalVotesText}"
+                                      Foreground="white"
+                                      FontSize="28"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="votes cast"
+                                      Foreground="#ffe0cc"
+                                      FontSize="10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Turnout Rate Card -->
+                    <Border Grid.Row="0" Grid.Column="1"
+                           Background="#d97509"
+                           BorderThickness="2"
+                           BorderBrush="Black"
+                           CornerRadius="8"
+                           Padding="15">
+                        <StackPanel Orientation="Vertical" Spacing="8">
+                            <TextBlock Text="Turnout Rate"
+                                      Foreground="white"
+                                      FontSize="12"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="{Binding TurnoutRateText}"
+                                      Foreground="white"
+                                      FontSize="24"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="vs country population"
+                                      Foreground="#ffe0cc"
+                                      FontSize="10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Connected Polling Stations Card -->
+                    <Border Grid.Row="0" Grid.Column="2"
+                           Background="#6b4423"
+                           BorderThickness="2"
+                           BorderBrush="Black"
+                           CornerRadius="8"
+                           Padding="15">
+                        <StackPanel Orientation="Vertical" Spacing="8">
+                            <TextBlock Text="Polling Stations Connected"
+                                      Foreground="white"
+                                      FontSize="12"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="{Binding PollingStationsConnectedText}"
+                                      Foreground="white"
+                                      FontSize="28"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="{Binding PollingStationConnectionRateText}"
+                                      Foreground="#e8d4c0"
+                                      FontSize="10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Registered Voters Card -->
+                    <Border Grid.Row="1" Grid.Column="0"
+                           Background="#6b4423"
+                           BorderThickness="2"
+                           BorderBrush="Black"
+                           CornerRadius="8"
+                           Padding="15">
+                        <StackPanel Orientation="Vertical" Spacing="8">
+                            <TextBlock Text="Registered Voters"
+                                      Foreground="white"
+                                      FontSize="12"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="{Binding RegisteredVotersText}"
+                                      Foreground="white"
+                                      FontSize="28"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="counted from voter records"
+                                      Foreground="#e8d4c0"
+                                      FontSize="10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Country Population Card -->
+                    <Border Grid.Row="1" Grid.Column="1"
+                           Background="#2d5f73"
+                           BorderThickness="2"
+                           BorderBrush="Black"
+                           CornerRadius="8"
+                           Padding="15">
+                        <StackPanel Orientation="Vertical" Spacing="8">
+                            <TextBlock Text="Country Population"
+                                      Foreground="white"
+                                      FontSize="12"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="{Binding CountryPopulationText}"
+                                      Foreground="white"
+                                      FontSize="22"
+                                      FontWeight="Bold"/>
+                            <TextBlock Text="baseline"
+                                      Foreground="#d8ecf5"
+                                      FontSize="10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- National Participation Card (BLANK) -->
+                    <Border Grid.Row="1" Grid.Column="2"
+                           Background="#2d5f73"
+                           BorderThickness="2"
+                           BorderBrush="Black"
+                           CornerRadius="8"
+                           Padding="15">
+                        <StackPanel Orientation="Vertical" Spacing="8">
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Rankings Side by Side -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="15" RowDefinitions="Auto">
+                    <!-- Candidate Votes Section -->
+                    <Border Grid.Column="0"
+                           Background="white"
+                           BorderThickness="2"
+                           BorderBrush="#d97509"
+                           CornerRadius="8"
+                           Padding="15">
+                        <StackPanel Orientation="Vertical" Spacing="12">
+                            <TextBlock Text="Election-Wide Candidate Ranking"
+                                      Foreground="black"
+                                      FontSize="16"
+                                      FontWeight="Bold"
+                                      Margin="0,0,0,5"/>
+
+                            <ItemsControl ItemsSource="{Binding CandidateVotes}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="150,*,80" ColumnSpacing="10" Margin="0,8">
+                                            <StackPanel Grid.Column="0" Orientation="Vertical">
+                                                <TextBlock Text="{Binding FullName}"
+                                                          Foreground="black"
+                                                          FontSize="12"
+                                                          FontWeight="Bold"/>
+                                                <TextBlock Text="{Binding Party}"
+                                                          Foreground="#666666"
+                                                          FontSize="10"/>
+                                            </StackPanel>
+
+                                            <Grid Grid.Column="1" Height="30">
+                                                <ProgressBar Value="{Binding VoteCount}"
+                                                             Maximum="{Binding #Root.DataContext.MaxVoteCount}"
+                                                             MinHeight="24"
+                                                             Foreground="#d97509"
+                                                             Background="#e8e8e8"
+                                                             VerticalAlignment="Center"/>
+                                            </Grid>
+
+                                            <TextBlock Grid.Column="2"
+                                                      Text="{Binding VotePercentageText}"
+                                                      Foreground="black"
+                                                      FontSize="12"
+                                                      FontWeight="Bold"
+                                                      HorizontalAlignment="Right"
+                                                      VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="No candidates with votes yet"
+                                      Foreground="#999999"
+                                      FontSize="11"
+                                      IsVisible="{Binding ShowNoCandidateMessage}"
+                                      Margin="0,10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Constituency Turnout Ranking -->
+                    <Border Grid.Column="1"
+                           Background="white"
+                           BorderThickness="2"
+                           BorderBrush="#2d5f73"
+                           CornerRadius="8"
+                           Padding="15">
+                        <StackPanel Orientation="Vertical" Spacing="12">
+                            <TextBlock Text="Top Constituencies by Turnout"
+                                      Foreground="black"
+                                      FontSize="16"
+                                      FontWeight="Bold"
+                                      Margin="0,0,0,2"/>
+                            <TextBlock Text="{Binding BestConstituencyText}"
+                                      Foreground="#2d5f73"
+                                      FontSize="12"
+                                      FontWeight="Bold"/>
+
+                            <ItemsControl ItemsSource="{Binding TopConstituencies}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="#d6e7ef" BorderThickness="0,0,0,1" Padding="0,6">
+                                            <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="4">
+                                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                                          Text="{Binding ConstituencyName}"
+                                                          FontWeight="Bold"
+                                                          Foreground="black"
+                                                          TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Row="0" Grid.Column="1"
+                                                          Text="{Binding TurnoutRateText}"
+                                                          HorizontalAlignment="Right"
+                                                          FontWeight="Bold"
+                                                          Foreground="#2d5f73"/>
+
+                                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                                          Text="{Binding TotalVotes, StringFormat='Votes: {0:N0}'}"
+                                                          Foreground="#444444"/>
+                                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                                          Text="{Binding ExpectedVotes, StringFormat='Expected: {0:N0}'}"
+                                                          HorizontalAlignment="Right"
+                                                          Foreground="#444444"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Loading Indicator -->
+                <TextBlock Text="{Binding StatusMessage}"
+                          Foreground="{Binding StatusColor}"
+                          FontSize="12"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding IsLoading}"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer with Buttons -->
+        <StackPanel Grid.Row="2"
+                   Orientation="Vertical"
+                   VerticalAlignment="Bottom"
+                   HorizontalAlignment="Center"
+                   Spacing="10"
+                   Margin="0,0,0,15">
+            
+            <!-- Status Message -->
+            <TextBlock Text="{Binding StatusMessage}" 
+                      Foreground="{Binding StatusColor}"
+                      HorizontalAlignment="Center"
+                      FontSize="12"
+                      Height="20"
+                      IsVisible="{Binding IsNotLoading}"/>
+            
+            <!-- Buttons -->
+            <StackPanel Orientation="Horizontal" 
+                       HorizontalAlignment="Center"
+                       Spacing="15">
+                
+                <Button Command="{Binding RefreshStatisticsCommand}"
+                       Background="#d97509"  
+                       Width="140"
+                       Height="50" 
+                       BorderThickness="2"
+                       BorderBrush="Black"
+                       FontSize="14">
+                    <TextBlock Text="Refresh" Foreground="white" FontWeight="Bold"/>
+                </Button>
+                
+                <Button Command="{Binding GoBackCommand}"
+                       Background="#6b4423"  
+                       Width="140"
+                       Height="50" 
+                       BorderThickness="2"
+                       BorderBrush="Black"
+                       FontSize="14">
+                    <TextBlock Text="Back" Foreground="white" FontWeight="Bold"/>
+                </Button>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>

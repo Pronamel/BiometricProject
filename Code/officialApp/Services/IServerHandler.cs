@@ -23,8 +23,6 @@ public interface IServerHandler
         string lastName,
         string dateOfBirth,
         string townOfBirth,
-        string addressLine1,
-        string addressLine2,
         string postCode,
         string county,
         string constituency,
@@ -51,6 +49,8 @@ public interface IServerHandler
     Task<bool> SetAccessCodeAsync(string accessCode);
     Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request);
     Task<PollingStationVoteCountResponse?> GetPollingStationVoteCountAsync();
+    Task<ElectionStatistics?> GetElectionStatisticsAsync();
+    Task<DuplicateFingerprintScanResponse?> ScanDuplicateVoterFingerprintsAsync();
     
     Task<bool> GenerateAccessCodeForVoterAsync(string voterId);
     

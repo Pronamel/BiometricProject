@@ -264,6 +264,70 @@ public class ApiService : IApiService
         return Convert.ToBase64String(wrappedDek);
     }
 
+    //--------------------------------------------
+    // Response Decryption Helpers
+    //--------------------------------------------
+
+    private static byte[] DecryptWithAesGcm(byte[] encryptedPayload, byte[] dek)
+    {
+        if (encryptedPayload == null || encryptedPayload.Length < 28)
+        {
+            throw new CryptographicException("Encrypted payload is invalid or too short");
+        }
+
+        const int nonceLength = 12;
+        const int tagLength = 16;
+        int cipherLength = encryptedPayload.Length - nonceLength - tagLength;
+
+        if (cipherLength <= 0)
+        {
+            throw new CryptographicException("Encrypted payload cipher text is missing");
+        }
+
+        byte[] nonce = new byte[nonceLength];
+        byte[] tag = new byte[tagLength];
+        byte[] ciphertext = new byte[cipherLength];
+
+        Buffer.BlockCopy(encryptedPayload, 0, nonce, 0, nonceLength);
+        Buffer.BlockCopy(encryptedPayload, nonceLength, tag, 0, tagLength);
+        Buffer.BlockCopy(encryptedPayload, nonceLength + tagLength, ciphertext, 0, cipherLength);
+
+        byte[] plaintext = new byte[cipherLength];
+        using var aes = new AesGcm(dek, tagSizeInBytes: tagLength);
+        aes.Decrypt(nonce, ciphertext, tag, plaintext);
+
+        return plaintext;
+    }
+
+    private static string DecryptStringFromBase64(string encryptedBase64, byte[] dek)
+    {
+        var encryptedPayload = Convert.FromBase64String(encryptedBase64);
+        var plaintextBytes = DecryptWithAesGcm(encryptedPayload, dek);
+        return Encoding.UTF8.GetString(plaintextBytes);
+    }
+
+    //--------------------------------------------
+    // Authenticated Request Helpers
+    //--------------------------------------------
+
+    private async Task<StringContent> WrapRequestPayloadAsync(object payload)
+    {
+        var envelope = await BuildEncryptedEnvelopeAsync(payload);
+        if (!envelope.Success)
+        {
+            throw new InvalidOperationException("Failed to encrypt request payload");
+        }
+
+        var encryptedRequest = new
+        {
+            wrappedDek = envelope.WrappedDek,
+            encryptedPayload = envelope.EncryptedPayload
+        };
+
+        var jsonContent = JsonSerializer.Serialize(encryptedRequest, _jsonOptions);
+        return new StringContent(jsonContent, Encoding.UTF8, "application/json");
+    }
+
     private sealed class VoterPublicKeyResponse
     {
         public bool Success { get; set; }
@@ -452,6 +516,8 @@ public class ApiService : IApiService
 
     private async Task<HttpResponseMessage> SendAuthenticatedGetAsync(string endpoint)
     {
+        // For GET requests, we send Authorization header via JWT token
+        // The connection is already HTTPS encrypted, so the request is secure
         var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}{endpoint}");
         AddAuthorizationHeader(request);
         return await _httpClient.SendAsync(request);
@@ -459,10 +525,40 @@ public class ApiService : IApiService
 
     private async Task<HttpResponseMessage> SendAuthenticatedPostAsync(string endpoint, HttpContent content)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}{endpoint}");
-        request.Content = content;
-        AddAuthorizationHeader(request);
-        return await _httpClient.SendAsync(request);
+        try
+        {
+            // Check if content is already encrypted (contains wrappedDek and encryptedPayload)
+            string? contentString = null;
+            if (content is StringContent stringContent)
+            {
+                contentString = await content.ReadAsStringAsync();
+            }
+
+            if (!string.IsNullOrWhiteSpace(contentString) && 
+                contentString.Contains("wrappedDek") && contentString.Contains("encryptedPayload"))
+            {
+                // Already encrypted, send as-is
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}{endpoint}");
+                request.Content = content;
+                AddAuthorizationHeader(request);
+                return await _httpClient.SendAsync(request);
+            }
+
+            // Not encrypted yet - for now, send as-is
+            // Future: wrap if needed
+            var request2 = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}{endpoint}");
+            request2.Content = content;
+            AddAuthorizationHeader(request2);
+            return await _httpClient.SendAsync(request2);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to send authenticated POST request: {ex.Message}");
+            return new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new { error = ex.Message }))
+            };
+        }
     }
 
     //--------------------------------------------
@@ -599,6 +695,116 @@ public class ApiService : IApiService
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching polling station vote count: {ex.Message}");
             return null;
+        }
+    }
+
+    public async Task<ElectionStatistics?> GetElectionStatisticsAsync()
+    {
+        try
+        {
+            if (!IsAuthenticated)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Not authenticated for election statistics");
+                return null;
+            }
+
+            var response = await SendAuthenticatedGetAsync("/api/official/election-statistics");
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to fetch election statistics: {response.StatusCode} {errorBody}");
+                return null;
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var payload = JsonSerializer.Deserialize<ElectionStatistics>(body, _jsonOptions);
+
+            if (payload?.Success != true)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Election statistics response was not successful");
+                return null;
+            }
+
+            // Calculate vote percentages from candidate-attributed votes only.
+            var totalCandidateVotes = payload.CandidateVotes.Sum(c => c.VoteCount);
+            foreach (var candidate in payload.CandidateVotes)
+            {
+                candidate.VotePercentage = totalCandidateVotes > 0
+                    ? (decimal)candidate.VoteCount / totalCandidateVotes * 100
+                    : 0;
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Election statistics retrieved: {payload.TotalVotes} total votes, {payload.TurnoutRate}% turnout");
+            return payload;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching election statistics: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<DuplicateFingerprintScanResponse?> ScanDuplicateVoterFingerprintsAsync()
+    {
+        try
+        {
+            if (!IsAuthenticated)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Not authenticated for duplicate fingerprint scan");
+                return new DuplicateFingerprintScanResponse
+                {
+                    Success = false,
+                    Message = "Official is not authenticated"
+                };
+            }
+
+            var content = new StringContent("{}", Encoding.UTF8, "application/json");
+            var response = await SendAuthenticatedPostAsync("/api/official/scan-duplicate-voter-fingerprints", content);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var payload = JsonSerializer.Deserialize<DuplicateFingerprintScanResponse>(body, _jsonOptions);
+                if (payload != null)
+                {
+                    return payload;
+                }
+
+                return new DuplicateFingerprintScanResponse
+                {
+                    Success = false,
+                    Message = "Server returned an empty response"
+                };
+            }
+
+            string message = "Duplicate fingerprint scan failed";
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("message", out var messageProp))
+                {
+                    message = messageProp.GetString() ?? message;
+                }
+            }
+            catch
+            {
+            }
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Duplicate fingerprint scan failed: {response.StatusCode} {body}");
+            return new DuplicateFingerprintScanResponse
+            {
+                Success = false,
+                Message = message
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Duplicate fingerprint scan error: {ex.Message}");
+            return new DuplicateFingerprintScanResponse
+            {
+                Success = false,
+                Message = $"Error: {ex.Message}"
+            };
         }
     }
 
@@ -948,8 +1154,6 @@ public class ApiService : IApiService
         string lastName,
         string dateOfBirth,
         string townOfBirth,
-        string addressLine1,
-        string addressLine2,
         string postCode,
         string county,
         string constituency,
@@ -980,7 +1184,6 @@ public class ApiService : IApiService
                 string.IsNullOrWhiteSpace(lastName) ||
                 string.IsNullOrWhiteSpace(dateOfBirth) ||
                 string.IsNullOrWhiteSpace(townOfBirth) ||
-                string.IsNullOrWhiteSpace(addressLine1) ||
                 string.IsNullOrWhiteSpace(postCode) ||
                 string.IsNullOrWhiteSpace(county) ||
                 string.IsNullOrWhiteSpace(constituency) ||
@@ -1003,8 +1206,6 @@ public class ApiService : IApiService
             string? encryptedLastName = null;
             string? encryptedDateOfBirth = null;
             string? encryptedTownOfBirth = null;
-            string? encryptedAddressLine1 = null;
-            string? encryptedAddressLine2 = null;
             string? encryptedPostCode = null;
             string? encryptedCounty = null;
             string? encryptedConstituency = null;
@@ -1043,8 +1244,6 @@ public class ApiService : IApiService
                 encryptedLastName = EncryptStringToBase64(lastName, dek);
                 encryptedDateOfBirth = EncryptStringToBase64(isoDateOfBirth, dek);
                 encryptedTownOfBirth = EncryptStringToBase64(townOfBirth, dek);
-                encryptedAddressLine1 = EncryptStringToBase64(addressLine1, dek);
-                encryptedAddressLine2 = EncryptStringToBase64(addressLine2 ?? string.Empty, dek);
                 encryptedPostCode = EncryptStringToBase64(postCode, dek);
                 encryptedCounty = EncryptStringToBase64(county, dek);
                 encryptedConstituency = EncryptStringToBase64(constituency, dek);
@@ -1065,8 +1264,6 @@ public class ApiService : IApiService
                 lastName,
                 dateOfBirth = isoDateOfBirth,
                 townOfBirth,
-                addressLine1 = string.Empty,
-                addressLine2 = string.Empty,
                 postCode,
                 county,
                 constituency,
@@ -1082,8 +1279,6 @@ public class ApiService : IApiService
                 encryptedLastName,
                 encryptedDateOfBirth,
                 encryptedTownOfBirth,
-                encryptedAddressLine1,
-                encryptedAddressLine2,
                 encryptedPostCode,
                 encryptedCounty,
                 encryptedConstituency,

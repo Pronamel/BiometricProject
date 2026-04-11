@@ -241,8 +241,6 @@ public class DatabaseService
         string encryptedLastName,
         string encryptedDateOfBirth,
         string encryptedTownOfBirth,
-        string encryptedAddressLine1,
-        string encryptedAddressLine2,
         string encryptedPostCode,
         string encryptedFingerPrintScan)
     {
@@ -259,8 +257,6 @@ public class DatabaseService
                 string.IsNullOrWhiteSpace(encryptedLastName) ||
                 string.IsNullOrWhiteSpace(encryptedDateOfBirth) ||
                 string.IsNullOrWhiteSpace(encryptedTownOfBirth) ||
-                string.IsNullOrWhiteSpace(encryptedAddressLine1) ||
-                string.IsNullOrWhiteSpace(encryptedAddressLine2) ||
                 string.IsNullOrWhiteSpace(encryptedPostCode) ||
                 string.IsNullOrWhiteSpace(encryptedFingerPrintScan))
             {
@@ -289,8 +285,6 @@ public class DatabaseService
             byte[] encryptedLastNameBytes;
             byte[] encryptedDateOfBirthBytes;
             byte[] encryptedTownOfBirthBytes;
-            byte[] encryptedAddressLine1Bytes;
-            byte[] encryptedAddressLine2Bytes;
             byte[] encryptedPostCodeBytes;
             byte[] encryptedFingerprintBytes;
 
@@ -302,8 +296,6 @@ public class DatabaseService
                 encryptedLastNameBytes = Convert.FromBase64String(encryptedLastName.Trim());
                 encryptedDateOfBirthBytes = Convert.FromBase64String(encryptedDateOfBirth.Trim());
                 encryptedTownOfBirthBytes = Convert.FromBase64String(encryptedTownOfBirth.Trim());
-                encryptedAddressLine1Bytes = Convert.FromBase64String(encryptedAddressLine1.Trim());
-                encryptedAddressLine2Bytes = Convert.FromBase64String(encryptedAddressLine2.Trim());
                 encryptedPostCodeBytes = Convert.FromBase64String(encryptedPostCode.Trim());
                 encryptedFingerprintBytes = Convert.FromBase64String(encryptedFingerPrintScan.Trim());
             }
@@ -315,7 +307,6 @@ public class DatabaseService
             var voter = new Voter
             {
                 NationalId = encryptedNationalIdBytes,
-                ElectoralRollNumber = Array.Empty<byte>(),
                 Sdi = sdi,
                 ConstituencyId = constituency.ConstituencyId,
                 WardId = constituencyHash.Trim().ToLowerInvariant(),
@@ -323,8 +314,6 @@ public class DatabaseService
                 LastName = encryptedLastNameBytes,
                 DateOfBirth = encryptedDateOfBirthBytes,
                 TownOfBirth = encryptedTownOfBirthBytes,
-                AddressLine1 = encryptedAddressLine1Bytes,
-                PreviousAddress = encryptedAddressLine2Bytes,
                 Postcode = encryptedPostCodeBytes,
                 FingerprintScan = encryptedFingerprintBytes,
                 HasVoted = false,
@@ -612,6 +601,255 @@ public class DatabaseService
             return new List<CandidateDto>();
         }
     }
+
+    // ==========================================
+    // ELECTION STATISTICS METHODS
+    // ==========================================
+
+    public async Task<(bool Success, Guid? CurrentElectionId, int TotalVotes, int InvalidVotes, int ExpectedVotes)> GetElectionStatisticsAsync(Guid pollingStationId, Guid? electionId = null)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching election statistics for polling station {pollingStationId}");
+
+            Election? currentElection;
+
+            if (electionId.HasValue)
+            {
+                currentElection = await _dbContext.Elections
+                    .FirstOrDefaultAsync(e => e.ElectionId == electionId.Value);
+
+                if (currentElection == null)
+                {
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Requested election not found: {electionId.Value}");
+                    return (false, null, 0, 0, 0);
+                }
+            }
+            else
+            {
+                currentElection = await _dbContext.Elections
+                    .Where(e => e.Status == "Active" || e.Status == "OnGoing")
+                    .OrderByDescending(e => e.ElectionDate)
+                    .FirstOrDefaultAsync();
+
+                // Fallback to most recent election so dashboard can still render if status is stale.
+                if (currentElection == null)
+                {
+                    currentElection = await _dbContext.Elections
+                        .OrderByDescending(e => e.ElectionDate)
+                        .FirstOrDefaultAsync();
+                }
+            }
+
+            if (currentElection == null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  No election found");
+                return (false, null, 0, 0, 0);
+            }
+
+            var totalVotes = await _dbContext.VoteRecords
+                .Where(vr => vr.PollingStationId == pollingStationId && vr.ElectionId == currentElection.ElectionId)
+                .CountAsync();
+
+            var pollingStation = await _dbContext.PollingStations
+                .FirstOrDefaultAsync(ps => ps.PollingStationId == pollingStationId);
+
+            var invalidVotes = pollingStation?.InvalidVotes ?? 0;
+            var expectedVotes = pollingStation?.ExpectedVotes ?? 0;
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Election statistics: Total={totalVotes}, Invalid={invalidVotes}, Expected={expectedVotes}");
+            return (true, currentElection.ElectionId, totalVotes, invalidVotes, expectedVotes);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching election statistics: {ex.Message}");
+            return (false, null, 0, 0, 0);
+        }
+    }
+
+    public async Task<List<CandidateVoteDto>> GetVotesByCandidate(Guid electionId, Guid? pollingStationId = null)
+    {
+        try
+        {
+            if (pollingStationId.HasValue)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching votes by candidate for polling station {pollingStationId.Value}");
+            }
+            else
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching election-wide votes by candidate for election {electionId}");
+            }
+
+            var voteRecordsQuery = _dbContext.VoteRecords
+                .Where(vr => vr.ElectionId == electionId && vr.CandidateId != null);
+
+            if (pollingStationId.HasValue)
+            {
+                voteRecordsQuery = voteRecordsQuery.Where(vr => vr.PollingStationId == pollingStationId.Value);
+            }
+
+            var groupedVotes = await voteRecordsQuery
+                .Where(vr => vr.CandidateId.HasValue)
+                .GroupBy(vr => vr.CandidateId!.Value)
+                .Select(g => new
+                {
+                    CandidateId = g.Key,
+                    VoteCount = g.Count()
+                })
+                .OrderByDescending(g => g.VoteCount)
+                .ToListAsync();
+
+            var candidateIds = groupedVotes
+                .Select(g => g.CandidateId)
+                .ToList();
+
+            var candidateLookup = await _dbContext.Candidates
+                .Where(c => candidateIds.Contains(c.CandidateId))
+                .Select(c => new
+                {
+                    c.CandidateId,
+                    c.FirstName,
+                    c.LastName,
+                    c.Party
+                })
+                .ToDictionaryAsync(c => c.CandidateId, c => c);
+
+            var votesByCandidate = groupedVotes
+                .Select(v =>
+                {
+                    candidateLookup.TryGetValue(v.CandidateId, out var candidate);
+                    return new CandidateVoteDto(
+                        v.CandidateId,
+                        candidate?.FirstName ?? "Unknown",
+                        candidate?.LastName ?? "Candidate",
+                        candidate?.Party ?? "Independent",
+                        v.VoteCount
+                    );
+                })
+                .OrderByDescending(cv => cv.VoteCount)
+                .ToList();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found votes for {votesByCandidate.Count} candidates");
+            return votesByCandidate;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching votes by candidate: {ex.Message}");
+            return new List<CandidateVoteDto>();
+        }
+    }
+
+    public async Task<List<PollingStationStatsDto>> GetPollingStationStats(Guid constitutionId, Guid electionId)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching polling station stats for constituency {constitutionId}");
+
+            var stats = await _dbContext.PollingStations
+                .Where(ps => ps.ConstituencyId == constitutionId)
+                .Select(ps => new PollingStationStatsDto(
+                    ps.PollingStationId,
+                    ps.PollingStationCode ?? "",
+                    _dbContext.VoteRecords
+                        .Where(vr => vr.PollingStationId == ps.PollingStationId && vr.ElectionId == electionId)
+                        .Count(),
+                    ps.InvalidVotes,
+                    ps.ExpectedVotes
+                ))
+                .ToListAsync();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found stats for {stats.Count} polling stations");
+            return stats;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching polling station stats: {ex.Message}");
+            return new List<PollingStationStatsDto>();
+        }
+    }
+
+    public async Task<List<ConstituencyStatsDto>> GetConstituencyStats(Guid electionId)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching constituency stats for election {electionId}");
+
+            var constituencies = await _dbContext.Constituencies
+                .Select(c => new
+                {
+                    c.ConstituencyId,
+                    Name = c.Name ?? ""
+                })
+                .ToListAsync();
+
+            var votesByConstituency = await _dbContext.VoteRecords
+                .Where(vr => vr.ElectionId == electionId && vr.ConstituencyId.HasValue)
+                .GroupBy(vr => vr.ConstituencyId!.Value)
+                .Select(g => new
+                {
+                    ConstituencyId = g.Key,
+                    TotalVotes = g.Count()
+                })
+                .ToDictionaryAsync(x => x.ConstituencyId, x => x.TotalVotes);
+
+            var expectedByConstituency = await _dbContext.PollingStations
+                .GroupBy(ps => ps.ConstituencyId)
+                .Select(g => new
+                {
+                    ConstituencyId = g.Key,
+                    ExpectedVotes = g.Sum(ps => ps.ExpectedVotes)
+                })
+                .ToDictionaryAsync(x => x.ConstituencyId, x => x.ExpectedVotes);
+
+            var stats = constituencies
+                .Select(c =>
+                {
+                    votesByConstituency.TryGetValue(c.ConstituencyId, out var totalVotes);
+                    expectedByConstituency.TryGetValue(c.ConstituencyId, out var expectedVotes);
+                    return new ConstituencyStatsDto(
+                        c.ConstituencyId,
+                        c.Name,
+                        totalVotes,
+                        expectedVotes
+                    );
+                })
+                .Where(s => s.ExpectedVotes > 0)
+                .OrderByDescending(s => s.TotalVotes)
+                .ToList();
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found stats for {stats.Count} constituencies");
+            return stats;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching constituency stats: {ex.Message}");
+            return new List<ConstituencyStatsDto>();
+        }
+    }
+
+    public async Task<int> GetCountryPopulationAsync()
+    {
+        await Task.CompletedTask;
+        // Great Britain population baseline for national participation metric.
+        return 67_700_000;
+    }
+
+    public async Task<int> GetRegisteredVotersCountAsync()
+    {
+        return await _dbContext.Voters.CountAsync();
+    }
+
+    public async Task<int> GetTotalPollingStationsCountAsync()
+    {
+        return await _dbContext.PollingStations.CountAsync();
+    }
+
+    public async Task<int> GetInvalidVotesByElectionAsync(Guid electionId)
+    {
+        return await _dbContext.VoteRecords
+            .Where(vr => vr.ElectionId == electionId && vr.CandidateId == null)
+            .CountAsync();
+    }
 }
 
 // DTO for polling stations response
@@ -630,4 +868,30 @@ public record CandidateDto(
     string LastName,
     string Party,
     string Bio
+);
+
+// DTO for candidate votes
+public record CandidateVoteDto(
+    Guid CandidateId,
+    string FirstName,
+    string LastName,
+    string Party,
+    int VoteCount
+);
+
+// DTO for polling station statistics
+public record PollingStationStatsDto(
+    Guid PollingStationId,
+    string Code,
+    int TotalVotes,
+    int InvalidVotes,
+    int ExpectedVotes
+);
+
+// DTO for constituency statistics
+public record ConstituencyStatsDto(
+    Guid ConstituencyId,
+    string ConstituencyName,
+    int TotalVotes,
+    int ExpectedVotes
 );

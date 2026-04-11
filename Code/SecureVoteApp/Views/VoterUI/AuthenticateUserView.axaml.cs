@@ -9,12 +9,21 @@ public partial class AuthenticateUserView : UserControl
     {
         InitializeComponent();
 
-        AttachedToVisualTree += (_, _) =>
+        AttachedToVisualTree += async (_, _) =>
         {
             if (DataContext is AuthenticateUserViewModel viewModel)
             {
                 viewModel.ResetAuthenticationState();
                 viewModel.ApplyPendingLookup();
+                await viewModel.ActivateScannerAsync();
+            }
+        };
+
+        DetachedFromVisualTree += (_, _) =>
+        {
+            if (DataContext is AuthenticateUserViewModel viewModel)
+            {
+                viewModel.DeactivateScanner();
             }
         };
     }

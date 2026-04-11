@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using officialApp.Services;
@@ -22,8 +23,10 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     private readonly IServerHandler _serverHandler;
     private readonly IRealtimeService _realtimeService;
     private CancellationTokenSource? _voteListeningCancellation;
-    private CancellationTokenSource? _deviceStatusListeningCancellation;
     private bool _realtimeSubscriptionsRegistered;
+    private bool _isConnectingRealtime;
+    private readonly Dictionary<string, CancellationTokenSource> _pendingDisconnectRemovals = new();
+    private const int DisconnectedTemplateRemovalDelaySeconds = 15;
 
     // ==========================================
     // OBSERVABLE PROPERTIES
@@ -105,7 +108,14 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
 
     public async Task ActivateAsync()
     {
+        SystemStatus = "Syncing polling data...";
+        await StartVoteListening();
         await RefreshPollingStationVoteCountAsync();
+        StatusMessages = $"Live feed ready. Device templates update in real-time.\nLast sync: {DateTime.Now:HH:mm:ss}\nConnected devices: {ConnectedDevices.Count}";
+    }
+
+    public async Task WarmupRealtimeAsync()
+    {
         await StartVoteListening();
     }
 
@@ -121,18 +131,23 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
             return;
         }
 
+        if (_isConnectingRealtime)
+        {
+            return;
+        }
+
         if (_realtimeService.IsConnected)
         {
             IsListeningForVotes = true;
-            if (_deviceStatusListeningCancellation == null)
-            {
-                _ = StartDeviceStatusListening();
-            }
+            SystemStatus = "Connected (live)";
             return;
         }
         
         IsListeningForVotes = true;
+        _isConnectingRealtime = true;
         _voteListeningCancellation = new CancellationTokenSource();
+        SystemStatus = "Connecting live device feed...";
+        StatusMessages = $"Connecting to real-time channel...\nLast sync attempt: {DateTime.Now:HH:mm:ss}";
         
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official connecting to realtime channel for voter requests, votes, and device statuses...");
         
@@ -143,62 +158,34 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Realtime connection could not be established");
                 IsListeningForVotes = false;
+                SystemStatus = "Realtime unavailable";
+                StatusMessages = $"Realtime connection failed. Retrying when you reopen manager.\nLast attempt: {DateTime.Now:HH:mm:ss}";
                 return;
             }
 
-            if (_deviceStatusListeningCancellation == null)
-            {
-                _ = StartDeviceStatusListening();
-            }
-
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official realtime connection established");
+            SystemStatus = "Connected (live)";
+            StatusMessages = $"Realtime connected. Waiting for device status updates...\nConnected devices: {ConnectedDevices.Count}\nLast update: {DateTime.Now:HH:mm:ss}";
         }
         catch (OperationCanceledException)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote listening was cancelled");
             IsListeningForVotes = false;
+            SystemStatus = "Realtime cancelled";
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote listening error: {ex.Message}");
             IsListeningForVotes = false;
-        }
-    }
-
-    private async Task StartDeviceStatusListening()
-    {
-        if (_deviceStatusListeningCancellation != null)
-        {
-            return;
-        }
-
-        _deviceStatusListeningCancellation = new CancellationTokenSource();
-
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official starting to listen for device statuses...");
-
-        try
-        {
-            while (!_deviceStatusListeningCancellation.Token.IsCancellationRequested)
-            {
-                CleanupInactiveDevices();
-
-                await Task.Delay(3000, _deviceStatusListeningCancellation.Token);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status listening was cancelled");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device status listening error: {ex.Message}");
+            SystemStatus = "Realtime error";
+            StatusMessages = $"Realtime error: {ex.Message}\nLast attempt: {DateTime.Now:HH:mm:ss}";
         }
         finally
         {
-            _deviceStatusListeningCancellation = null;
+            _isConnectingRealtime = false;
         }
     }
-    
+
     // Method to be called when a vote is received
     public async Task OnVoteReceivedAsync(string candidateName, string partyName, int voterId)
     {
@@ -211,6 +198,16 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     {
         var normalizedStatus = status.Trim().ToLowerInvariant();
         var isLocked = normalizedStatus == "locked by official" || normalizedStatus == "device locked by official";
+        var isDisconnected = normalizedStatus == "disconnected";
+
+        if (isDisconnected)
+        {
+            ScheduleDisconnectedTemplateRemoval(deviceId);
+        }
+        else
+        {
+            CancelDisconnectedTemplateRemoval(deviceId);
+        }
 
         // Check if device already exists
         var existingDevice = ConnectedDevices.FirstOrDefault(d => d.DeviceIdentifier == deviceId);
@@ -241,27 +238,58 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
             ConnectedDevices.Add(device);
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] New device #{device.DeviceNumber} (Voter {voterId}) added with status: {status}");
         }
+
+        StatusMessages = $"Live device update received.\nConnected devices: {ConnectedDevices.Count}\nLast update: {DateTime.Now:HH:mm:ss}";
     }
 
-    // Method to clean up inactive devices (not heard from in 15+ seconds)
-    private void CleanupInactiveDevices()
+    public void OnDevicePresenceChanged(int voterId, string deviceId, bool isOnline, string status)
     {
-        var now = DateTime.Now;
-        var inactiveThreshold = TimeSpan.FromSeconds(15); // Remove devices inactive for 15+ seconds
-        
-        var devicesToRemove = ConnectedDevices
-            .Where(d => (now - d.LastStatusTime) > inactiveThreshold)
-            .ToList();
-        
-        if (devicesToRemove.Count > 0)
+        var existingDevice = ConnectedDevices.FirstOrDefault(d => d.DeviceIdentifier == deviceId);
+        var resolvedStatus = string.IsNullOrWhiteSpace(status)
+            ? (isOnline ? "Connected" : "Disconnected")
+            : status;
+        var normalizedStatus = resolvedStatus.Trim().ToLowerInvariant();
+        var isLocked = normalizedStatus == "locked by official" || normalizedStatus == "device locked by official";
+
+        if (existingDevice != null)
         {
-            foreach (var device in devicesToRemove)
+            existingDevice.VoterId = voterId;
+            existingDevice.IsLockedByOfficial = isLocked;
+            existingDevice.Status = isOnline ? resolvedStatus : "Disconnected";
+            existingDevice.LastStatusTime = DateTime.Now;
+
+            if (isOnline)
             {
-                var inactiveFor = (now - device.LastStatusTime).TotalSeconds;
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⏱ Removing inactive Device #{device.DeviceNumber} (Device ID: {device.DeviceIdentifier}, inactive for {inactiveFor:F1}s, last status: {device.LastStatusTime:HH:mm:ss})");
-                ConnectedDevices.Remove(device);
+                CancelDisconnectedTemplateRemoval(deviceId);
             }
+            else
+            {
+                ScheduleDisconnectedTemplateRemoval(deviceId);
+            }
+
+            StatusMessages = $"Presence update received.\nConnected devices: {ConnectedDevices.Count}\nLast update: {DateTime.Now:HH:mm:ss}";
+            return;
         }
+
+        if (!isOnline)
+        {
+            return;
+        }
+
+        var device = new ConnectedVoterDevice
+        {
+            VoterId = voterId,
+            DeviceNumber = _nextDeviceNumber++,
+            IsLockedByOfficial = isLocked,
+            Status = resolvedStatus,
+            ConnectedAtTime = DateTime.Now,
+            LastStatusTime = DateTime.Now,
+            DeviceIdentifier = deviceId
+        };
+
+        ConnectedDevices.Add(device);
+        CancelDisconnectedTemplateRemoval(deviceId);
+        StatusMessages = $"Device joined polling session.\nConnected devices: {ConnectedDevices.Count}\nLast update: {DateTime.Now:HH:mm:ss}";
     }
 
     // Method to add a new connected voter device
@@ -357,8 +385,75 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
         var device = ConnectedDevices.FirstOrDefault(d => d.DeviceNumber == deviceNumber);
         if (device != null)
         {
+            CancelDisconnectedTemplateRemoval(device.DeviceIdentifier);
             ConnectedDevices.Remove(device);
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device #{deviceNumber} disconnected");
+        }
+    }
+
+    private void ScheduleDisconnectedTemplateRemoval(string deviceId)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            return;
+        }
+
+        CancelDisconnectedTemplateRemoval(deviceId);
+
+        var cts = new CancellationTokenSource();
+        _pendingDisconnectRemovals[deviceId] = cts;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(DisconnectedTemplateRemovalDelaySeconds), cts.Token);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    var device = ConnectedDevices.FirstOrDefault(d => d.DeviceIdentifier == deviceId);
+                    if (device == null)
+                    {
+                        return;
+                    }
+
+                    var status = device.Status?.Trim().ToLowerInvariant() ?? string.Empty;
+                    var disconnectedFor = DateTime.Now - device.LastStatusTime;
+                    if (status == "disconnected" && disconnectedFor >= TimeSpan.FromSeconds(DisconnectedTemplateRemovalDelaySeconds))
+                    {
+                        ConnectedDevices.Remove(device);
+                        StatusMessages = $"Removed stale disconnected device template after {DisconnectedTemplateRemovalDelaySeconds}s.\nConnected devices: {ConnectedDevices.Count}\nLast update: {DateTime.Now:HH:mm:ss}";
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Removed disconnected device template: {deviceId}");
+                    }
+                }, DispatcherPriority.Input);
+            }
+            catch (TaskCanceledException)
+            {
+            }
+            finally
+            {
+                if (_pendingDisconnectRemovals.TryGetValue(deviceId, out var pending) && pending == cts)
+                {
+                    _pendingDisconnectRemovals.Remove(deviceId);
+                }
+
+                cts.Dispose();
+            }
+        });
+    }
+
+    private void CancelDisconnectedTemplateRemoval(string deviceId)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            return;
+        }
+
+        if (_pendingDisconnectRemovals.TryGetValue(deviceId, out var cts))
+        {
+            _pendingDisconnectRemovals.Remove(deviceId);
+            cts.Cancel();
+            cts.Dispose();
         }
     }
     
@@ -367,8 +462,6 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     {
         IsListeningForVotes = false;
         _voteListeningCancellation?.Cancel();
-        _deviceStatusListeningCancellation?.Cancel();
-        _deviceStatusListeningCancellation = null;
         _ = _realtimeService.DisconnectAsync();
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official stopped listening for votes");
     }
@@ -376,7 +469,6 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     [RelayCommand]
     private void GoBack()
     {
-        StopVoteListening();
         _navigationService.NavigateToOfficialMenu();
     }
     
@@ -486,6 +578,16 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Realtime device status from Voter {deviceStatus.VoterId}: {deviceStatus.Status} (Device: {deviceStatus.DeviceId})");
                 OnDeviceStatusReceived(deviceStatus.VoterId, deviceStatus.DeviceId, deviceStatus.Status);
+            });
+        };
+
+        _realtimeService.DevicePresenceChanged += presence =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                var isOnline = string.Equals(presence.State, "online", StringComparison.OrdinalIgnoreCase);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Presence update for device {presence.DeviceId}: {presence.State}");
+                OnDevicePresenceChanged(presence.VoterId, presence.DeviceId, isOnline, presence.Status);
             });
         };
 

@@ -29,6 +29,9 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 [C:/Users/alexa/OneDrive/Desktop/post T-vale/BiometricProject/Code/officialApp/MainWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
+[C:/Users/alexa/OneDrive/Desktop/post T-vale/BiometricProject/Code/officialApp/Views/ElectionStatisticsView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
 [C:/Users/alexa/OneDrive/Desktop/post T-vale/BiometricProject/Code/officialApp/Views/OfficialAddVoterView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
@@ -36,6 +39,9 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [C:/Users/alexa/OneDrive/Desktop/post T-vale/BiometricProject/Code/officialApp/Views/OfficialAuthenticateView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[C:/Users/alexa/OneDrive/Desktop/post T-vale/BiometricProject/Code/officialApp/Views/OfficialDuplicateFingerprintScanView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [C:/Users/alexa/OneDrive/Desktop/post T-vale/BiometricProject/Code/officialApp/Views/OfficialGenerateAccessCodeView.axaml]

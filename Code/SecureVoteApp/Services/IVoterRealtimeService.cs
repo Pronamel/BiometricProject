@@ -14,5 +14,6 @@ public interface IVoterRealtimeService
     event Action<string>? ConnectionStateChanged;
 
     Task<bool> ConnectAsync(string? deviceId, CancellationToken cancellationToken = default);
+    Task<bool> SendDeviceStatusAsync(string deviceId, string status, CancellationToken cancellationToken = default);
     Task DisconnectAsync();
 }

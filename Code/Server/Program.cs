@@ -51,7 +51,13 @@ Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Configured to listen on http://loc
 // Add basic services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    // Faster liveness detection so official UI presence updates do not lag for long after drops.
+    options.KeepAliveInterval = TimeSpan.FromSeconds(4);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(12);
+    options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+});
 
 //===========================================
 // JSON SERIALIZATION CONFIGURATION
@@ -531,6 +537,52 @@ async Task<byte[]> DecryptVoterFingerprintAsync(Voter voter)
     }
 }
 
+async Task<(string FirstName, string LastName, string NationalInsuranceNumber)> DecryptVoterIdentityAsync(Voter voter)
+{
+    if (voter.WrappedDek == null || voter.WrappedDek.Length == 0)
+    {
+        throw new InvalidOperationException("Voter wrapped DEK is missing");
+    }
+
+    if (voter.FirstName == null || voter.FirstName.Length == 0)
+    {
+        throw new InvalidOperationException("Voter encrypted first name is missing");
+    }
+
+    if (voter.LastName == null || voter.LastName.Length == 0)
+    {
+        throw new InvalidOperationException("Voter encrypted last name is missing");
+    }
+
+    if (voter.NationalId == null || voter.NationalId.Length == 0)
+    {
+        throw new InvalidOperationException("Voter encrypted national insurance number is missing");
+    }
+
+    var privateKeyPem = NormalizePem(await SecretsHelper.GetVoterEncryptionPrivateKeyPem());
+
+    using var rsa = RSA.Create();
+    rsa.ImportFromPem(privateKeyPem);
+
+    byte[] dek = rsa.Decrypt(voter.WrappedDek, RSAEncryptionPadding.OaepSHA256);
+    try
+    {
+        var firstNameBytes = DecryptAesGcmPayload(voter.FirstName, dek);
+        var lastNameBytes = DecryptAesGcmPayload(voter.LastName, dek);
+        var nationalIdBytes = DecryptAesGcmPayload(voter.NationalId, dek);
+
+        var firstName = Encoding.UTF8.GetString(firstNameBytes).Trim();
+        var lastName = Encoding.UTF8.GetString(lastNameBytes).Trim();
+        var nationalInsuranceNumber = Encoding.UTF8.GetString(nationalIdBytes).Trim();
+
+        return (firstName, lastName, nationalInsuranceNumber);
+    }
+    finally
+    {
+        CryptographicOperations.ZeroMemory(dek);
+    }
+}
+
 async Task<byte[]> DecryptOfficialFingerprintAsync(Official official)
 {
     if (official.FingerPrintScan == null || official.FingerPrintScan.Length == 0)
@@ -618,7 +670,34 @@ async Task<T> DecryptEnvelopePayloadAsync<T>(string wrappedDekBase64, string enc
     }
 }
 
-
+//===========================================
+// REQUEST/RESPONSE ENCRYPTION ARCHITECTURE
+//===========================================
+// Multi-Layer Encryption Strategy:
+//
+// Layer 1: Transport Security (HTTPS/TLS) ✓
+// - All traffic over HTTPS via Nginx reverse proxy
+// - TLS 1.2+ provides encryption for all requests and responses
+//
+// Layer 2: Application-Level Encryption (For Sensitive Requests) ✓
+// - Login, access codes, fingerprints use AES-GCM with RSA-wrapped DEK
+// - Client encrypts using server's public key
+// - Server decrypts using private key via UnwrapRequestDekAsync
+//
+// Response encryption NOT implemented because:
+// 1. HTTPS/TLS already encrypts responses (sufficient protection)
+// 2. Would require asymmetric key distribution to clients
+// 3. Adds complexity and CPU overhead without security benefit
+//
+// Request decryption flow:
+// 1. Client creates 32-byte DEK
+// 2. Client wraps DEK with server RSA public key
+// 3. Client encrypts request JSON with DEK using AES-GCM
+// 4. Client sends { wrappedDek, encryptedPayload } to server
+// 5. Server receives encrypted request
+// 6. Server (this file) calls UnwrapRequestDekAsync to get DEK
+// 7. Server calls DecryptAesGcmPayload to decrypt request
+// 8. Server processes decrypted request normally
 
 
 
@@ -916,8 +995,6 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
         string.IsNullOrWhiteSpace(request.EncryptedLastName) ||
         string.IsNullOrWhiteSpace(request.EncryptedDateOfBirth) ||
         string.IsNullOrWhiteSpace(request.EncryptedTownOfBirth) ||
-        string.IsNullOrWhiteSpace(request.EncryptedAddressLine1) ||
-        string.IsNullOrWhiteSpace(request.EncryptedAddressLine2) ||
         string.IsNullOrWhiteSpace(request.EncryptedPostCode) ||
         string.IsNullOrWhiteSpace(request.EncryptedFingerPrintScan))
     {
@@ -1017,8 +1094,6 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
         request.EncryptedLastName!,
         request.EncryptedDateOfBirth!,
         request.EncryptedTownOfBirth!,
-        request.EncryptedAddressLine1!,
-        request.EncryptedAddressLine2!,
         request.EncryptedPostCode!,
         request.EncryptedFingerPrintScan!);
 
@@ -2808,6 +2883,365 @@ app.MapGet("/api/official/polling-station-vote-count", async (
 .WithName("OfficialGetPollingStationVoteCount");
 
 
+app.MapGet("/api/official/election-statistics", async (
+    ClaimsPrincipal user,
+    Guid? electionId,
+    DatabaseService dbService,
+    ConnectionRegistry connectionRegistry) =>
+{
+    var stationId = user.FindFirst("station")?.Value;
+    var constituencyName = user.FindFirst("constituency")?.Value;
+
+    if (string.IsNullOrWhiteSpace(stationId) || !Guid.TryParse(stationId, out var pollingStationId))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "Polling station claim missing or invalid"
+        });
+    }
+
+    try
+    {
+        // Get basic election statistics
+        var (statsSuccess, resolvedElectionId, totalVotes, _, _) = 
+            await dbService.GetElectionStatisticsAsync(pollingStationId, electionId);
+
+        if (!statsSuccess || !resolvedElectionId.HasValue)
+        {
+            return Results.NotFound(new
+            {
+                success = false,
+                message = electionId.HasValue
+                    ? $"Election {electionId.Value} not found"
+                    : "No active election found"
+            });
+        }
+
+        // Election-wide leaderboard and constituency performance.
+        var candidateVotes = await dbService.GetVotesByCandidate(resolvedElectionId.Value);
+        var constituencyStats = await dbService.GetConstituencyStats(resolvedElectionId.Value);
+
+        totalVotes = constituencyStats.Sum(c => c.TotalVotes);
+        var registeredVoters = await dbService.GetRegisteredVotersCountAsync();
+        var totalPollingStations = await dbService.GetTotalPollingStationsCountAsync();
+        
+        // Get connected stations and ensure the requesting station is included
+        var connectedStations = new HashSet<string>(connectionRegistry.GetConnectedStationIds(), StringComparer.OrdinalIgnoreCase);
+        connectedStations.Add(stationId); // Always include the requesting station
+        var pollingStationsConnected = connectedStations.Count;
+
+        var topConstituencies = constituencyStats
+            .Where(c => c.ExpectedVotes > 0)
+            .Select(c => new
+            {
+                constituencyId = c.ConstituencyId,
+                constituencyName = c.ConstituencyName,
+                totalVotes = c.TotalVotes,
+                expectedVotes = c.ExpectedVotes,
+                turnoutRate = Math.Round((decimal)c.TotalVotes / c.ExpectedVotes * 100, 2)
+            })
+            .OrderByDescending(c => c.turnoutRate)
+            .ThenByDescending(c => c.totalVotes)
+            .Take(12)
+            .ToList();
+
+        var countryPopulation = await dbService.GetCountryPopulationAsync();
+
+        // Turnout is measured against country population for the dashboard.
+        decimal turnoutRate = countryPopulation > 0 ? (decimal)totalVotes / countryPopulation * 100 : 0;
+        decimal pollingStationConnectionRate = totalPollingStations > 0 ? (decimal)pollingStationsConnected / totalPollingStations * 100 : 0;
+        decimal populationParticipationRate = countryPopulation > 0 ? (decimal)totalVotes / countryPopulation * 100 : 0;
+
+        var bestConstituency = topConstituencies.FirstOrDefault();
+
+        return Results.Ok(new
+        {
+            success = true,
+            electionId = resolvedElectionId.Value,
+            pollingStationId,
+            totalVotes,
+            registeredVoters,
+            turnoutRate = Math.Round(turnoutRate, 6),
+            pollingStationsConnected,
+            totalPollingStations,
+            pollingStationConnectionRate = Math.Round(pollingStationConnectionRate, 2),
+            candidateVotes,
+            constituencyName,
+            topConstituencies,
+            countryPopulation,
+            populationParticipationRate = Math.Round(populationParticipationRate, 6),
+            bestConstituency
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching election statistics: {ex.Message}");
+        return Results.Json(new
+        {
+            success = false,
+            message = "Error fetching statistics",
+            error = ex.Message
+        }, statusCode: StatusCodes.Status500InternalServerError);
+    }
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialGetElectionStatistics");
+
+app.MapPost("/api/official/scan-duplicate-voter-fingerprints", async (
+    ClaimsPrincipal user,
+    ApplicationDbContext dbContext) =>
+{
+    const double MATCH_THRESHOLD = 40.0;
+
+    var officialId = user.FindFirst("officialId")?.Value ?? "unknown";
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Duplicate voter fingerprint scan started by official {officialId}");
+
+    try
+    {
+        var allVoters = await dbContext.Voters
+            .AsTracking()
+            .Where(v => !string.IsNullOrWhiteSpace(v.Sdi))
+            .ToListAsync();
+
+        var candidateVoters = allVoters
+            .Where(v => v.FingerprintScan != null && v.FingerprintScan.Length > 0)
+            .ToList();
+
+        if (candidateVoters.Count < 2)
+        {
+            return Results.Ok(new
+            {
+                success = true,
+                message = "Not enough voter fingerprints to compare.",
+                totalVotersConsidered = allVoters.Count,
+                comparableVoters = candidateVoters.Count,
+                comparisonsPerformed = 0,
+                matchedGroupCount = 0,
+                suspiciousRecordCount = 0,
+                duplicateSdiGroups = Array.Empty<string>(),
+                duplicateIdentityGroups = Array.Empty<List<string>>()
+            });
+        }
+
+        var comparableEntries = new List<(Voter Voter, FingerprintTemplate Template)>();
+        var failedDecryptions = 0;
+
+        foreach (var voter in candidateVoters)
+        {
+            try
+            {
+                var fingerprintBytes = await DecryptVoterFingerprintAsync(voter);
+                var image = new FingerprintImage(fingerprintBytes);
+                var template = new FingerprintTemplate(image);
+                comparableEntries.Add((voter, template));
+            }
+            catch (Exception ex)
+            {
+                failedDecryptions++;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Skipping voter {voter.VoterId} during duplicate scan: {ex.Message}");
+            }
+        }
+
+        if (comparableEntries.Count < 2)
+        {
+            return Results.Ok(new
+            {
+                success = true,
+                message = "Not enough decryptable voter fingerprints to compare.",
+                totalVotersConsidered = allVoters.Count,
+                comparableVoters = comparableEntries.Count,
+                comparisonsPerformed = 0,
+                matchedGroupCount = 0,
+                suspiciousRecordCount = 0,
+                failedDecryptions,
+                duplicateSdiGroups = Array.Empty<string>(),
+                duplicateIdentityGroups = Array.Empty<List<string>>()
+            });
+        }
+
+        var count = comparableEntries.Count;
+        var parent = Enumerable.Range(0, count).ToArray();
+        int comparisonsPerformed = 0;
+
+        int Find(int x)
+        {
+            while (parent[x] != x)
+            {
+                parent[x] = parent[parent[x]];
+                x = parent[x];
+            }
+
+            return x;
+        }
+
+        void Union(int a, int b)
+        {
+            var rootA = Find(a);
+            var rootB = Find(b);
+            if (rootA != rootB)
+            {
+                parent[rootB] = rootA;
+            }
+        }
+
+        for (int i = 0; i < count - 1; i++)
+        {
+            var matcher = new FingerprintMatcher(comparableEntries[i].Template);
+            for (int j = i + 1; j < count; j++)
+            {
+                comparisonsPerformed++;
+                var score = matcher.Match(comparableEntries[j].Template);
+                if (score >= MATCH_THRESHOLD)
+                {
+                    Union(i, j);
+                }
+            }
+        }
+
+        var groupedByRoot = new Dictionary<int, List<Voter>>();
+        for (int i = 0; i < count; i++)
+        {
+            var root = Find(i);
+            if (!groupedByRoot.TryGetValue(root, out var voters))
+            {
+                voters = new List<Voter>();
+                groupedByRoot[root] = voters;
+            }
+
+            voters.Add(comparableEntries[i].Voter);
+        }
+
+        var duplicateSdiGroups = new List<string>();
+        var suspiciousSdiSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in groupedByRoot.Values.Where(g => g.Count > 1))
+        {
+            var sdis = group
+                .Select(v => v.Sdi?.Trim())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s!)
+                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (sdis.Count < 2)
+            {
+                continue;
+            }
+
+            foreach (var sdi in sdis)
+            {
+                suspiciousSdiSet.Add(sdi);
+            }
+
+            duplicateSdiGroups.Add(string.Join(",", sdis));
+        }
+
+        int suspiciousRecordCount = 0;
+        if (suspiciousSdiSet.Count > 0)
+        {
+            var suspiciousRows = allVoters
+                .Where(v => !string.IsNullOrWhiteSpace(v.Sdi) && suspiciousSdiSet.Contains(v.Sdi!.Trim()))
+                .ToList();
+
+            foreach (var row in suspiciousRows)
+            {
+                if (!row.UnderSuspicion)
+                {
+                    row.UnderSuspicion = true;
+                }
+            }
+
+            suspiciousRecordCount = suspiciousRows.Count;
+            await dbContext.SaveChangesAsync();
+        }
+
+        var duplicateIdentityGroups = new List<List<string>>();
+        if (duplicateSdiGroups.Count > 0)
+        {
+            var sdiQueueByValue = allVoters
+                .Where(v => !string.IsNullOrWhiteSpace(v.Sdi))
+                .GroupBy(v => v.Sdi!.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new Queue<Voter>(g),
+                    StringComparer.OrdinalIgnoreCase);
+
+            foreach (var sdiGroup in duplicateSdiGroups)
+            {
+                var readableEntries = new List<string>();
+                var sdiTokens = sdiGroup
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                foreach (var sdiToken in sdiTokens)
+                {
+                    if (!sdiQueueByValue.TryGetValue(sdiToken, out var queue) || queue.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var voter = queue.Dequeue();
+                    try
+                    {
+                        var (firstName, lastName, nationalInsuranceNumber) = await DecryptVoterIdentityAsync(voter);
+                        var fullName = $"{firstName} {lastName}".Trim();
+                        if (string.IsNullOrWhiteSpace(fullName))
+                        {
+                            fullName = "[Name unavailable]";
+                        }
+
+                        var niDisplay = string.IsNullOrWhiteSpace(nationalInsuranceNumber)
+                            ? "[NI unavailable]"
+                            : nationalInsuranceNumber;
+
+                        readableEntries.Add($"{fullName} | NI: {niDisplay}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Failed to decrypt identity fields for SDI {sdiToken}: {ex.Message}");
+                        readableEntries.Add($"[Decrypt failed] SDI: {sdiToken}");
+                    }
+                }
+
+                if (readableEntries.Count > 0)
+                {
+                    duplicateIdentityGroups.Add(readableEntries);
+                }
+            }
+        }
+
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Duplicate scan complete. Compared {comparisonsPerformed} pairs, matched groups: {duplicateSdiGroups.Count}, suspicious rows: {suspiciousRecordCount}");
+
+        return Results.Ok(new
+        {
+            success = true,
+            message = duplicateSdiGroups.Count > 0
+                ? "Duplicate fingerprint groups found and flagged."
+                : "No duplicate fingerprints found.",
+            totalVotersConsidered = allVoters.Count,
+            comparableVoters = comparableEntries.Count,
+            comparisonsPerformed,
+            matchedGroupCount = duplicateSdiGroups.Count,
+            suspiciousRecordCount,
+            failedDecryptions,
+            duplicateSdiGroups,
+            duplicateIdentityGroups
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Duplicate voter fingerprint scan failed: {ex.Message}");
+        return Results.Json(new
+        {
+            success = false,
+            message = $"Duplicate fingerprint scan failed: {ex.Message}"
+        }, statusCode: StatusCodes.Status500InternalServerError);
+    }
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialScanDuplicateVoterFingerprints");
+
+
 app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, OfficialService officialService, ClaimsPrincipal user, IHubContext<VotingHub> hubContext) =>
 {
     var officialId = user.FindFirst("officialId")?.Value ?? "Unknown";
@@ -3498,8 +3932,6 @@ record CreateVoterRequest(
     string LastName,
     string DateOfBirth,
     string TownOfBirth,
-    string AddressLine1,
-    string AddressLine2,
     string PostCode,
     string County,
     string Constituency,
@@ -3515,8 +3947,6 @@ record CreateVoterRequest(
     string? EncryptedLastName,
     string? EncryptedDateOfBirth,
     string? EncryptedTownOfBirth,
-    string? EncryptedAddressLine1,
-    string? EncryptedAddressLine2,
     string? EncryptedPostCode,
     string? EncryptedCounty,
     string? EncryptedConstituency,

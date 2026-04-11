@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using SecureVoteApp.Services.Scanner;
 using SecureVoteApp.Services;
@@ -68,6 +69,12 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     [ObservableProperty]
     private bool isStartScanningEnabled = true;
 
+    [ObservableProperty]
+    private bool isCooldownActive;
+
+    [ObservableProperty]
+    private int cooldownSecondsRemaining;
+
     // ==========================================
     // PUBLIC PROPERTIES
     // ==========================================
@@ -77,9 +84,14 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     
     // Quality threshold for feedback and acceptance (must match ScannerService MIN_QUALITY_THRESHOLD)
     private const int QUALITY_THRESHOLD = 10;
+    private const int SCANNER_COOLDOWN_SECONDS = 5;
     private byte[]? _capturedFingerprintData = null;        // Raw image data (200,000 bytes) - for display
     private uint _capturedFingerprintWidth = 0;             // Width of captured fingerprint image
     private uint _capturedFingerprintHeight = 0;            // Height of captured fingerprint image
+    private bool _scannerSessionActive;
+    private bool _eventHandlersAttached;
+    private bool _isProcessingFingerprint;
+    private CancellationTokenSource? _cooldownCts;
 
     // ==========================================
     // IMAGE MANAGEMENT METHODS
@@ -132,6 +144,8 @@ public partial class AuthenticateUserViewModel : ViewModelBase
         QualityScore = 0;
         IsCapturing = false;
         CaptureStatusMessage = "Ready to scan";
+        IsCooldownActive = false;
+        CooldownSecondsRemaining = 0;
         ImageSource = LoadImage("fingerPrint.png");
         IsBackEnabled = !_deviceLockState.IsLocked;
         IsStartScanningEnabled = !_deviceLockState.IsLocked && !IsCapturing;
@@ -415,6 +429,8 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             if (isLocked)
             {
                 StatusMessage = "Device locked. Authentication controls are disabled until an official unlocks this device.";
+                _cooldownCts?.Cancel();
+                CleanupCapture(closeDevice: true);
             }
             else
             {
@@ -425,6 +441,11 @@ public partial class AuthenticateUserViewModel : ViewModelBase
                 if (StatusMessage.Contains("Device locked", StringComparison.OrdinalIgnoreCase))
                 {
                     StatusMessage = "Device unlocked. Authentication controls are enabled.";
+                }
+
+                if (_scannerSessionActive)
+                {
+                    _ = StartScanningInternalAsync();
                 }
             }
         });
@@ -486,8 +507,41 @@ public partial class AuthenticateUserViewModel : ViewModelBase
     [RelayCommand]
     private async Task StartScanning()
     {
-        Console.WriteLine("[AuthenticateUserViewModel] Start scanning command triggered");
+        await ActivateScannerAsync();
+    }
+
+    public async Task ActivateScannerAsync()
+    {
+        if (_scannerSessionActive)
+        {
+            return;
+        }
+
+        _scannerSessionActive = true;
+        _isProcessingFingerprint = false;
+        _cooldownCts?.Cancel();
+        _cooldownCts = null;
+        IsCooldownActive = false;
+        CooldownSecondsRemaining = 0;
+
         ApplyPendingLookup();
+        await StartScanningInternalAsync();
+    }
+
+    public void DeactivateScanner()
+    {
+        _scannerSessionActive = false;
+        _isProcessingFingerprint = false;
+        _cooldownCts?.Cancel();
+        _cooldownCts = null;
+        IsCooldownActive = false;
+        CooldownSecondsRemaining = 0;
+        CleanupCapture(closeDevice: true);
+    }
+
+    private async Task StartScanningInternalAsync()
+    {
+        Console.WriteLine("[AuthenticateUserViewModel] Start scanning command triggered");
 
         if (_deviceLockState.IsLocked)
         {
@@ -515,10 +569,13 @@ public partial class AuthenticateUserViewModel : ViewModelBase
 
             Console.WriteLine("[AuthenticateUserViewModel] ✓ Device opened");
 
-            // Subscribe to events
-            _scannerService.PreviewImageAvailable += OnPreviewImageAvailable;
-            _scannerService.FingerprintCaptured += OnFingerprintCaptured;
-            _scannerService.ErrorOccurred += OnScannerError;
+            if (!_eventHandlersAttached)
+            {
+                _scannerService.PreviewImageAvailable += OnPreviewImageAvailable;
+                _scannerService.FingerprintCaptured += OnFingerprintCaptured;
+                _scannerService.ErrorOccurred += OnScannerError;
+                _eventHandlersAttached = true;
+            }
 
             // Start capture
             if (!_scannerService.StartCapture())
@@ -527,7 +584,7 @@ public partial class AuthenticateUserViewModel : ViewModelBase
                 Console.WriteLine("[AuthenticateUserViewModel] ❌ Failed to start capture");
                 _serverHandler.CurrentDeviceStatus = "Scanner capture failed";
                 await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
-                CleanupCapture();
+                CleanupCapture(closeDevice: true);
                 return;
             }
 
@@ -598,8 +655,15 @@ public partial class AuthenticateUserViewModel : ViewModelBase
         }
     }
 
-    private void OnFingerprintCaptured(object? sender, ScannerEventArgs args)
+    private async void OnFingerprintCaptured(object? sender, ScannerEventArgs args)
     {
+        if (_isProcessingFingerprint)
+        {
+            return;
+        }
+
+        _isProcessingFingerprint = true;
+
         try
         {
             Console.WriteLine($"[AuthenticateUserViewModel] Fingerprint captured: Success={args.IsSuccess}, Quality={args.QualityScore}");
@@ -611,51 +675,55 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             }
 
             // Update UI on the main thread
-            Dispatcher.UIThread.InvokeAsync(() =>
+            _ = Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (args.IsSuccess)
                 {
                     CaptureStatusMessage = "Fingerprint captured. Comparing...";
                     Console.WriteLine("[AuthenticateUserViewModel] ✓ Fingerprint data saved - starting comparison");
-                    
-                    // Start fingerprint comparison asynchronously
-                    Task.Run(async () =>
-                    {
-                        // Compare the fingerprints with the baseline
-                        await CompareFingerprints();
-                        
-                        // After comparison, schedule UI update and navigation
-                        await Task.Delay(1000);
-                        scannAttempts++;
-                        
-                        if (_navigationService != null)
-                        {
-                            await Dispatcher.UIThread.InvokeAsync(async () =>
-                            {
-                                await attemptHandler(scannAttempts, validFingerPrintScan);
-                            }, DispatcherPriority.Input);
-                        }
-                        else
-                        {
-                            Console.WriteLine("[AuthenticateUserViewModel] ❌ ERROR: NavigationService is null");
-                            CleanupCapture();
-                        }
-                    });
                 }
                 else
                 {
                     CaptureStatusMessage = "Capture failed or incomplete";
                     Console.WriteLine("[AuthenticateUserViewModel] ❌ Capture was not successful");
                 }
-
-                CleanupCapture();
             }, DispatcherPriority.Input);
+
+            CleanupCapture(closeDevice: false);
+
+            if (args.IsSuccess)
+            {
+                await CompareFingerprints();
+                await Task.Delay(1000);
+                scannAttempts++;
+
+                if (_navigationService != null)
+                {
+                    _ = Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await attemptHandler(scannAttempts, validFingerPrintScan);
+                    }, DispatcherPriority.Input);
+                }
+                else
+                {
+                    Console.WriteLine("[AuthenticateUserViewModel] ❌ ERROR: NavigationService is null");
+                }
+            }
+
+            if (_scannerSessionActive && !_deviceLockState.IsLocked && !validFingerPrintScan && scannAttempts < 3)
+            {
+                await StartCooldownAndResumeAsync();
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[AuthenticateUserViewModel] ❌ Error in capture handler: {ex.Message}");
             Console.WriteLine($"[AuthenticateUserViewModel] Stack: {ex.StackTrace}");
-            CleanupCapture();
+            CleanupCapture(closeDevice: false);
+        }
+        finally
+        {
+            _isProcessingFingerprint = false;
         }
     }
 
@@ -673,19 +741,51 @@ public partial class AuthenticateUserViewModel : ViewModelBase
                 _serverHandler.CurrentDeviceStatus = "Scanner not connected";
                 _ = _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
             }
-            CleanupCapture();
+            CleanupCapture(closeDevice: false);
         }, DispatcherPriority.Input);
     }
 
-    private void CleanupCapture()
+    private async Task StartCooldownAndResumeAsync()
+    {
+        _cooldownCts?.Cancel();
+        _cooldownCts = new CancellationTokenSource();
+        var token = _cooldownCts.Token;
+
+        IsCooldownActive = true;
+
+        try
+        {
+            for (int i = SCANNER_COOLDOWN_SECONDS; i >= 1; i--)
+            {
+                CooldownSecondsRemaining = i;
+                CaptureStatusMessage = $"Scanner cooldown: {i}s";
+                await Task.Delay(1000, token);
+            }
+
+            if (!_scannerSessionActive || _deviceLockState.IsLocked || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            IsCooldownActive = false;
+            CooldownSecondsRemaining = 0;
+            CaptureStatusMessage = "Place finger on scanner...";
+            await StartScanningInternalAsync();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        finally
+        {
+            IsCooldownActive = false;
+            CooldownSecondsRemaining = 0;
+        }
+    }
+
+    private void CleanupCapture(bool closeDevice)
     {
         try
         {
-            // Unsubscribe from events
-            _scannerService.PreviewImageAvailable -= OnPreviewImageAvailable;
-            _scannerService.FingerprintCaptured -= OnFingerprintCaptured;
-            _scannerService.ErrorOccurred -= OnScannerError;
-
             // Try to stop capture (don't check if active first, as that can crash on invalid state)
             try
             {
@@ -696,14 +796,24 @@ public partial class AuthenticateUserViewModel : ViewModelBase
                 Console.WriteLine($"[AuthenticateUserViewModel] ⚠️ StopCapture access violation (device may be in bad state): {ex.Message}");
             }
 
-            // Close device
-            try
+            if (closeDevice)
             {
-                _scannerService.CloseDevice();
-            }
-            catch (AccessViolationException ex)
-            {
-                Console.WriteLine($"[AuthenticateUserViewModel] ⚠️ CloseDevice access violation: {ex.Message}");
+                if (_eventHandlersAttached)
+                {
+                    _scannerService.PreviewImageAvailable -= OnPreviewImageAvailable;
+                    _scannerService.FingerprintCaptured -= OnFingerprintCaptured;
+                    _scannerService.ErrorOccurred -= OnScannerError;
+                    _eventHandlersAttached = false;
+                }
+
+                try
+                {
+                    _scannerService.CloseDevice();
+                }
+                catch (AccessViolationException ex)
+                {
+                    Console.WriteLine($"[AuthenticateUserViewModel] ⚠️ CloseDevice access violation: {ex.Message}");
+                }
             }
 
             // Update UI on main thread
@@ -792,12 +902,14 @@ public partial class AuthenticateUserViewModel : ViewModelBase
             return;
         }
 
+        DeactivateScanner();
         _navigationService.NavigateToMain();
     }
 
     [RelayCommand]
     private void SignOut()
     {
+        DeactivateScanner();
         _serverHandler.Logout();
         _navigationService.NavigateToMain();
     }

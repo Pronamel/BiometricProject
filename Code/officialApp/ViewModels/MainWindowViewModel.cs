@@ -27,6 +27,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly OfficialVotingPollingManagerView _officialVotingPollingManagerView;
     private readonly OfficialAddVoterView _officialAddVoterView;
     private readonly OfficialAssignProxyView _officialAssignProxyView;
+    private readonly ElectionStatisticsView _electionStatisticsView;
+    private readonly OfficialDuplicateFingerprintScanView _officialDuplicateFingerprintScanView;
     
     // Navigation service
     private readonly INavigationService _navigationService;
@@ -44,6 +46,8 @@ public partial class MainWindowViewModel : ViewModelBase
         OfficialVotingPollingManagerViewModel officialVotingPollingManagerViewModel,
         OfficialAddVoterViewModel officialAddVoterViewModel,
         OfficialAssignProxyViewModel officialAssignProxyViewModel,
+        ElectionStatisticsViewModel electionStatisticsViewModel,
+        OfficialDuplicateFingerprintScanViewModel officialDuplicateFingerprintScanViewModel,
         INavigationService navigationService,
         IRealtimeService realtimeService)
     {
@@ -62,6 +66,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _officialVotingPollingManagerView = new OfficialVotingPollingManagerView { DataContext = officialVotingPollingManagerViewModel };
         _officialAddVoterView = new OfficialAddVoterView { DataContext = officialAddVoterViewModel };
         _officialAssignProxyView = new OfficialAssignProxyView { DataContext = officialAssignProxyViewModel };
+        _electionStatisticsView = new ElectionStatisticsView { DataContext = electionStatisticsViewModel };
+        _officialDuplicateFingerprintScanView = new OfficialDuplicateFingerprintScanView { DataContext = officialDuplicateFingerprintScanViewModel };
         
         // Initialize navigation service with all view factories
         ((NavigationService)_navigationService).Initialize(
@@ -71,7 +77,9 @@ public partial class MainWindowViewModel : ViewModelBase
             () => _officialGenerateAccessCodeView,
             () => _officialVotingPollingManagerView,
             () => _officialAddVoterView,
-            () => _officialAssignProxyView
+            () => _officialAssignProxyView,
+            () => _electionStatisticsView,
+            () => _officialDuplicateFingerprintScanView
         );
         
         // Set initial view to Official Authenticate

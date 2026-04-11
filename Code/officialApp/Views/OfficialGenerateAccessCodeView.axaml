@@ -68,17 +68,6 @@
                     <TextBlock Text="Generate" Foreground="white"/>
                 </Button>
                 
-                <Button 
-                    Command="{Binding CancelCommand}"
-                    Background="#e74c3c"  
-                    Width="120"
-                    Height="50" 
-                    BorderThickness="2"
-                    BorderBrush="Black"
-                    FontSize="16">
-                    <TextBlock Text="Cancel" Foreground="white"/>
-                </Button>
-                
             </StackPanel>
             
         </StackPanel>

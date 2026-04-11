@@ -52,6 +52,12 @@ public partial class OfficialMenuViewModel : ViewModelBase
     }
     
     [RelayCommand]
+    private void Statistics()
+    {
+        _navigationService.NavigateToElectionStatistics();
+    }
+    
+    [RelayCommand]
     private void Reports()
     {
         _navigationService.NavigateToOfficialAddVoter();
@@ -61,6 +67,12 @@ public partial class OfficialMenuViewModel : ViewModelBase
     private void AssignProxy()
     {
         _navigationService.NavigateToOfficialAssignProxy();
+    }
+
+    [RelayCommand]
+    private void DuplicateFingerprintScan()
+    {
+        _navigationService.NavigateToOfficialDuplicateFingerprintScan();
     }
 
     [RelayCommand]

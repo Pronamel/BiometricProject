@@ -13,6 +13,7 @@ public interface IRealtimeService
     event Action<List<string>>? VoterRequestsReceived;
     event Action<VoteInfo>? VoteReceived;
     event Action<DeviceStatus>? DeviceStatusReceived;
+    event Action<DevicePresenceUpdate>? DevicePresenceChanged;
     event Action<string>? ConnectionStateChanged;
 
     Task<bool> ConnectAsync(CancellationToken cancellationToken = default);

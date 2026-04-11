@@ -72,6 +72,13 @@ public partial class OfficialLoginViewModel : ViewModelBase
         _serverHandler = serverHandler;
     }
 
+    public void ResetLoginState()
+    {
+        IsLoggingIn = false;
+        LoginStatus = string.Empty;
+        Password = string.Empty;
+    }
+
     // ==========================================
     // COMMANDS
     // ==========================================
@@ -100,6 +107,9 @@ public partial class OfficialLoginViewModel : ViewModelBase
                 
                 // Wait a moment to show success message
                 await Task.Delay(1000);
+
+                // Clear status on the login screen before leaving so stale success does not linger.
+                LoginStatus = string.Empty;
                 
                 // Pass credentials to the authenticate view before navigating
                 _navigationService.NavigateToOfficialAuthenticate(Username, Password);

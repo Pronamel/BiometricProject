@@ -1,5 +1,5 @@
 // This service handles communication with the server for voter authentication and real-time communication.
-// It provides methods for voter session creation, access code verification, and device heartbeat updates.
+// It provides methods for voter session creation, access code verification, and fallback HTTP device status updates.
 
 using System;
 using System.Collections.Generic;
@@ -45,9 +45,6 @@ public class ApiService : IApiService
     private string? _voterEncryptionKeyId;
     private string? _voterEncryptionKeyVersion;
 
-    // Device heartbeat loop for continuous status updates
-    private CancellationTokenSource? _deviceHeartbeatCancellation;
-    
     // Current device status - can be updated by any part of the app
     public string CurrentDeviceStatus { get; set; } = "Device initializing";
     
@@ -403,9 +400,6 @@ public class ApiService : IApiService
                         _jwtToken = linkResponse.Token;
                         _tokenExpiry = DateTime.UtcNow.AddHours(8);
                         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter JWT token stored, expires in 8 hours");
-                        
-                        // Start device heartbeat loop to send continuous status updates
-                        StartDeviceHeartbeatAsync();
                     }
                     
                     return linkResponse;
@@ -1014,62 +1008,6 @@ public class ApiService : IApiService
         }
     }
 
-    //--------------------------------------------
-    // Device Heartbeat Loop
-    //--------------------------------------------
-    
-    /// <summary>
-    /// Starts a background loop that sends device status updates every 10 seconds.
-    /// This allows the official to continuously monitor the voter device.
-    /// Only activates after JWT token has been acquired.
-    /// </summary>
-    public async void StartDeviceHeartbeatAsync()
-    {
-        if (_deviceHeartbeatCancellation != null)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠ Device heartbeat already running");
-            return;
-        }
-        
-        _deviceHeartbeatCancellation = new CancellationTokenSource();
-        
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 Starting device heartbeat loop (10 second interval)");
-        
-        try
-        {
-            while (!_deviceHeartbeatCancellation.Token.IsCancellationRequested)
-            {
-                await Task.Delay(10000, _deviceHeartbeatCancellation.Token); // 10 seconds
-                
-                if (!_deviceHeartbeatCancellation.Token.IsCancellationRequested && IsAuthenticated)
-                {
-                    await SendDeviceStatusAsync(CurrentDeviceStatus);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🛑 Device heartbeat stopped");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Device heartbeat error: {ex.Message}");
-        }
-    }
-    
-    /// <summary>
-    /// Stops the device heartbeat loop.
-    /// </summary>
-    private void StopDeviceHeartbeat()
-    {
-        if (_deviceHeartbeatCancellation != null)
-        {
-            _deviceHeartbeatCancellation.Cancel();
-            _deviceHeartbeatCancellation.Dispose();
-            _deviceHeartbeatCancellation = null;
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Device heartbeat cancelled");
-        }
-    }
     public void Logout()
     {
         LogoutAsync().GetAwaiter().GetResult();

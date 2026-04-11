@@ -1,0 +1,96 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:vm="using:officialApp.ViewModels"
+            xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            mc:Ignorable="d"
+            d:DesignWidth="900"
+            d:DesignHeight="560"
+            x:Class="officialApp.Views.OfficialDuplicateFingerprintScanView"
+            x:DataType="vm:OfficialDuplicateFingerprintScanViewModel">
+
+    <Design.DataContext>
+        <vm:OfficialDuplicateFingerprintScanViewModel/>
+    </Design.DataContext>
+
+    <Grid Background="#f6f2e6" RowDefinitions="Auto,Auto,*,Auto" Margin="20">
+        <TextBlock Grid.Row="0"
+                   Text="Duplicate Fingerprint Scan"
+                   FontSize="26"
+                   FontWeight="Bold"
+                   Foreground="black"
+                   HorizontalAlignment="Center"/>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center" Margin="0,16,0,16">
+            <Button Content="Start scan"
+                    Command="{Binding StartScanCommand}"
+                    IsEnabled="{Binding !IsScanning}"
+                    Width="160"
+                    Height="46"
+                    FontSize="16"
+                    Background="#d97509"
+                    Foreground="White"
+                    FontWeight="Bold"/>
+
+            <ProgressBar Width="180"
+                         Height="10"
+                         IsIndeterminate="True"
+                         IsVisible="{Binding IsScanning}"/>
+        </StackPanel>
+
+        <Border Grid.Row="2"
+                Background="#d0d0d0"
+                BorderBrush="#9f9f9f"
+                BorderThickness="2"
+                CornerRadius="8"
+                Padding="14">
+            <Grid RowDefinitions="Auto,*">
+                <TextBlock Grid.Row="0"
+                           Text="Templates"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="#202020"
+                           Margin="0,0,0,10"/>
+
+                <ScrollViewer Grid.Row="1">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Detected matches appear below with decrypted full name and National Insurance number."
+                                   Foreground="#404040"
+                                   TextWrapping="Wrap"/>
+
+                        <ItemsControl ItemsSource="{Binding DuplicateGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#efefef"
+                                            BorderBrush="#b4b4b4"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="10">
+                                        <TextBlock Text="{Binding .}" TextWrapping="Wrap" Foreground="#1f1f1f"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="3" Margin="0,16,0,0" Spacing="8">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="{Binding StatusColor}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+
+            <TextBlock Text="{Binding ComparisonsPerformed, StringFormat='Comparisons: {0}'}" Foreground="#333" HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding MatchedGroupCount, StringFormat='Matched Identity Groups: {0}'}" Foreground="#333" HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding SuspiciousRecordCount, StringFormat='Flagged Records: {0}'}" Foreground="#333" HorizontalAlignment="Center"/>
+
+            <Button Content="Back"
+                    Command="{Binding BackCommand}"
+                    Width="120"
+                    Height="42"
+                    HorizontalAlignment="Center"
+                    Background="#6b4423"
+                    Foreground="White"
+                    FontWeight="Bold"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

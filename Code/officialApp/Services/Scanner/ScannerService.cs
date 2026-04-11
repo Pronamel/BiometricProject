@@ -4,9 +4,31 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Drawing;
 using System.Drawing.Imaging;
+using Console = officialApp.Services.Scanner.ScannerConsole;
 
 namespace officialApp.Services.Scanner
 {
+    internal static class ScannerConsole
+    {
+        public static bool Enabled { get; set; } = false;
+
+        public static void WriteLine()
+        {
+            if (Enabled)
+            {
+                System.Console.WriteLine();
+            }
+        }
+
+        public static void WriteLine(string message)
+        {
+            if (Enabled)
+            {
+                System.Console.WriteLine(message);
+            }
+        }
+    }
+
     // Scanner service implementation for fingerprint capture
     public class ScannerService : IScannerService
     {

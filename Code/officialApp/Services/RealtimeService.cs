@@ -16,6 +16,7 @@ public class RealtimeService : IRealtimeService
     public event Action<List<string>>? VoterRequestsReceived;
     public event Action<VoteInfo>? VoteReceived;
     public event Action<DeviceStatus>? DeviceStatusReceived;
+    public event Action<DevicePresenceUpdate>? DevicePresenceChanged;
     public event Action<string>? ConnectionStateChanged;
 
     public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
@@ -51,9 +52,9 @@ public class RealtimeService : IRealtimeService
                 .WithAutomaticReconnect()
                 .Build();
 
-            _hubConnection.HandshakeTimeout = TimeSpan.FromSeconds(30);
-            _hubConnection.ServerTimeout = TimeSpan.FromSeconds(60);
-            _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            _hubConnection.HandshakeTimeout = TimeSpan.FromSeconds(15);
+            _hubConnection.ServerTimeout = TimeSpan.FromSeconds(16);
+            _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(4);
 
             RegisterHandlers(_hubConnection);
         }
@@ -103,6 +104,11 @@ public class RealtimeService : IRealtimeService
         connection.On<DeviceStatus>("official.v1.deviceStatusReceived", payload =>
         {
             DeviceStatusReceived?.Invoke(payload);
+        });
+
+        connection.On<DevicePresenceUpdate>("official.v1.devicePresenceChanged", payload =>
+        {
+            DevicePresenceChanged?.Invoke(payload);
         });
 
         connection.Reconnecting += error =>
