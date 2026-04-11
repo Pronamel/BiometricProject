@@ -13,159 +13,138 @@
         <vm:OfficialMenuViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6" RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="*,Auto">
 
-        <TextBlock Grid.Row="0"
-                   Text="Official Admin Menu"
-                   HorizontalAlignment="Left"
-                   Margin="20,16,0,0"
-                   Foreground="black"
-                   FontSize="18"
-                   FontWeight="Bold"/>
+        <!-- 3x2 Checkerboard Grid: Dark-Light-Dark / Light-Dark-Light -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*" RowDefinitions="*,*">
 
-        <!-- Six menu tiles arranged in a 2x3 grid -->
-        <Grid Grid.Row="1"
-              HorizontalAlignment="Center"
-              VerticalAlignment="Center"
-              ColumnDefinitions="Auto,Auto,Auto"
-              RowDefinitions="Auto,Auto"
-              ColumnSpacing="30"
-              RowSpacing="30">
-            
-            <Button 
-                Grid.Row="0"
-                Grid.Column="0"
-                Command="{Binding VotingStartCommand}"
-                Background="#d97509"  
-                Width="140"
-                Height="110" 
-                BorderThickness="2"
-                BorderBrush="Black"
-                FontSize="18">
-                <StackPanel>
-                    <TextBlock Text="Generate" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Access" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Code" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+            <!-- Row 0, Col 0: DARK -->
+            <Button Grid.Row="0" Grid.Column="0"
+                    Command="{Binding VotingStartCommand}"
+                    Background="#285A48"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    BorderThickness="0"
+                    CornerRadius="0">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="220">
+                    <TextBlock Text="Generate Access Code" FontSize="22" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock Text="Issue a code for voters to join your polling station" FontSize="13" Foreground="#B0E4CC" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                 </StackPanel>
             </Button>
 
-            <Button
-                Grid.Row="0"
-                Grid.Column="1"
-                Command="{Binding ManagerCommand}"
-                Background="#d97509"  
-                Width="140"
-                Height="110" 
-                BorderThickness="2"
-                BorderBrush="Black"
-                FontSize="18">
-                <StackPanel>
-                    <TextBlock Text="Polling" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="System" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Management" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+            <!-- Row 0, Col 1: LIGHT -->
+            <Button Grid.Row="0" Grid.Column="1"
+                    Command="{Binding ManagerCommand}"
+                    Background="#B0E4CC"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    BorderThickness="0"
+                    CornerRadius="0">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background" Value="#7BBFAC"/>
+                    </Style>
+                </Button.Styles>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="220">
+                    <TextBlock Text="Polling System Management" FontSize="22" FontWeight="Bold" Foreground="#091413" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock Text="Monitor connected devices and polling stations" FontSize="13" Foreground="#285A48" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                 </StackPanel>
             </Button>
 
-            <Button
-                Grid.Row="0"
-                Grid.Column="2"
-                Command="{Binding StatisticsCommand}"
-                Background="#d97509"  
-                Width="140"
-                Height="110" 
-                BorderThickness="2"
-                BorderBrush="Black"
-                FontSize="18">
-                <StackPanel>
-                    <TextBlock Text="Election" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Statistics" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Dashboard" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+            <!-- Row 0, Col 2: DARK -->
+            <Button Grid.Row="0" Grid.Column="2"
+                    Command="{Binding StatisticsCommand}"
+                    Background="#285A48"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    BorderThickness="0"
+                    CornerRadius="0">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="220">
+                    <TextBlock Text="Election Statistics" FontSize="22" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock Text="View live voting data and turnout rates" FontSize="13" Foreground="#B0E4CC" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                 </StackPanel>
             </Button>
 
-            <Button
-                Grid.Row="1"
-                Grid.Column="0"
-                Command="{Binding ReportsCommand}"
-                Background="#d97509"  
-                Width="140"
-                Height="110" 
-                BorderThickness="2"
-                BorderBrush="Black"
-                FontSize="18">
-                <StackPanel>
-                    <TextBlock Text="Create" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="User" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+            <!-- Row 1, Col 0: LIGHT -->
+            <Button Grid.Row="1" Grid.Column="0"
+                    Command="{Binding ReportsCommand}"
+                    Background="#B0E4CC"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    BorderThickness="0"
+                    CornerRadius="0">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background" Value="#7BBFAC"/>
+                    </Style>
+                </Button.Styles>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="220">
+                    <TextBlock Text="Create User" FontSize="22" FontWeight="Bold" Foreground="#091413" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock Text="Register a new voter or official account" FontSize="13" Foreground="#285A48" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                 </StackPanel>
             </Button>
 
-            <Button
-                Grid.Row="1"
-                Grid.Column="1"
-                Command="{Binding AssignProxyCommand}"
-                Background="#6b4423"  
-                Width="140"
-                Height="110" 
-                BorderThickness="2"
-                BorderBrush="Black"
-                FontSize="18">
-                <StackPanel>
-                    <TextBlock Text="Assign" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Proxy" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Voter" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+            <!-- Row 1, Col 1: DARK -->
+            <Button Grid.Row="1" Grid.Column="1"
+                    Command="{Binding AssignProxyCommand}"
+                    Background="#285A48"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    BorderThickness="0"
+                    CornerRadius="0">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="220">
+                    <TextBlock Text="Assign Proxy Voter" FontSize="22" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock Text="Assign a proxy to vote on behalf of a registered voter" FontSize="13" Foreground="#B0E4CC" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                 </StackPanel>
             </Button>
 
-            <Button
-                Grid.Row="1"
-                Grid.Column="2"
-                Command="{Binding DuplicateFingerprintScanCommand}"
-                Background="#6b4423"
-                Width="140"
-                Height="110"
-                BorderThickness="2"
-                BorderBrush="Black"
-                FontSize="18">
-                <StackPanel>
-                    <TextBlock Text="Duplicate" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Print" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
-                    <TextBlock Text="Scan" HorizontalAlignment="Center" Margin="0,0,0,4" Foreground="white"/>
+            <!-- Row 1, Col 2: LIGHT -->
+            <Button Grid.Row="1" Grid.Column="2"
+                    Command="{Binding DuplicateFingerprintScanCommand}"
+                    Background="#B0E4CC"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    BorderThickness="0"
+                    CornerRadius="0">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background" Value="#7BBFAC"/>
+                    </Style>
+                </Button.Styles>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="220">
+                    <TextBlock Text="Duplicate Fingerprint Scan" FontSize="22" FontWeight="Bold" Foreground="#091413" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock Text="Detect duplicate biometric records in the system" FontSize="13" Foreground="#285A48" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                 </StackPanel>
             </Button>
         </Grid>
 
-        <!-- Bottom Controls: Status Message and Buttons -->
-        <StackPanel Grid.Row="2"
-               Orientation="Vertical" 
-               VerticalAlignment="Bottom" 
-               HorizontalAlignment="Center"
-               Spacing="10"
-               Margin="0,0,0,15">
-            
-            <!-- Status Message -->
-            <TextBlock Text="{Binding StatusMessage}" 
+        <!-- Bottom bar: status + logout -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,10,0,10">
+            <TextBlock Text="{Binding StatusMessage}"
                        Foreground="{Binding StatusColor}"
-                       HorizontalAlignment="Center"
-                       FontSize="12"
-                       Height="20"/>
-            
-            <!-- Bottom Buttons Row -->
-            <StackPanel Orientation="Horizontal" 
-                       HorizontalAlignment="Center"
-                       Spacing="15">
-                
-                <!-- Logout Button -->
-                <Button 
-                    Command="{Binding LogoutCommand}"
-                    Background="#e74c3c"  
+                       VerticalAlignment="Center"
+                       FontSize="12"/>
+            <Button Command="{Binding LogoutCommand}"
+                    Background="{StaticResource BannerBrush}"
                     Width="120"
-                    Height="50" 
+                    Height="40"
                     BorderThickness="2"
                     BorderBrush="Black"
                     FontSize="14">
-                    <TextBlock Text="Logout" Foreground="white" FontWeight="Bold"/>
-                </Button>
-            </StackPanel>
+                <TextBlock Text="Logout" Foreground="White" FontWeight="Bold"/>
+            </Button>
         </StackPanel>
     </Grid>
 </UserControl>

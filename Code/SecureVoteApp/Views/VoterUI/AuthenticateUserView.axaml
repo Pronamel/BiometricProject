@@ -15,7 +15,7 @@
     </Design.DataContext>
 
 
-    <Grid Background="#f6f2e6">
+    <Grid Background="#BBE1FA">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
             <!-- Live Preview Image -->
             <Panel Background="Black" 
@@ -31,7 +31,7 @@
 
             <TextBlock Text="{Binding CaptureStatusMessage}"
                        FontSize="14"
-                       Foreground="#333"
+                       Foreground="#1B262C"
                        HorizontalAlignment="Center"
                        TextAlignment="Center"
                        TextWrapping="Wrap"
@@ -40,7 +40,7 @@
 
             <TextBlock Text="{Binding CooldownSecondsRemaining, StringFormat='Scanner cooldown: {0}s'}"
                        FontSize="14"
-                       Foreground="#e67e22"
+                       Foreground="#0F4C75"
                        HorizontalAlignment="Center"
                        TextAlignment="Center"
                        IsVisible="{Binding IsCooldownActive}"/>
@@ -66,12 +66,12 @@
                     
                     <TextBlock Text="Press lightly and hold for 3 seconds" 
                             FontSize="14"
-                            Foreground="#333"
+                            Foreground="#1B262C"
                             Margin="0,5,0,15"/>
 
                     <TextBlock Text="{Binding StatusMessage}" 
                             FontSize="14"
-                            Foreground="DarkGreen"
+                            Foreground="#0F4C75"
                             FontWeight="SemiBold"
                             TextWrapping="Wrap"
                             Margin="0,0,0,5"/>
@@ -79,7 +79,7 @@
                     <TextBlock Text="{Binding VoterStatusMessage}"
                             FontSize="14"
                             FontWeight="Bold"
-                            Foreground="DarkGreen"
+                            Foreground="#0F4C75"
                             TextWrapping="Wrap"/>
                 </StackPanel>
             </StackPanel>
@@ -88,7 +88,7 @@
 
         <!-- Back Button at Bottom Left -->
         <Button Content="Back" 
-                Background="Crimson" 
+                Background="#0F4C75" 
                 Foreground="White"
                 Width="100" 
                 Height="35"
@@ -98,6 +98,12 @@
                 VerticalAlignment="Bottom"
                 Margin="10"
             IsEnabled="{Binding IsBackEnabled}"
-            Command="{Binding BackCommand}"/>
+            Command="{Binding BackCommand}">
+            <Button.Styles>
+                <Style Selector="Button:pointerover">
+                    <Setter Property="Background" Value="#3282B8"/>
+                </Style>
+            </Button.Styles>
+        </Button>
     </Grid>
 </UserControl>

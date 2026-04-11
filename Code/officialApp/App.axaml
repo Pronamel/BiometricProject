@@ -7,4 +7,15 @@
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>
+    <Application.Resources>
+        <!-- Official App Color Palette (Teal Theme) -->
+        <Color x:Key="BannerColor">#091413</Color>
+        <Color x:Key="NavBackgroundColor">#B0E4CC</Color>
+        <Color x:Key="AccentColor1">#285A48</Color>
+        <Color x:Key="AccentColor2">#408A71</Color>
+        <SolidColorBrush x:Key="BannerBrush" Color="{StaticResource BannerColor}"/>
+        <SolidColorBrush x:Key="NavBackgroundBrush" Color="{StaticResource NavBackgroundColor}"/>
+        <SolidColorBrush x:Key="AccentBrush1" Color="{StaticResource AccentColor1}"/>
+        <SolidColorBrush x:Key="AccentBrush2" Color="{StaticResource AccentColor2}"/>
+    </Application.Resources>
 </Application>

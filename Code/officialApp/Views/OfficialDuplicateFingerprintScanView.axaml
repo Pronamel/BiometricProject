@@ -13,7 +13,7 @@
         <vm:OfficialDuplicateFingerprintScanViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6" RowDefinitions="Auto,Auto,*,Auto" Margin="20">
+    <Grid Background="{StaticResource NavBackgroundBrush}" RowDefinitions="Auto,Auto,*,Auto" Margin="20">
         <TextBlock Grid.Row="0"
                    Text="Duplicate Fingerprint Scan"
                    FontSize="26"
@@ -23,14 +23,14 @@
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center" Margin="0,16,0,16">
             <Button Content="Start scan"
-                    Command="{Binding StartScanCommand}"
-                    IsEnabled="{Binding !IsScanning}"
-                    Width="160"
-                    Height="46"
-                    FontSize="16"
-                    Background="#d97509"
-                    Foreground="White"
-                    FontWeight="Bold"/>
+                Command="{Binding StartScanCommand}"
+                IsEnabled="{Binding !IsScanning}"
+                Width="160"
+                Height="46"
+                FontSize="16"
+                Background="{StaticResource AccentBrush1}"
+                Foreground="White"
+                FontWeight="Bold"/>
 
             <ProgressBar Width="180"
                          Height="10"
@@ -39,8 +39,8 @@
         </StackPanel>
 
         <Border Grid.Row="2"
-                Background="#d0d0d0"
-                BorderBrush="#9f9f9f"
+                Background="#408A71"
+                BorderBrush="#285A48"
                 BorderThickness="2"
                 CornerRadius="8"
                 Padding="14">
@@ -49,24 +49,24 @@
                            Text="Templates"
                            FontSize="16"
                            FontWeight="SemiBold"
-                           Foreground="#202020"
+                           Foreground="White"
                            Margin="0,0,0,10"/>
 
                 <ScrollViewer Grid.Row="1">
                     <StackPanel Spacing="10">
                         <TextBlock Text="Detected matches appear below with decrypted full name and National Insurance number."
-                                   Foreground="#404040"
+                                   Foreground="White"
                                    TextWrapping="Wrap"/>
 
                         <ItemsControl ItemsSource="{Binding DuplicateGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="#efefef"
-                                            BorderBrush="#b4b4b4"
+                                    <Border Background="#B0E4CC"
+                                            BorderBrush="#408A71"
                                             BorderThickness="1"
                                             CornerRadius="6"
                                             Padding="10">
-                                        <TextBlock Text="{Binding .}" TextWrapping="Wrap" Foreground="#1f1f1f"/>
+                                        <TextBlock Text="{Binding .}" TextWrapping="Wrap" Foreground="#285A48"/>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

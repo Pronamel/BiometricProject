@@ -16,53 +16,88 @@
     </Design.DataContext>
     
 
-    <Grid Background="#f6f2e6">
-        
-        <!-- Title -->
-        <TextBlock Text="Select Vote Type" 
-                   FontSize="28" 
-                   FontWeight="Bold"
-                   HorizontalAlignment="Center" 
-                   VerticalAlignment="Top"
-                   Foreground="DarkSlateGray" 
-                   Margin="0,40,0,0"/>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Personal Vote Button -->
-        <Button 
-            Command="{Binding OpenNINEntryCommand}"
-            Background="purple"  
-            Width="120"
-            Height="120" 
-            HorizontalAlignment="Center" 
-            VerticalAlignment="Center"
-            Margin="0,0,200,0"
-            BorderThickness="2"
-            BorderBrush="Black"
-            FontSize="18"
-            CornerRadius="10">
-            <StackPanel>
-                <TextBlock Text="Personal" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                <TextBlock Text="Vote" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-            </StackPanel>
-        </Button>
+        <Border Grid.Column="0" Background="#BBE1FA">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="320" Spacing="16" Margin="24">
+                <TextBlock Text="Vote In Person"
+                           FontSize="38"
+                           FontWeight="Bold"
+                           Foreground="#1B262C"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"/>
+                <TextBlock Text="Choose this option if you are the registered voter and want to cast your ballot yourself."
+                           FontSize="18"
+                           Foreground="#1B262C"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,18"/>
 
-        <!-- Proxy Vote Button -->
-        <Button
-            Command="{Binding OpenProxyVoteCommand}"
-            Background="green"  
-            Width="120"
-            Height="120" 
-            HorizontalAlignment="Center" 
-            VerticalAlignment="Center"
-            Margin="200,0,0,0"
-            BorderThickness="2"
-            BorderBrush="Black"
-            FontSize="18"
-            CornerRadius="10">
-            <StackPanel>
-                <TextBlock Text="Proxy" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
-                <TextBlock Text="Vote" HorizontalAlignment="Center" Margin="0,0,0,5" Foreground="white"/>
+                <Button Command="{Binding OpenNINEntryCommand}"
+                        Content="Personal Vote"
+                        Background="#1B262C"
+                        Foreground="#BBE1FA"
+                        Width="250"
+                        Height="76"
+                        HorizontalAlignment="Center"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                        BorderThickness="2"
+                        BorderBrush="#0F4C75"
+                    FontSize="20"
+                        FontWeight="SemiBold"
+                        CornerRadius="14">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#BBE1FA"/>
+                            <Setter Property="Foreground" Value="#1B262C"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
             </StackPanel>
-        </Button>
+        </Border>
+
+        <Border Grid.Column="1" Background="#0F4C75">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="320" Spacing="16" Margin="24">
+                <TextBlock Text="Vote By Proxy"
+                           FontSize="38"
+                           FontWeight="Bold"
+                           Foreground="#F2F7FB"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"/>
+                <TextBlock Text="Choose this option when an approved proxy is voting on behalf of a registered voter."
+                           FontSize="18"
+                           Foreground="#F2F7FB"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,18"/>
+
+                <Button Command="{Binding OpenProxyVoteCommand}"
+                        Content="Proxy Vote"
+                        Background="#BBE1FA"
+                        Foreground="#1B262C"
+                        Width="250"
+                        Height="76"
+                        HorizontalAlignment="Center"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                        BorderThickness="2"
+                        BorderBrush="#3282B8"
+                    FontSize="20"
+                        FontWeight="SemiBold"
+                        CornerRadius="14">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#1B262C"/>
+                            <Setter Property="Foreground" Value="#BBE1FA"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

@@ -15,13 +15,13 @@
     </Design.DataContext>
 
 
-    <Grid Background="#f6f2e6">
+    <Grid Background="{StaticResource NavBackgroundBrush}">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
             <!-- Live Preview Image -->
-            <Panel Background="Black" 
-                   Width="250"
-                   Height="250"
-                   HorizontalAlignment="Center">
+                                 <Panel Background="Black"
+                                     Width="250"
+                                     Height="250"
+                                     HorizontalAlignment="Center">
                 <Image Source="{Binding PreviewImage}"
                     Width="250"
                     Height="250"

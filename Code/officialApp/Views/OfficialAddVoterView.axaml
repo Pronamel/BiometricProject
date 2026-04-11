@@ -11,38 +11,38 @@
         <vm:OfficialAddVoterViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6">
+    <Grid Background="#B0E4CC">
         <ScrollViewer>
             <StackPanel VerticalAlignment="Top" HorizontalAlignment="Stretch" Spacing="15" Margin="20">
             <TextBlock Text="Create User"
                       FontSize="28"
                       FontWeight="Bold"
-                      Foreground="black"
+                      Foreground="Black"
                       HorizontalAlignment="Center"/>
 
             <TextBlock Text="Choose user type, complete fields, scan fingerprint, then submit."
                       TextWrapping="Wrap"
-                      Foreground="#555555"
+                      Foreground="Black"
                       FontSize="14"
                       HorizontalAlignment="Center"/>
 
             <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
                 <Button Content="Create Voter"
-                        Width="160"
-                        Height="42"
-                        FontSize="14"
-                        FontWeight="Bold"
+                    Width="160"
+                    Height="42"
+                    FontSize="14"
+                    FontWeight="Bold"
                     Command="{Binding SwitchToCreateVoterModeCommand}"
-                    Background="#d97509"
+                    Background="{StaticResource AccentBrush1}"
                     Foreground="White"/>
 
                 <Button Content="Create Official"
-                        Width="160"
-                        Height="42"
-                        FontSize="14"
-                        FontWeight="Bold"
+                    Width="160"
+                    Height="42"
+                    FontSize="14"
+                    FontWeight="Bold"
                     Command="{Binding SwitchToCreateOfficialModeCommand}"
-                    Background="#6b4423"
+                    Background="{StaticResource AccentBrush2}"
                     Foreground="White"/>
             </StackPanel>
 
@@ -51,107 +51,117 @@
             <Grid ColumnDefinitions="2*,*" ColumnSpacing="24">
                 <StackPanel Grid.Column="0" Spacing="10" Margin="20,0,20,20">
                     <Border IsVisible="{Binding IsCreateVoterMode}"
-                            Background="#ece6d6"
-                            BorderBrush="#d9c8a9"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="16">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="Voter Details" FontSize="16" FontWeight="Bold" Foreground="black"/>
+                        Background="#285A48" CornerRadius="10" Padding="6">
+                        <Border Background="#408A71"
+                                BorderBrush="#0992C2"
+                                BorderThickness="2"
+                                CornerRadius="8"
+                                Padding="16">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Voter Details" FontSize="16" FontWeight="Bold" Foreground="White"/>
 
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                             <StackPanel Grid.Column="0" Spacing="5">
-                                <TextBlock Text="First Name (e.g., John)" Foreground="black" FontSize="14"/>
-                                <TextBox Text="{Binding FirstName}" Height="40" FontSize="14" Padding="10"/>
+                                <TextBlock Text="First Name (e.g., John)" Foreground="Black" FontSize="16"/>
+                                <TextBox Text="{Binding FirstName}" Height="40" FontSize="14" Foreground="#285A48" Padding="10" Background="#E0F5EC"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Spacing="5">
-                                <TextBlock Text="Last Name (e.g., Smith)" Foreground="black" FontSize="14"/>
-                                <TextBox Text="{Binding LastName}" Height="40" FontSize="14" Padding="10"/>
+                                <TextBlock Text="Last Name (e.g., Smith)" Foreground="Black" FontSize="16"/>
+                                <TextBox Text="{Binding LastName}" Height="40" FontSize="14" Foreground="#285A48" Padding="10" Background="#E0F5EC"/>
                             </StackPanel>
                         </Grid>
 
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                             <StackPanel Grid.Column="0" Spacing="5">
-                                <TextBlock Text="National Insurance Number (optional, e.g., AB123456C)" Foreground="black" FontSize="14"/>
-                                <TextBox Text="{Binding NationalInsuranceNumber}" Height="40" FontSize="14" Padding="10"/>
+                                <TextBlock Text="National Insurance Number (optional, e.g., AB123456C)" Foreground="Black" FontSize="16"/>
+                                <TextBox Text="{Binding NationalInsuranceNumber}" Height="40" FontSize="14" Foreground="#285A48" Padding="10" Background="#E0F5EC"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Spacing="5">
-                                <TextBlock Text="Date of Birth" Foreground="black" FontSize="14"/>
-                                <DatePicker SelectedDate="{Binding SelectedDateOfBirth}" Height="40" FontSize="14"/>
+                                <TextBlock Text="Date of Birth" Foreground="Black" FontSize="16"/>
+                                <DatePicker SelectedDate="{Binding SelectedDateOfBirth}" Height="40" FontSize="14" Background="#E0F5EC"/>
                             </StackPanel>
                         </Grid>
 
                         <StackPanel Spacing="5">
-                            <TextBlock Text="Town Of Birth (e.g., London)" Foreground="black" FontSize="14"/>
-                            <TextBox Text="{Binding TownOfBirth}" Height="40" FontSize="14" Padding="10"/>
+                            <TextBlock Text="Town Of Birth (e.g., London)" Foreground="Black" FontSize="16"/>
+                            <TextBox Text="{Binding TownOfBirth}" Height="40" FontSize="14" Foreground="#285A48" Padding="10" Background="#E0F5EC"/>
                         </StackPanel>
 
                         <Grid ColumnDefinitions="*,2*" ColumnSpacing="24">
                             <StackPanel Grid.Column="0" Spacing="5">
-                                <TextBlock Text="Post Code (e.g., SW1A 1AA)" Foreground="black" FontSize="14"/>
-                                <TextBox Text="{Binding PostCode}" Height="40" FontSize="14" Padding="10"/>
+                                <TextBlock Text="Post Code (e.g., SW1A 1AA)" Foreground="Black" FontSize="16"/>
+                                <TextBox Text="{Binding PostCode}" Height="40" FontSize="14" Foreground="#285A48" Padding="10" Background="#E0F5EC"/>
                             </StackPanel>
 
                             <Grid Grid.Column="1" ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <StackPanel Grid.Column="0" Spacing="5">
-                                    <TextBlock Text="County" Foreground="black" FontSize="14"/>
+                                    <TextBlock Text="County" Foreground="Black" FontSize="16"/>
                                     <ComboBox SelectedItem="{Binding SelectedCounty}"
                                               ItemsSource="{Binding CountyOptions}"
                                               Height="40"
                                               FontSize="14"
-                                              PlaceholderText="Select county"/>
+                                              PlaceholderText="Select county"
+                                              Background="#E0F5EC"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="1" Spacing="5">
-                                    <TextBlock Text="Constituency" Foreground="black" FontSize="14"/>
+                                    <TextBlock Text="Constituency" Foreground="Black" FontSize="16"/>
                                     <ComboBox SelectedItem="{Binding SelectedConstituency}"
                                               ItemsSource="{Binding ConstituencyOptions}"
                                               Height="40"
                                               FontSize="14"
-                                              PlaceholderText="Select constituency"/>
+                                              PlaceholderText="Select constituency"
+                                              Background="#E0F5EC"/>
                                 </StackPanel>
                             </Grid>
                         </Grid>
 
-                        </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </Border>
 
                     <Border IsVisible="{Binding IsCreateOfficialMode}"
-                            Background="#ece6d6"
-                            BorderBrush="#d9c8a9"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="16">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="Official Details" FontSize="16" FontWeight="Bold" Foreground="black"/>
+                        Background="#285A48" CornerRadius="10" Padding="6">
+                        <Border Background="#408A71"
+                                BorderBrush="#0992C2"
+                                BorderThickness="2"
+                                CornerRadius="8"
+                                Padding="16">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Official Details" FontSize="16" FontWeight="Bold" Foreground="White"/>
 
-                        <StackPanel Spacing="5">
-                            <TextBlock Text="Username (e.g., official.j.smith)" Foreground="black" FontSize="14"/>
-                            <TextBox Text="{Binding OfficialUsername}"
-                                    Height="40"
-                                    FontSize="14"
-                                    Padding="10"/>
-                        </StackPanel>
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="Username (e.g., official.j.smith)" Foreground="Black" FontSize="16"/>
+                                    <TextBox Text="{Binding OfficialUsername}"
+                                            Height="40"
+                                            FontSize="14"
+                                            Foreground="#285A48"
+                                            Padding="10"
+                                            Background="#E0F5EC"/>
+                                </StackPanel>
 
-                        <StackPanel Spacing="5">
-                            <TextBlock Text="Password (e.g., SecurePass!2026)" Foreground="black" FontSize="14"/>
-                            <TextBox Text="{Binding Password}"
-                                    Height="40"
-                                    FontSize="14"
-                                    Padding="10"/>
-                        </StackPanel>
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="Password (e.g., SecurePass!2026)" Foreground="Black" FontSize="16"/>
+                                    <TextBox Text="{Binding Password}"
+                                            Height="40"
+                                            FontSize="14"
+                                            Foreground="#285A48"
+                                            Padding="10"
+                                            Background="#E0F5EC"/>
+                                </StackPanel>
 
-                        <StackPanel Spacing="5">
-                            <TextBlock Text="Polling Station" Foreground="black" FontSize="14"/>
-                            <ComboBox SelectedItem="{Binding SelectedPollingStation}"
-                                      ItemsSource="{Binding PollingStationOptions}"
-                                      Height="40"
-                                      FontSize="14"
-                                      PlaceholderText="Select polling station"/>
-                        </StackPanel>
-                        </StackPanel>
+                                <StackPanel Spacing="5">
+                                    <TextBlock Text="Polling Station" Foreground="Black" FontSize="14"/>
+                                    <ComboBox SelectedItem="{Binding SelectedPollingStation}"
+                                              ItemsSource="{Binding PollingStationOptions}"
+                                              Height="40"
+                                              FontSize="14"
+                                              PlaceholderText="Select polling station"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </Border>
 
                 </StackPanel>
@@ -195,7 +205,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Center" Margin="0,10,0,0">
                         <Button 
                             Command="{Binding SubmitCommand}"
-                            Background="#27ae60"
+                            Background="{StaticResource AccentBrush2}"
                             Width="120"
                             Height="50"
                             BorderThickness="2"
@@ -206,7 +216,7 @@
 
                         <Button
                             Command="{Binding ReCaptureCommand}"
-                            Background="#d97509"
+                            Background="{StaticResource AccentBrush1}"
                             Width="120"
                             Height="50"
                             BorderThickness="2"
@@ -246,7 +256,7 @@
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
             Margin="10"
-            Background="#E0E0E0"
-            Foreground="Black"/>
+            Background="{StaticResource AccentBrush1}"
+            Foreground="White"/>
     </Grid>
 </UserControl>

@@ -45,10 +45,15 @@ public partial class NINEntryViewModel : ViewModelBase
     private string townOfBirth = string.Empty;
 
     [ObservableProperty]
+    private string nationalInsuranceNumber = string.Empty;
+
+    [ObservableProperty]
     private bool dateOfBirthVisible = true;
 
     [ObservableProperty]
     private string statusMessage = string.Empty;
+
+    public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
 
     [ObservableProperty]
     private bool showAlreadyVotedMessage = false;
@@ -58,6 +63,11 @@ public partial class NINEntryViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool isLooking = false;
+
+    partial void OnStatusMessageChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasStatusMessage));
+    }
 
 
 
@@ -80,6 +90,7 @@ public partial class NINEntryViewModel : ViewModelBase
         SelectedDateOfBirth = null;
         PostCode = string.Empty;
         TownOfBirth = string.Empty;
+        NationalInsuranceNumber = string.Empty;
         DateOfBirthVisible = true;
         StatusMessage = string.Empty;
         ShowAlreadyVotedMessage = false;

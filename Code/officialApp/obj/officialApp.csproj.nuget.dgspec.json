@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\officialApp\\officialApp.csproj": {}
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\officialApp.csproj": {}
   },
   "projects": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\officialApp\\officialApp.csproj": {
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\officialApp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
+        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\officialApp.csproj",
         "projectName": "officialApp",
-        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
+        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\officialApp.csproj",
         "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\officialApp\\obj\\",
+        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",

@@ -14,7 +14,7 @@
         <vm:OfficialVotingPollingManagerViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6">
+    <Grid Background="#B0E4CC">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -28,13 +28,13 @@
             </Grid.ColumnDefinitions>
             
             <!-- Back Button -->
-            <Button Grid.Column="0" 
-                    Content="← Back" 
-                    Command="{Binding GoBackCommand}"
-                    Padding="10,5"
-                    VerticalAlignment="Center"
-                    Background="#E0E0E0"
-                    Foreground="Black"/>
+                                <Button Grid.Column="0" 
+                                    Content="← Back" 
+                                    Command="{Binding GoBackCommand}"
+                                    Padding="10,5"
+                                    VerticalAlignment="Center"
+                                    Background="{StaticResource AccentBrush1}"
+                                    Foreground="White"/>
             
             <!-- Title -->
             <TextBlock Grid.Column="1"
@@ -57,25 +57,30 @@
             <!-- Left Section -->
             <StackPanel Grid.Column="0" Margin="0,0,10,0">
                 
-                <TextBlock Text="Connected Voter Devices" FontSize="14" FontWeight="Bold" Margin="0,20,0,10"/>
+                <TextBlock Text="Connected Voter Devices" FontSize="16" FontWeight="Bold" Foreground="Black" Margin="0,20,0,10"/>
                 
                 <!-- Half Vertical Space Box - Connected Devices -->
-                <Border Background="LightGray" 
-                        BorderBrush="Black" 
-                        BorderThickness="1" 
+                <Border Background="#285A48"
+                        CornerRadius="10"
+                        Padding="6"
                         Height="400" 
                         Margin="0,0,0,20"
-                        Padding="10">
-                    <ScrollViewer>
-                        <ItemsControl ItemsSource="{Binding ConnectedDevices}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="models:ConnectedVoterDevice">
-                                    <Border BorderBrush="DarkGray" 
-                                            BorderThickness="1" 
-                                            Background="White" 
-                                            Padding="10" 
-                                            Margin="0,0,0,5"
-                                            CornerRadius="3">
+                        >
+                    <Border Background="#E0F5EC"
+                            BorderBrush="#285A48"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            Padding="10">
+                        <ScrollViewer>
+                            <ItemsControl ItemsSource="{Binding ConnectedDevices}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ConnectedVoterDevice">
+                                        <Border BorderBrush="#285A48"
+                                                BorderThickness="1"
+                                                Background="#B0E4CC"
+                                                Padding="10"
+                                                Margin="0,0,0,6"
+                                                CornerRadius="6">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="80"/>
@@ -85,17 +90,17 @@
                                             
                                             <!-- Device Label -->
                                             <StackPanel Grid.Column="0" Spacing="3">
-                                                <TextBlock Text="Device #" FontSize="11" FontWeight="Bold" Foreground="Gray"/>
-                                                <TextBlock Text="{Binding DisplayLabel}" FontSize="14" FontWeight="Bold" Foreground="Blue"/>
-                                                <TextBlock Text="{Binding VoterId, StringFormat=Voter {0}}" FontSize="11" Foreground="Gray"/>
+                                                <TextBlock Text="Device #" FontSize="11" FontWeight="Bold" Foreground="#285A48"/>
+                                                <TextBlock Text="{Binding DisplayLabel}" FontSize="14" FontWeight="Bold" Foreground="#091413"/>
+                                                <TextBlock Text="{Binding VoterId, StringFormat=Voter {0}}" FontSize="11" Foreground="#285A48"/>
                                             </StackPanel>
                                             
                                             <!-- Status -->
                                             <StackPanel Grid.Column="1" Margin="15,0,0,0" Spacing="3">
-                                                <TextBlock Text="Status" FontSize="11" FontWeight="Bold" Foreground="Gray"/>
-                                                <TextBlock Text="{Binding Status}" FontSize="13" FontWeight="Bold" Foreground="Green"/>
+                                                <TextBlock Text="Status" FontSize="11" FontWeight="Bold" Foreground="#285A48"/>
+                                                <TextBlock Text="{Binding Status}" FontSize="13" FontWeight="Bold" Foreground="#091413"/>
                                                 <Border IsVisible="{Binding IsLockedByOfficial}"
-                                                        Background="#D9534F"
+                                                        Background="#A53B36"
                                                         CornerRadius="10"
                                                         Padding="8,2"
                                                         HorizontalAlignment="Left">
@@ -109,24 +114,25 @@
                                             <!-- Official control -->
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                                 <Button Content="Lock"
-                                                        Background="#D9534F"
+                                                        Background="#d32f2f"
                                                         Foreground="White"
                                                         Padding="10,4"
                                                         Command="{Binding $parent[ItemsControl].DataContext.LockDeviceCommand}"
                                                         CommandParameter="{Binding}"/>
                                                 <Button Content="Unlock"
-                                                        Background="#5CB85C"
+                                                        Background="#388e3c"
                                                         Foreground="White"
                                                         Padding="10,4"
                                                         Command="{Binding $parent[ItemsControl].DataContext.UnlockDeviceCommand}"
                                                         CommandParameter="{Binding}"/>
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
                 </Border>
                 
                 <!-- Connected Voter Devices Section -->
@@ -139,19 +145,34 @@
             <!-- Right Section -->
             <StackPanel Grid.Column="1" Margin="10,0,0,0">
                 <TextBlock Text="Polling Station Stats"
-                           FontSize="14"
+                           FontSize="16"
                            FontWeight="Bold"
+                           Foreground="Black"
                            Margin="0,20,0,10"/>
 
-                <Border Background="#ece6d6"
-                        BorderBrush="#d9c8a9"
-                        BorderThickness="1"
-                        CornerRadius="8"
+                <Border Background="#285A48"
+                        CornerRadius="10"
+                        Padding="6"
                         Height="400"
                         Margin="0,0,0,20"
-                        Padding="16">
-                    <!-- 8 Text Labels with TextBoxes -->
-                    <Grid>
+                        >
+                    <Border Background="#E0F5EC"
+                            BorderBrush="#285A48"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            Padding="16">
+                        <!-- 8 Text Labels with TextBoxes -->
+                        <Grid>
+                            <Grid.Styles>
+                                <Style Selector="TextBlock">
+                                    <Setter Property="Foreground" Value="#091413"/>
+                                    <Setter Property="FontSize" Value="16"/>
+                                </Style>
+                                <Style Selector="TextBlock.value">
+                                    <Setter Property="Foreground" Value="#285A48"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                </Style>
+                            </Grid.Styles>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="1"/>
@@ -175,44 +196,45 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- Row 1 -->
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Votes (VoteRecords):" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TotalVotes}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
-                        <Rectangle Grid.Row="1" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Votes (VoteRecords):" VerticalAlignment="Center" Margin="0,5"/>
+                        <TextBlock Classes="value" Grid.Row="0" Grid.Column="1" Text="{Binding TotalVotes}" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                        <Rectangle Grid.Row="1" Grid.ColumnSpan="2" Fill="#7BBFAC" Height="1" Margin="0,2"/>
 
                         <!-- Row 2 -->
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Expected Voters:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ExpectedVoters}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
-                        <Rectangle Grid.Row="3" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Expected Voters:" VerticalAlignment="Center" Margin="0,5"/>
+                        <TextBlock Classes="value" Grid.Row="2" Grid.Column="1" Text="{Binding ExpectedVoters}" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                        <Rectangle Grid.Row="3" Grid.ColumnSpan="2" Fill="#7BBFAC" Height="1" Margin="0,2"/>
 
                         <!-- Row 3 -->
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Turnout %:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding TurnoutRate}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
-                        <Rectangle Grid.Row="5" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Turnout %:" VerticalAlignment="Center" Margin="0,5"/>
+                        <TextBlock Classes="value" Grid.Row="4" Grid.Column="1" Text="{Binding TurnoutRate}" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                        <Rectangle Grid.Row="5" Grid.ColumnSpan="2" Fill="#7BBFAC" Height="1" Margin="0,2"/>
 
                         <!-- Row 4 -->
-                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Devices Locked:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                        <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding DevicesLocked}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
-                        <Rectangle Grid.Row="7" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Devices Locked:" VerticalAlignment="Center" Margin="0,5"/>
+                        <TextBlock Classes="value" Grid.Row="6" Grid.Column="1" Text="{Binding DevicesLocked}" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                        <Rectangle Grid.Row="7" Grid.ColumnSpan="2" Fill="#7BBFAC" Height="1" Margin="0,2"/>
 
                         <!-- Row 5 -->
-                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Registered Voters:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                        <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding RegisteredVoters}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
-                        <Rectangle Grid.Row="9" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Registered Voters:" VerticalAlignment="Center" Margin="0,5"/>
+                        <TextBlock Classes="value" Grid.Row="8" Grid.Column="1" Text="{Binding RegisteredVoters}" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                        <Rectangle Grid.Row="9" Grid.ColumnSpan="2" Fill="#7BBFAC" Height="1" Margin="0,2"/>
 
                         <!-- Row 6 -->
-                        <TextBlock Grid.Row="10" Grid.Column="0" Text="Polling Start:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                        <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding PollingStartTime}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
-                        <Rectangle Grid.Row="11" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                        <TextBlock Grid.Row="10" Grid.Column="0" Text="Polling Start:" VerticalAlignment="Center" Margin="0,5"/>
+                        <TextBlock Classes="value" Grid.Row="10" Grid.Column="1" Text="{Binding PollingStartTime}" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                        <Rectangle Grid.Row="11" Grid.ColumnSpan="2" Fill="#7BBFAC" Height="1" Margin="0,2"/>
 
                         <!-- Row 7 -->
-                        <TextBlock Grid.Row="12" Grid.Column="0" Text="Polling End:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                        <TextBlock Grid.Row="12" Grid.Column="1" Text="{Binding PollingEndTime}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
-                        <Rectangle Grid.Row="13" Grid.ColumnSpan="2" Fill="LightGray" Height="1" Margin="0,2"/>
+                        <TextBlock Grid.Row="12" Grid.Column="0" Text="Polling End:" VerticalAlignment="Center" Margin="0,5"/>
+                        <TextBlock Classes="value" Grid.Row="12" Grid.Column="1" Text="{Binding PollingEndTime}" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                        <Rectangle Grid.Row="13" Grid.ColumnSpan="2" Fill="#7BBFAC" Height="1" Margin="0,2"/>
 
                         <!-- Row 8 -->
-                        <TextBlock Grid.Row="14" Grid.Column="0" Text="System Status:" VerticalAlignment="Center" Margin="0,5" FontSize="16"/>
-                        <TextBlock Grid.Row="14" Grid.Column="1" Text="{Binding SystemStatus}" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="16"/>
-                    </Grid>
+                        <TextBlock Grid.Row="14" Grid.Column="0" Text="System Status:" VerticalAlignment="Center" Margin="0,5"/>
+                        <TextBlock Classes="value" Grid.Row="14" Grid.Column="1" Text="{Binding SystemStatus}" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                        </Grid>
+                    </Border>
                 </Border>
             </StackPanel>
             

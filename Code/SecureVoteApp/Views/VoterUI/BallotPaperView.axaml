@@ -15,23 +15,23 @@
         <vm:BallotPaperViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6">
+    <Grid Background="#BBE1FA">
         <Grid.RowDefinitions>
             <RowDefinition Height="15*"/>
             <RowDefinition Height="85*"/>
         </Grid.RowDefinitions>
         
         <!-- Top Grid - 15% of view -->
-        <Grid Grid.Row="0" Background="#f6f2e6">
+        <Grid Grid.Row="0" Background="#BBE1FA">
             <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center" Spacing="5" Margin="25,0,0,0">
                 <TextBlock Text="-Election of the member of parlament for the [Fake] constituency"
                            FontSize="20"
                            FontWeight="Bold"
-                           Foreground="Black"
+                           Foreground="#1B262C"
                            HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding ReadingCandidateName}"
                            FontSize="16"
-                           Foreground="Black"
+                           Foreground="#1B262C"
                            HorizontalAlignment="Left"/>
             </StackPanel>
             
@@ -45,7 +45,7 @@
                         Content="Cast Vote"
                         FontSize="16"
                         FontWeight="Bold"
-                        Background="#4CAF50"
+                        Background="#0F4C75"
                         Foreground="White"
                         Padding="15,8"
                         IsEnabled="{Binding !IsCastingVote}"/>
@@ -53,12 +53,12 @@
                 <TextBlock Text="{Binding VoteStatus}"
                            FontSize="12"
                            HorizontalAlignment="Center"
-                           Foreground="DarkGreen"/>
+                           Foreground="#0F4C75"/>
             </StackPanel>
         </Grid>
         
         <!-- Bottom Grid - 85% of view with candidates -->
-            <Grid Grid.Row="1" Background="#f6f2e6" Margin="15,0,15,10">
+            <Grid Grid.Row="1" Background="#BBE1FA" Margin="15,0,15,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
@@ -103,7 +103,7 @@
                 ZIndex="100">
             <Border HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="#2E7D32"
+                    Background="#0F4C75"
                     CornerRadius="12"
                     Padding="26,18"
                     MinWidth="320">

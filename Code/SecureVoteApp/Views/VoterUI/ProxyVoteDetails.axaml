@@ -7,112 +7,220 @@
             x:Class="SecureVoteApp.Views.VoterUI.ProxyVoteDetailsView"
             x:DataType="vm:ProxyVoteDetailsViewModel">
 
+    <UserControl.Styles>
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="#F5FBFF"/>
+            <Setter Property="Foreground" Value="#1B262C"/>
+            <Setter Property="BorderBrush" Value="#3282B8"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="CaretBrush" Value="#0F4C75"/>
+        </Style>
+
+        <Style Selector="DatePicker">
+            <Setter Property="Background" Value="#F5FBFF"/>
+            <Setter Property="Foreground" Value="#1B262C"/>
+            <Setter Property="BorderBrush" Value="#3282B8"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="MinHeight" Value="44"/>
+        </Style>
+    </UserControl.Styles>
+
     <Design.DataContext>
         <vm:ProxyVoteDetailsViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+    <Grid Background="#BBE1FA">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-        <TextBlock Grid.ColumnSpan="2"
-                   Text="Proxy Vote Identity Check"
-                   FontSize="24"
-                   FontWeight="Bold"
-                   HorizontalAlignment="Center"
-                   Margin="0,20,0,30"
-                   Foreground="#333"/>
-
-        <StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
-            <StackPanel Spacing="16">
-                <TextBlock Text="Represented Voter" FontWeight="Bold" Foreground="#333" FontSize="16"/>
-
-                <StackPanel>
-                    <TextBlock Text="First Name" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" Text="{Binding RepresentedFirstName}"/>
-                </StackPanel>
-
-                <StackPanel>
-                    <TextBlock Text="Last Name" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" Text="{Binding RepresentedLastName}"/>
-                </StackPanel>
-
-                <StackPanel>
-                    <TextBlock Text="Date Of Birth" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <DatePicker Width="300" Height="35" SelectedDate="{Binding RepresentedDateOfBirth}"/>
-                </StackPanel>
-
-                <StackPanel>
-                    <TextBlock Text="Post Code" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" Text="{Binding RepresentedPostCode}"/>
-                </StackPanel>
-
-                <StackPanel>
-                    <TextBlock Text="Town Of Birth" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" Text="{Binding RepresentedTownOfBirth}"/>
-                </StackPanel>
-            </StackPanel>
+        <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,16,0,8" Spacing="4">
+            <TextBlock Text="Proxy Vote Identity Check"
+                       FontSize="30"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       Foreground="#1B262C"/>
+            <TextBlock Text="Confirm represented voter and proxy details"
+                       FontSize="14"
+                       HorizontalAlignment="Center"
+                       Foreground="#0F4C75"/>
         </StackPanel>
 
-        <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
-            <StackPanel Spacing="16">
-                <TextBlock Text="Proxy Voter" FontWeight="Bold" Foreground="#333" FontSize="16"/>
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <Grid HorizontalAlignment="Center" Margin="18,6,18,18" MaxWidth="860">
+                <Border Background="#D8ECFB"
+                        BorderBrush="#3282B8"
+                        BorderThickness="2"
+                        CornerRadius="16"
+                        Padding="24"
+                        MinWidth="720"
+                        VerticalAlignment="Top">
+                    <StackPanel Spacing="16">
+                        <Grid ColumnDefinitions="*,*"
+                            ColumnSpacing="28">
+                                <Border Grid.Column="0"
+                                    Background="#EAF6FF"
+                                    BorderBrush="#3282B8"
+                                    BorderThickness="1.5"
+                                    CornerRadius="12"
+                                    Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Represented Voter"
+                                               FontSize="18"
+                                               FontWeight="Bold"
+                                               Foreground="#1B262C"/>
 
-                <StackPanel>
-                    <TextBlock Text="First Name" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" Text="{Binding ProxyFirstName}"/>
-                </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="First Name" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <TextBox MinHeight="44"
+                                                 HorizontalAlignment="Stretch"
+                                                 Text="{Binding RepresentedFirstName}"
+                                                 IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
 
-                <StackPanel>
-                    <TextBlock Text="Last Name" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" Text="{Binding ProxyLastName}"/>
-                </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Last Name" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <TextBox MinHeight="44"
+                                                 HorizontalAlignment="Stretch"
+                                                 Text="{Binding RepresentedLastName}"
+                                                 IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
 
-                <StackPanel>
-                    <TextBlock Text="Date Of Birth" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <DatePicker Width="300" Height="35" SelectedDate="{Binding ProxyDateOfBirth}"/>
-                </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Date Of Birth" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <DatePicker MinHeight="44"
+                                                    Height="44"
+                                                    HorizontalAlignment="Stretch"
+                                                    SelectedDate="{Binding RepresentedDateOfBirth}"
+                                                    IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
 
-                <StackPanel>
-                    <TextBlock Text="Post Code" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" Text="{Binding ProxyPostCode}"/>
-                </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Post Code" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <TextBox MinHeight="44"
+                                                 HorizontalAlignment="Stretch"
+                                                 Text="{Binding RepresentedPostCode}"
+                                                 IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
 
-                <StackPanel>
-                    <TextBlock Text="Town Of Birth" FontWeight="Medium" Foreground="#333" Margin="0,0,0,5"/>
-                    <TextBox Width="300" Height="35" Text="{Binding ProxyTownOfBirth}"/>
-                </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Town Of Birth" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <TextBox MinHeight="44"
+                                                 HorizontalAlignment="Stretch"
+                                                 Text="{Binding RepresentedTownOfBirth}"
+                                                 IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
 
-                <TextBlock Text="{Binding StatusMessage}"
-                           Foreground="DarkGreen"
-                           FontWeight="SemiBold"
-                           TextWrapping="Wrap"
-                           Width="300"/>
+                                <Border Grid.Column="1"
+                                    Background="#EAF6FF"
+                                    BorderBrush="#3282B8"
+                                    BorderThickness="1.5"
+                                    CornerRadius="12"
+                                    Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Proxy Voter"
+                                               FontSize="18"
+                                               FontWeight="Bold"
+                                               Foreground="#1B262C"/>
 
-                <ProgressBar IsIndeterminate="True"
-                             IsVisible="{Binding IsLooking}"
-                             Width="300"
-                             Height="8"/>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="First Name" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <TextBox MinHeight="44"
+                                                 HorizontalAlignment="Stretch"
+                                                 Text="{Binding ProxyFirstName}"
+                                                 IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20" Margin="0,16,0,0">
-                    <Button Content="Back"
-                            Width="80"
-                            Height="35"
-                            Background="LightGray"
-                            FontSize="14"
-                            Command="{Binding BackCommand}"/>
-                    <Button Content="Authenticate >"
-                            Width="120"
-                            Height="35"
-                            Background="Green"
-                            Foreground="White"
-                            FontSize="14"
-                            IsEnabled="{Binding !IsLooking}"
-                            Command="{Binding AuthenticateCommand}"/>
-                </StackPanel>
-            </StackPanel>
-        </StackPanel>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Last Name" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <TextBox MinHeight="44"
+                                                 HorizontalAlignment="Stretch"
+                                                 Text="{Binding ProxyLastName}"
+                                                 IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Date Of Birth" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <DatePicker MinHeight="44"
+                                                    Height="44"
+                                                    HorizontalAlignment="Stretch"
+                                                    SelectedDate="{Binding ProxyDateOfBirth}"
+                                                    IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Post Code" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <TextBox MinHeight="44"
+                                                 HorizontalAlignment="Stretch"
+                                                 Text="{Binding ProxyPostCode}"
+                                                 IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Town Of Birth" FontWeight="SemiBold" Foreground="#1B262C"/>
+                                        <TextBox MinHeight="44"
+                                                 HorizontalAlignment="Stretch"
+                                                 Text="{Binding ProxyTownOfBirth}"
+                                                 IsEnabled="{Binding !IsLooking}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <ProgressBar IsIndeterminate="True"
+                                     IsVisible="{Binding IsLooking}"
+                                     Height="8"/>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2,0,0">
+                            <Button Content="Back"
+                                    Grid.Column="0"
+                                    Width="108"
+                                    Height="44"
+                                    Background="#3282B8"
+                                    Foreground="White"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    FontSize="14"
+                                    FontWeight="SemiBold"
+                                    CornerRadius="10"
+                                    Command="{Binding BackCommand}"
+                                    IsEnabled="{Binding !IsLooking}">
+                                <Button.Styles>
+                                    <Style Selector="Button:pointerover">
+                                        <Setter Property="Background" Value="#0F4C75"/>
+                                    </Style>
+                                </Button.Styles>
+                            </Button>
+
+                            <Button Content="Authenticate"
+                                    Grid.Column="2"
+                                    Width="168"
+                                    Height="44"
+                                    Background="#0F4C75"
+                                    Foreground="White"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    FontSize="14"
+                                    FontWeight="SemiBold"
+                                    CornerRadius="10"
+                                    Command="{Binding AuthenticateCommand}"
+                                    IsEnabled="{Binding !IsLooking}">
+                                <Button.Styles>
+                                    <Style Selector="Button:pointerover">
+                                        <Setter Property="Background" Value="#1B262C"/>
+                                    </Style>
+                                </Button.Styles>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
     </Grid>
 </UserControl>

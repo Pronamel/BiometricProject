@@ -14,13 +14,16 @@
   </ItemGroup>
 
   <!-- IBScanUltimate SDK DLL references - Copy to output directory -->
-  <ItemGroup>
-    <None Include="IBScanUltimate_SDK\bin\x64-windows\IBScanUltimate.dll">
+  <!-- IBScanUltimate SDK DLL references - Copy to output directory root for P/Invoke -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <Content Include="IBScanUltimate_SDK\bin\x64-windows\IBScanUltimate.dll">
+      <Link>IBScanUltimate.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="IBScanUltimate_SDK\bin\x64-windows\ACamSDK.dll">
+    </Content>
+    <Content Include="IBScanUltimate_SDK\bin\x64-windows\ACamSDK.dll">
+      <Link>ACamSDK.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

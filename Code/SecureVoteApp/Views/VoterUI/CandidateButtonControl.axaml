@@ -18,7 +18,7 @@
         <!-- Top Line -->
         <Border Grid.Row="0" 
                 Height="2" 
-                Background="Black"
+            Background="#1B262C"
                 HorizontalAlignment="Stretch"
                 Margin="0,0,25,0"/>
         
@@ -34,10 +34,10 @@
                 <TextBlock Text="{Binding CandidateName}"
                            FontSize="18"
                            FontWeight="Bold"
-                           Foreground="Black"/>
+                           Foreground="#1B262C"/>
                 <TextBlock Text="{Binding Bio}"
                            FontSize="13"
-                           Foreground="#444444"
+                           Foreground="#0F4C75"
                            TextWrapping="Wrap"/>
             </StackPanel>
             
@@ -47,7 +47,7 @@
                     Content=""
                     Command="{Binding SelectCandidateCommand}"
                     Background="{Binding ButtonBackground}"
-                    BorderBrush="Black"
+                    BorderBrush="#1B262C"
                     BorderThickness="2"
                     Width="60"
                     Height="60"
@@ -60,7 +60,7 @@
         <!-- Bottom Line -->
         <Border Grid.Row="2" 
                 Height="2" 
-                Background="Black"
+            Background="#1B262C"
                 HorizontalAlignment="Stretch" 
                 Margin="0,0,25,0"/>
     </Grid>

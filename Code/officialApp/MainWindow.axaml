@@ -11,7 +11,7 @@
         Height="784"
         MinWidth="1280"
         MinHeight="640"
-        Background="#f6f2e6">
+        Background="{StaticResource NavBackgroundBrush}">
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
@@ -19,14 +19,14 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6">
+    <Grid Background="{StaticResource NavBackgroundBrush}">
         <Grid.RowDefinitions> 
             <RowDefinition Height="70"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- Header section -->
-        <Grid Grid.Row="0" Background="#d97509">
+        <Grid Grid.Row="0" Background="{StaticResource BannerBrush}">
             <TextBlock Text="Official Administration" FontSize="32" 
                     Foreground="White"
                     FontWeight="Bold"
@@ -36,7 +36,7 @@
 
         <!-- Container for the current view -->
         <ContentControl Grid.Row="1"
-                        Background="#f6f2e6"
-                        Content="{Binding CurrentView}"/>
+                Background="{StaticResource NavBackgroundBrush}"
+                Content="{Binding CurrentView}"/>
     </Grid>
 </Window>

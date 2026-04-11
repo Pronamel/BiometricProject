@@ -12,21 +12,21 @@
         <vm:ElectionStatisticsViewModel/>
     </Design.DataContext>
 
-    <Grid Background="#f6f2e6" RowDefinitions="Auto,*,Auto">
+    <Grid Background="{StaticResource NavBackgroundBrush}" RowDefinitions="Auto,*,Auto">
         
         <!-- Header -->
-        <StackPanel Grid.Row="0" 
-                   Orientation="Vertical"
-                   Margin="20,16,20,20"
-                   Spacing="5">
-            <TextBlock Text="Election Statistics Dashboard"
-                      Foreground="black"
-                      FontSize="24"
-                      FontWeight="Bold"/>
-            <TextBlock Text="{Binding ConstituencyName}"
-                      Foreground="#666666"
-                      FontSize="14"/>
-        </StackPanel>
+         <StackPanel Grid.Row="0" 
+                 Orientation="Vertical"
+                 Margin="20,16,20,20"
+                 Spacing="5">
+             <TextBlock Text="Election Statistics Dashboard"
+                 Foreground="{StaticResource BannerBrush}"
+                 FontSize="24"
+                 FontWeight="Bold"/>
+             <TextBlock Text="{Binding ConstituencyName}"
+                 Foreground="{StaticResource AccentBrush2}"
+                 FontSize="14"/>
+         </StackPanel>
 
         <!-- Main Content -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -36,12 +36,12 @@
                 <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="15" RowSpacing="15">
                     
                     <!-- Total Votes Card -->
-                    <Border Grid.Row="0" Grid.Column="0"
-                           Background="#d97509"
-                           BorderThickness="2"
-                           BorderBrush="Black"
-                           CornerRadius="8"
-                           Padding="15">
+                                          <Border Grid.Row="0" Grid.Column="0"
+                                              Background="{StaticResource AccentBrush1}"
+                                              BorderThickness="2"
+                                              BorderBrush="Black"
+                                              CornerRadius="8"
+                                              Padding="15">
                         <StackPanel Orientation="Vertical" Spacing="8">
                             <TextBlock Text="Total Votes"
                                       Foreground="white"
@@ -58,12 +58,12 @@
                     </Border>
 
                     <!-- Turnout Rate Card -->
-                    <Border Grid.Row="0" Grid.Column="1"
-                           Background="#d97509"
-                           BorderThickness="2"
-                           BorderBrush="Black"
-                           CornerRadius="8"
-                           Padding="15">
+                                          <Border Grid.Row="0" Grid.Column="1"
+                                              Background="{StaticResource AccentBrush1}"
+                                              BorderThickness="2"
+                                              BorderBrush="Black"
+                                              CornerRadius="8"
+                                              Padding="15">
                         <StackPanel Orientation="Vertical" Spacing="8">
                             <TextBlock Text="Turnout Rate"
                                       Foreground="white"
@@ -80,12 +80,12 @@
                     </Border>
 
                     <!-- Connected Polling Stations Card -->
-                    <Border Grid.Row="0" Grid.Column="2"
-                           Background="#6b4423"
-                           BorderThickness="2"
-                           BorderBrush="Black"
-                           CornerRadius="8"
-                           Padding="15">
+                                          <Border Grid.Row="0" Grid.Column="2"
+                                              Background="{StaticResource AccentBrush2}"
+                                              BorderThickness="2"
+                                              BorderBrush="Black"
+                                              CornerRadius="8"
+                                              Padding="15">
                         <StackPanel Orientation="Vertical" Spacing="8">
                             <TextBlock Text="Polling Stations Connected"
                                       Foreground="white"
@@ -102,12 +102,12 @@
                     </Border>
 
                     <!-- Registered Voters Card -->
-                    <Border Grid.Row="1" Grid.Column="0"
-                           Background="#6b4423"
-                           BorderThickness="2"
-                           BorderBrush="Black"
-                           CornerRadius="8"
-                           Padding="15">
+                                          <Border Grid.Row="1" Grid.Column="0"
+                                              Background="{StaticResource AccentBrush2}"
+                                              BorderThickness="2"
+                                              BorderBrush="Black"
+                                              CornerRadius="8"
+                                              Padding="15">
                         <StackPanel Orientation="Vertical" Spacing="8">
                             <TextBlock Text="Registered Voters"
                                       Foreground="white"
@@ -124,12 +124,12 @@
                     </Border>
 
                     <!-- Country Population Card -->
-                    <Border Grid.Row="1" Grid.Column="1"
-                           Background="#2d5f73"
-                           BorderThickness="2"
-                           BorderBrush="Black"
-                           CornerRadius="8"
-                           Padding="15">
+                                          <Border Grid.Row="1" Grid.Column="1"
+                                              Background="{StaticResource BannerBrush}"
+                                              BorderThickness="2"
+                                              BorderBrush="Black"
+                                              CornerRadius="8"
+                                              Padding="15">
                         <StackPanel Orientation="Vertical" Spacing="8">
                             <TextBlock Text="Country Population"
                                       Foreground="white"
@@ -146,12 +146,12 @@
                     </Border>
 
                     <!-- National Participation Card (BLANK) -->
-                    <Border Grid.Row="1" Grid.Column="2"
-                           Background="#2d5f73"
-                           BorderThickness="2"
-                           BorderBrush="Black"
-                           CornerRadius="8"
-                           Padding="15">
+                                          <Border Grid.Row="1" Grid.Column="2"
+                                              Background="{StaticResource BannerBrush}"
+                                              BorderThickness="2"
+                                              BorderBrush="Black"
+                                              CornerRadius="8"
+                                              Padding="15">
                         <StackPanel Orientation="Vertical" Spacing="8">
                         </StackPanel>
                     </Border>
@@ -188,12 +188,12 @@
                                             </StackPanel>
 
                                             <Grid Grid.Column="1" Height="30">
-                                                <ProgressBar Value="{Binding VoteCount}"
-                                                             Maximum="{Binding #Root.DataContext.MaxVoteCount}"
-                                                             MinHeight="24"
-                                                             Foreground="#d97509"
-                                                             Background="#e8e8e8"
-                                                             VerticalAlignment="Center"/>
+                                                   <ProgressBar Value="{Binding VoteCount}"
+                                                                Maximum="{Binding #Root.DataContext.MaxVoteCount}"
+                                                                MinHeight="24"
+                                                                Foreground="{StaticResource AccentBrush1}"
+                                                                Background="#e8e8e8"
+                                                                VerticalAlignment="Center"/>
                                             </Grid>
 
                                             <TextBlock Grid.Column="2"
@@ -217,12 +217,12 @@
                     </Border>
 
                     <!-- Constituency Turnout Ranking -->
-                    <Border Grid.Column="1"
-                           Background="white"
-                           BorderThickness="2"
-                           BorderBrush="#2d5f73"
-                           CornerRadius="8"
-                           Padding="15">
+                                          <Border Grid.Column="1"
+                                              Background="white"
+                                              BorderThickness="2"
+                                              BorderBrush="{StaticResource BannerBrush}"
+                                              CornerRadius="8"
+                                              Padding="15">
                         <StackPanel Orientation="Vertical" Spacing="12">
                             <TextBlock Text="Top Constituencies by Turnout"
                                       Foreground="black"
@@ -297,7 +297,7 @@
                        Spacing="15">
                 
                 <Button Command="{Binding RefreshStatisticsCommand}"
-                       Background="#d97509"  
+                       Background="{StaticResource AccentBrush1}"
                        Width="140"
                        Height="50" 
                        BorderThickness="2"
@@ -307,7 +307,7 @@
                 </Button>
                 
                 <Button Command="{Binding GoBackCommand}"
-                       Background="#6b4423"  
+                       Background="{StaticResource AccentBrush2}"
                        Width="140"
                        Height="50" 
                        BorderThickness="2"
