@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\officialApp.csproj": {}
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj": {}
   },
   "projects": {
-    "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\officialApp.csproj": {
+    "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\officialApp.csproj",
+        "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
         "projectName": "officialApp",
-        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\officialApp.csproj",
+        "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\officialApp.csproj",
         "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\post T-vale\\BiometricProject\\Code\\OfficialApp\\obj\\",
+        "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\officialApp\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -109,19 +109,19 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.25, 8.0.25]"
+              "version": "[8.0.26, 8.0.26]"
             },
             {
               "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[8.0.25, 8.0.25]"
+              "version": "[8.0.26, 8.0.26]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.25, 8.0.25]"
+              "version": "[8.0.26, 8.0.26]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.25, 8.0.25]"
+              "version": "[8.0.26, 8.0.26]"
             }
           ],
           "frameworkReferences": {
@@ -129,7 +129,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.104/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.106/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

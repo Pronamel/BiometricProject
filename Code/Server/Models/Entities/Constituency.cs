@@ -8,7 +8,6 @@ namespace Server.Models.Entities
         public Guid ConstituencyId { get; set; }
         public string Name { get; set; } = string.Empty;
         public int TotalVoters { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<Voter>? Voters { get; set; } = new List<Voter>();
         public ICollection<PollingStation>? PollingStations { get; set; } = new List<PollingStation>();

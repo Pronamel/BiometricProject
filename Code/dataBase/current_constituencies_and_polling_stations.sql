@@ -4,8 +4,8 @@
 BEGIN;
 
 -- Insert any missing constituencies
-INSERT INTO "Constituencies" ("ConstituencyId", "Name", "TotalVoters", "CreatedAt")
-SELECT gen_random_uuid(), v."Name", v."TotalVoters", CURRENT_TIMESTAMP
+INSERT INTO "Constituencies" ("ConstituencyId", "Name", "TotalVoters")
+SELECT gen_random_uuid(), v."Name", v."TotalVoters"
 FROM (VALUES
     ('Aberafan Maesteg', 69817, 'Bridgend', 3491),
     ('Aberdeen North', 76895, 'Aberdeen City', 3845),

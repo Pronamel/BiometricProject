@@ -406,3 +406,6 @@ C:\Users\alexa\OneDrive\Desktop\post T-vale\BiometricProject\Code\Server\obj\Rel
 C:\Users\alexa\OneDrive\Desktop\post T-vale\BiometricProject\Code\Server\obj\Release\net8.0\Server.pdb
 C:\Users\alexa\OneDrive\Desktop\post T-vale\BiometricProject\Code\Server\obj\Release\net8.0\Server.genruntimeconfig.cache
 C:\Users\alexa\OneDrive\Desktop\post T-vale\BiometricProject\Code\Server\obj\Release\net8.0\ref\Server.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Isopoh.Cryptography.Argon2.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Isopoh.Cryptography.Blake2b.dll
+C:\Users\alexa\OneDrive\Desktop\dis\BiometricProject\Code\Server\bin\Release\net8.0\Isopoh.Cryptography.SecureArray.dll

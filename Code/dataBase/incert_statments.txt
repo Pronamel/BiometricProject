@@ -1,9 +1,9 @@
 -- 1. Constituencies
-INSERT INTO "Constituencies" ("ConstituencyId", "Name", "TotalVoters", "CreatedAt") VALUES
-('a1b2c3d4-e5f6-4a5b-8c9d-1e2f3a4b5c6d', 'Canterbury', 82000, '2024-01-01'),
-('b2c3d4e5-f6a7-4b5c-9d1e-2f3a4b5c6d7e', 'Ashford', 76500, '2024-01-01'),
-('c3d4e5f6-a7b8-4c5d-1e2f-3a4b5c6d7e8f', 'Dover', 71200, '2024-01-01'),
-('d4e5f6a7-b8c9-4d5e-2f3a-4b5c6d7e8f9a', 'Folkestone and Hythe', 68900, '2024-01-01');
+INSERT INTO "Constituencies" ("ConstituencyId", "Name", "TotalVoters") VALUES
+('a1b2c3d4-e5f6-4a5b-8c9d-1e2f3a4b5c6d', 'Canterbury', 82000),
+('b2c3d4e5-f6a7-4b5c-9d1e-2f3a4b5c6d7e', 'Ashford', 76500),
+('c3d4e5f6-a7b8-4c5d-1e2f-3a4b5c6d7e8f', 'Dover', 71200),
+('d4e5f6a7-b8c9-4d5e-2f3a-4b5c6d7e8f9a', 'Folkestone and Hythe', 68900);
 
 -- 2. Elections
 INSERT INTO "Elections" ("ElectionId", "Name", "ElectionDate", "ElectionType", "Status", "CreatedAt") VALUES

@@ -427,6 +427,7 @@ static string NormalizeTownOfBirthForSdi(string value)
 
 static string BuildIdentityCanonicalString(string firstName, string lastName, DateTime dateOfBirth, string postCode, string townOfBirth)
 {
+    // Demo-only: first/last name matching is used for the presentation and will be removed after the presentation.
     return string.Join("|",
         NormalizeNameForSdi(firstName),
         NormalizeNameForSdi(lastName),
@@ -1074,6 +1075,7 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
         });
     }
 
+    // Demo-only: first/last name matching is used for the presentation and will be removed after the presentation.
     var canonicalIdentity = BuildIdentityCanonicalString(
         request.FirstName,
         request.LastName,
@@ -1506,6 +1508,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
         ));
     }
 
+    // Demo-only: first/last name matching is used for the presentation and will be removed after the presentation.
     var canonicalIdentity = BuildIdentityCanonicalString(
         firstName,
         lastName,
@@ -1724,6 +1727,7 @@ app.MapPost("/api/official/assign-proxy-voter", async (HttpContext httpContext, 
         return Results.BadRequest(new AssignProxyVoterResponse(false, "Proxy voter date of birth is invalid.", null, null));
     }
 
+    // Demo-only: first/last name matching is used for the presentation and will be removed after the presentation.
     var representedCanonicalIdentity = BuildIdentityCanonicalString(
         request.RepresentedFirstName,
         request.RepresentedLastName,
@@ -1732,6 +1736,7 @@ app.MapPost("/api/official/assign-proxy-voter", async (HttpContext httpContext, 
         request.RepresentedTownOfBirth);
     var representedSdi = ComputeSdiHmacSha256(representedCanonicalIdentity, sdiHmacSecret!);
 
+    // Demo-only: first/last name matching is used for the presentation and will be removed after the presentation.
     var proxyCanonicalIdentity = BuildIdentityCanonicalString(
         request.ProxyFirstName,
         request.ProxyLastName,
