@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    actor User as Poll Official
+    participant App as Official App
+    participant Server as API Server
+    participant DB as Database
+    participant Auth as JWT Service
+
+    User->>App: Enter username and password
+    App->>Server: GET server public key
+    Server-->>App: RSA-4096 public key
+
+    App->>App: Generate DEK (AES-256-GCM)
+    App->>App: Encrypt credentials with DEK
+    App->>App: Wrap DEK using RSA-OAEP-SHA256
+    App->>Server: POST encrypted login payload
+
+    Server->>Server: Unwrap DEK and decrypt payload
+    Server->>DB: Verify username and password hash
+    DB-->>Server: Match or no match
+
+    alt Invalid credentials
+        Server-->>App: 401 Unauthorized
+        App-->>User: Authentication failed
+    else Valid credentials
+        Server->>Server: Check active session
+        alt Already logged in
+            Server-->>App: 409 Conflict
+            App-->>User: Already logged in elsewhere
+        else Session available
+            Server->>Auth: Generate signed JWT (8h)
+            Auth-->>Server: JWT token
+            Server-->>App: 200 OK + JWT + user profile
+            App-->>User: Authentication successful
+        end
+    end

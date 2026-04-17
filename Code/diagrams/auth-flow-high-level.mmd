@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    actor User as Poll Official
+    participant App as Official App
+    participant Server as API Server
+    participant DB as Database
+
+    User->>App: Enter username and password
+    App->>Server: Send encrypted login request
+    Server->>DB: Validate credentials
+    DB-->>Server: Valid or invalid
+
+    alt Invalid credentials
+        Server-->>App: Login failed (401)
+        App-->>User: Show error message
+    else Valid credentials
+        Server-->>App: JWT token + profile (200)
+        App-->>User: Login successful
+    end
