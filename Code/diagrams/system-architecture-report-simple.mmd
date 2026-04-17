@@ -1,0 +1,13 @@
+flowchart TB
+    subgraph Clients
+        direction TB
+        SV[SecureVoteApp]
+        OA[officialApp]
+    end
+
+    AS[Application Server]
+    DB[(PostgreSQL Database)]
+
+    SV -->|HTTPS| AS
+    OA -->|HTTPS| AS
+    AS -->|SQL| DB

@@ -1,0 +1,22 @@
+flowchart TB
+    subgraph Clients
+        direction TB
+        SV[SecureVoteApp]
+        OA[officialApp]
+    end
+
+    subgraph ServerTier[Application Server Tier]
+        API[API and Business Logic]
+        SEC[Security and Identity\nAuth + JWT + Crypto]
+        AUD[Audit and Logging\nTraceability Records]
+    end
+
+    DB[(PostgreSQL Database\nElection Data + Encrypted Biometric Data)]
+
+    SV -->|HTTPS| API
+    OA -->|HTTPS| API
+
+    API --> SEC
+    API --> AUD
+    API -->|SQL| DB
+    AUD -->|Audit Events| DB

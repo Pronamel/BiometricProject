@@ -1,0 +1,40 @@
+%%{init: {"sequence": {"messageMargin": 64, "noteMargin": 24, "boxMargin": 18, "wrap": true}}}%%
+sequenceDiagram
+    autonumber
+    actor User as Voter
+    participant App as Voting App
+    participant Server as API Server
+    participant DB as Database
+
+    Note over User,Server: Start: SDI lookup already completed
+
+    User->>App: Start fingerprint check
+    App->>App: Build payload
+    App->>App: Encrypt payload
+    App->>Server: POST /api/verify-prints<br/>(encrypted)
+
+    Server->>Server: Decrypt + validate
+
+    alt Single voter path (matched voter from SDI lookup)
+        Server->>DB: Fetch voter by matched voter ID
+        DB-->>Server: Voter record + stored fingerprint
+        Server->>Server: Compare scanned vs stored
+    else Collision path (candidate IDs from SDI collision)
+        Server->>DB: Fetch candidate voters by candidate IDs
+        DB-->>Server: Candidate records + fingerprints
+        loop For each candidate
+            Server->>Server: Compare scanned vs candidate
+        end
+        Server->>Server: Select first score >= threshold
+    end
+
+    alt Server outcome: match and not voted
+        Server-->>App: 200 OK<br/>matchedVoterId + score
+        App-->>User: Authentication successful
+    else Server outcome: match but already voted
+        Server-->>App: 400 already voted
+        App-->>User: Stop and request official assistance
+    else Server outcome: no fingerprint match
+        Server-->>App: 400 no match<br/>score + threshold
+        App-->>User: Authentication failed (retry)
+    end

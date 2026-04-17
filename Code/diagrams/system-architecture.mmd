@@ -1,0 +1,12 @@
+flowchart LR
+    subgraph Clients
+        SV[SecureVoteApp]
+        OA[officialApp]
+    end
+
+    API[Server API]
+    DB[(PostgreSQL Database)]
+
+    SV --> API
+    OA --> API
+    API --> DB
