@@ -43,7 +43,7 @@ public class DatabaseService
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Fetching all polling stations for dropdown");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fetching all polling stations for dropdown");
             
             var pollingStations = await _dbContext.PollingStations
                 .Include(ps => ps.Constituency)
@@ -57,7 +57,7 @@ public class DatabaseService
                 $"{ps.PollingStationCode} - {ps.County} ({ps.Constituency?.Name})"
             )).ToList();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found {pollingStationDtos.Count} polling stations");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Found {pollingStationDtos.Count} polling stations");
             foreach (var ps in pollingStationDtos.Take(5))
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - {ps.DisplayName}");
@@ -71,7 +71,7 @@ public class DatabaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error retrieving polling stations: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error retrieving polling stations: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return new List<PollingStationDto>();
         }
@@ -81,7 +81,7 @@ public class DatabaseService
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Querying Officials for username: {username}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Querying Officials for username: {username}");
             
             var official = await _dbContext.Officials
                 .Include(o => o.AssignedPollingStation)
@@ -90,17 +90,17 @@ public class DatabaseService
 
             if (official == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No official found with username '{username}'");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No official found with username '{username}'");
                 return null;
             }
 
             if (!PasswordHasher.VerifyPassword(official.PasswordHash, password))
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Invalid password for username '{username}'");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Invalid password for username '{username}'");
                 return null;
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official found: {official.OfficialId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official found: {official.OfficialId}");
             Console.WriteLine($"    AssignedPollingStationId: {official.AssignedPollingStationId}");
             Console.WriteLine($"    AssignedPollingStation is null: {official.AssignedPollingStation == null}");
             if (official.AssignedPollingStation != null)
@@ -117,7 +117,7 @@ public class DatabaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error retrieving official by credentials: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error retrieving official by credentials: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return null;
         }
@@ -127,7 +127,7 @@ public class DatabaseService
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 [DatabaseService] UpdateOfficialFingerprintAsync called");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] UpdateOfficialFingerprintAsync called");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Username: '{username}'");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Encrypted fingerprint payload received");
 
@@ -148,7 +148,7 @@ public class DatabaseService
             }
             catch (FormatException)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ [DatabaseService] Invalid base64 in encrypted fingerprint payload");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Invalid base64 in encrypted fingerprint payload");
                 return false;
             }
             
@@ -158,7 +158,7 @@ public class DatabaseService
 
             if (official == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ [DatabaseService] No official found with username '{username}'");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] No official found with username '{username}'");
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Attempting to debug - checking all officials:");
                 
                 var allOfficials = await _dbContext.Officials.ToListAsync();
@@ -174,11 +174,11 @@ public class DatabaseService
 
             if (!PasswordHasher.VerifyPassword(official.PasswordHash, password))
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ [DatabaseService] Invalid password for username '{username}'");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Invalid password for username '{username}'");
                 return false;
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ [DatabaseService] Official found: {official.OfficialId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Official found: {official.OfficialId}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Setting encrypted fingerprint properties...");
             
             official.FingerPrintScan = encryptedFingerprintBytes;
@@ -189,12 +189,12 @@ public class DatabaseService
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Calling SaveChangesAsync()...");
             await _dbContext.SaveChangesAsync();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ [DatabaseService] Encrypted fingerprint updated for official {official.OfficialId} ({username}).");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Encrypted fingerprint updated for official {official.OfficialId} ({username}).");
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ [DatabaseService] Error updating official fingerprint: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Error updating official fingerprint: {ex.Message}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Exception type: {ex.GetType().FullName}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DatabaseService] Stack Trace: {ex.StackTrace}");
             return false;
@@ -205,25 +205,25 @@ public class DatabaseService
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Querying Voters for VoterId: {voterId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Querying Voters for VoterId: {voterId}");
             
             var voter = await _dbContext.Voters
                 .FirstOrDefaultAsync(v => v.VoterId == voterId);
 
             if (voter == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with VoterId '{voterId}'");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No voter found with VoterId '{voterId}'");
                 return null;
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter found: {voter.VoterId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter found: {voter.VoterId}");
             Console.WriteLine($"    Encrypted voter record loaded");
 
             return voter;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error retrieving voter by ID: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error retrieving voter by ID: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return null;
         }
@@ -276,7 +276,7 @@ public class DatabaseService
                 .CountAsync(v => v.Sdi == sdi);
             if (existingSdiCount > 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Creating voter with non-unique SDI. Existing records: {existingSdiCount}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: Creating voter with non-unique SDI. Existing records: {existingSdiCount}");
             }
 
             byte[] wrappedDek;
@@ -330,7 +330,7 @@ public class DatabaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error creating voter: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error creating voter: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return (false, "Failed to create voter", null);
         }
@@ -391,7 +391,7 @@ public class DatabaseService
                 return (false, "Encrypted fingerprint payload contains invalid base64", null);
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔐 Using client-provided Argon2 password hash for official: {username}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Using client-provided Argon2 password hash for official: {username}");
 
             var official = new Official
             {
@@ -408,7 +408,7 @@ public class DatabaseService
             _dbContext.Officials.Add(official);
             await _dbContext.SaveChangesAsync();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official created successfully: {username}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official created successfully: {username}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Official ID: {official.OfficialId}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Polling Station: {pollingStation.PollingStationCode} ({pollingStation.County})");
 
@@ -416,7 +416,7 @@ public class DatabaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error creating official: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error creating official: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return (false, "Failed to create official", null);
         }
@@ -424,14 +424,14 @@ public class DatabaseService
 
     public async Task<Voter?> GetVoterByNINAsync(string nin)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ NIN lookup disabled: NationalId is stored encrypted");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: NIN lookup disabled: NationalId is stored encrypted");
         return null;
     }
 
     public async Task<Voter?> GetVoterByNameAndDateAsync(
         string firstName, string lastName, DateTime dateOfBirth)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Name+DOB lookup disabled: identity fields are stored encrypted");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: Name+DOB lookup disabled: identity fields are stored encrypted");
         return null;
     }
 
@@ -447,14 +447,14 @@ public class DatabaseService
 
             if (matches.Count > 1)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Multiple voters matched same SDI; returning first match for compatibility");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: Multiple voters matched same SDI; returning first match for compatibility");
             }
 
             return matches[0];
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voter by SDI: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error looking up voter by SDI: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return null;
         }
@@ -465,7 +465,7 @@ public class DatabaseService
         try
         {
             var normalizedSdi = sdi.Trim().ToLowerInvariant();
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Looking up voters by SDI");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Looking up voters by SDI");
 
             var safeLimit = Math.Clamp(limit, 1, 50);
             var matches = await _dbContext.Voters
@@ -478,20 +478,20 @@ public class DatabaseService
 
             if (matches.Count == 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No voter found with provided SDI");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] No voter found with provided SDI");
                 return new List<Voter>();
             }
 
             if (matches.Count > 1)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  SDI collision detected. Candidate count: {matches.Count}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: SDI collision detected. Candidate count: {matches.Count}");
             }
 
             return matches;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voters by SDI: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error looking up voters by SDI: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return new List<Voter>();
         }
@@ -519,7 +519,7 @@ public class DatabaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error looking up voters by ID list: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error looking up voters by ID list: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return new List<Voter>();
         }
@@ -547,12 +547,12 @@ public class DatabaseService
             _dbContext.Voters.Update(representedVoter);
             await _dbContext.SaveChangesAsync();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Proxy SDI assigned for voter {representedVoter.VoterId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Proxy SDI assigned for voter {representedVoter.VoterId}");
             return (true, "Proxy voter assigned successfully");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error assigning proxy voter: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error assigning proxy voter: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return (false, "Failed to assign proxy voter");
         }
@@ -562,7 +562,7 @@ public class DatabaseService
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Fetching candidates for election ID: {electionId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fetching candidates for election ID: {electionId}");
             
             var candidates = await _dbContext.Candidates
                 .Where(c => c.ElectionId == electionId)
@@ -570,7 +570,7 @@ public class DatabaseService
 
             if (candidates.Count == 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  No candidates found for election ID: {electionId}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: No candidates found for election ID: {electionId}");
                 return new List<CandidateDto>();
             }
 
@@ -582,7 +582,7 @@ public class DatabaseService
                 c.Bio ?? string.Empty
             )).ToList();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found {candidateDtos.Count} candidates for election");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Found {candidateDtos.Count} candidates for election");
             foreach (var candidate in candidateDtos.Take(5))
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   - {candidate.FirstName} {candidate.LastName} ({candidate.Party})");
@@ -596,7 +596,7 @@ public class DatabaseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching candidates by election ID: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching candidates by election ID: {ex.Message}");
             Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             return new List<CandidateDto>();
         }
@@ -610,7 +610,7 @@ public class DatabaseService
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching election statistics for polling station {pollingStationId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fetching election statistics for polling station {pollingStationId}");
 
             Election? currentElection;
 
@@ -621,7 +621,7 @@ public class DatabaseService
 
                 if (currentElection == null)
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Requested election not found: {electionId.Value}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: Requested election not found: {electionId.Value}");
                     return (false, null, 0, 0, 0);
                 }
             }
@@ -643,7 +643,7 @@ public class DatabaseService
 
             if (currentElection == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  No election found");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: No election found");
                 return (false, null, 0, 0, 0);
             }
 
@@ -657,12 +657,12 @@ public class DatabaseService
             var invalidVotes = pollingStation?.InvalidVotes ?? 0;
             var expectedVotes = pollingStation?.ExpectedVotes ?? 0;
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Election statistics: Total={totalVotes}, Invalid={invalidVotes}, Expected={expectedVotes}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Election statistics: Total={totalVotes}, Invalid={invalidVotes}, Expected={expectedVotes}");
             return (true, currentElection.ElectionId, totalVotes, invalidVotes, expectedVotes);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching election statistics: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching election statistics: {ex.Message}");
             return (false, null, 0, 0, 0);
         }
     }
@@ -673,11 +673,11 @@ public class DatabaseService
         {
             if (pollingStationId.HasValue)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching votes by candidate for polling station {pollingStationId.Value}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fetching votes by candidate for polling station {pollingStationId.Value}");
             }
             else
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching election-wide votes by candidate for election {electionId}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fetching election-wide votes by candidate for election {electionId}");
             }
 
             var voteRecordsQuery = _dbContext.VoteRecords
@@ -729,12 +729,12 @@ public class DatabaseService
                 .OrderByDescending(cv => cv.VoteCount)
                 .ToList();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found votes for {votesByCandidate.Count} candidates");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Found votes for {votesByCandidate.Count} candidates");
             return votesByCandidate;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching votes by candidate: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching votes by candidate: {ex.Message}");
             return new List<CandidateVoteDto>();
         }
     }
@@ -743,7 +743,7 @@ public class DatabaseService
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching polling station stats for constituency {constitutionId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fetching polling station stats for constituency {constitutionId}");
 
             var stats = await _dbContext.PollingStations
                 .Where(ps => ps.ConstituencyId == constitutionId)
@@ -758,12 +758,12 @@ public class DatabaseService
                 ))
                 .ToListAsync();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found stats for {stats.Count} polling stations");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Found stats for {stats.Count} polling stations");
             return stats;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching polling station stats: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching polling station stats: {ex.Message}");
             return new List<PollingStationStatsDto>();
         }
     }
@@ -772,7 +772,7 @@ public class DatabaseService
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📊 Fetching constituency stats for election {electionId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Fetching constituency stats for election {electionId}");
 
             var constituencies = await _dbContext.Constituencies
                 .Select(c => new
@@ -817,12 +817,12 @@ public class DatabaseService
                 .OrderByDescending(s => s.TotalVotes)
                 .ToList();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Found stats for {stats.Count} constituencies");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Found stats for {stats.Count} constituencies");
             return stats;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching constituency stats: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error fetching constituency stats: {ex.Message}");
             return new List<ConstituencyStatsDto>();
         }
     }

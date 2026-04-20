@@ -1,0 +1,61 @@
+# Build output
+bin/
+obj/
+publish/
+out/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.userprefs
+*.sln.docstates
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# .NET
+*.dll
+*.exe
+!Scanner/**/*.dll
+!Scanner/**/*.exe
+*.pdb
+*.mdb
+*.cache
+*.log
+
+# Temp build folders
+temp-build*/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# OneDrive
+*.tmp
+
+# Database dumps (large binary files)
+*.dump
+dataBase/DatabaseInstance/
+dataBase/databaseBackupFromEc2/
+
+# SourceAFIS test data (large databases)
+SourceAFISTest/data/
+Code/SourceAFISTest/archive.zip
+
+# SDK binaries (large, not source code)
+**/IBScanUltimate_SDK/bin/
+**/IBScanUltimate_SDK/Samples/
+Scanner/IBScanUltimate_x64_4.3.0/
+Scanner/SDK for scanner/
+Scanner/2026-*/

@@ -1,0 +1,32 @@
+%%{init: {"sequence": {"messageMargin": 64, "noteMargin": 24, "boxMargin": 18, "wrap": true}}}%%
+sequenceDiagram
+    autonumber
+    actor User as Voter
+    participant App as Voting App
+    participant Server as API Server
+    participant DB as Database
+
+    User->>App: Enter name, DOB, postcode, town of birth
+    App->>App: Build lookup payload
+    App->>App: Encrypt payload
+    App->>Server: POST /api/voter/lookup-for-auth
+
+    Server->>Server: Decrypt + validate fields
+    Server->>DB: Find voter candidates by SDI
+    DB-->>Server: Matching voter records
+
+    alt Single voter match
+        Server-->>App: 200 OK with voterId
+        App-->>User: Voter found
+        Note over App,Server: Continues to voter-auth-dataflow-only
+    else Multiple matches (collision)
+        Server-->>App: 400 requiresDisambiguation + candidate IDs
+        App-->>User: Multiple matches found, continue to fingerprint scan
+        Note over App,Server: Continues to voter-auth-dataflow-only collision path
+    else Already voted
+        Server-->>App: 400 already voted
+        App-->>User: Stop and request official assistance
+    else No match
+        Server-->>App: 400 voter not found
+        App-->>User: Check details and try again
+    end

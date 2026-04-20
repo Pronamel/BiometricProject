@@ -1,0 +1,32 @@
+%%{init: {"sequence": {"messageMargin": 64, "noteMargin": 24, "boxMargin": 18, "wrap": true}}}%%
+sequenceDiagram
+    autonumber
+    actor User as Authenticated Voter
+    participant App as Voting App
+    participant Server as API Server
+    participant DB as Database
+    participant Hub as Official Realtime Hub
+
+    Note over User,App: Starts after successful result from voter-auth-dataflow-only
+
+    App->>Server: GET /api/candidates
+    Server-->>App: Candidate list
+    App-->>User: Show ballot paper
+
+    User->>App: Select candidate and confirm vote
+    App->>Server: POST /api/voter/cast-vote
+    Server->>Server: Validate token claims (voter, station, constituency)
+    Server->>DB: Check voter has not already voted
+    Server->>DB: Verify candidate and polling station
+    DB-->>Server: Validation result
+
+    alt Valid vote
+        Server->>DB: Mark voter HasVoted = true
+        Server->>DB: Insert vote record
+        Server->>Hub: Notify linked official(s) via SignalR
+        Server-->>App: 200 vote successfully cast
+        App-->>User: Show vote confirmed
+    else Already voted or invalid context
+        Server-->>App: 400 vote failed
+        App-->>User: Show error and request official help
+    end

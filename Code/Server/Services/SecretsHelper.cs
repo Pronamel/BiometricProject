@@ -39,12 +39,12 @@ public class SecretsHelper
             if (_cachedSecret.Length < 32)
                 throw new InvalidOperationException("JWT_SECRET must be at least 32 bytes long");
             
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ JWT secret loaded from AWS Secrets Manager");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] JWT secret loaded from AWS Secrets Manager");
             return _cachedSecret;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to load JWT secret from AWS Secrets Manager: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Failed to load JWT secret from AWS Secrets Manager: {ex.Message}");
             throw;
         }
     }
@@ -98,12 +98,12 @@ public class SecretsHelper
             if (_cachedSdiHmacSecret.Length < 32)
                 throw new InvalidOperationException("SDI HMAC secret must be at least 32 characters long");
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ SDI HMAC secret loaded from AWS Secrets Manager ({secretId})");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] SDI HMAC secret loaded from AWS Secrets Manager ({secretId})");
             return _cachedSdiHmacSecret;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to load SDI HMAC secret from AWS Secrets Manager: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Failed to load SDI HMAC secret from AWS Secrets Manager: {ex.Message}");
             throw;
         }
     }
@@ -161,12 +161,12 @@ public class SecretsHelper
             if (string.IsNullOrWhiteSpace(_cachedVoterEncryptionPublicKey))
                 throw new InvalidOperationException("Resolved voter encryption public key is empty");
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption public key loaded from AWS Secrets Manager ({secretId})");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter encryption public key loaded from AWS Secrets Manager ({secretId})");
             return _cachedVoterEncryptionPublicKey;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to load voter encryption public key from AWS Secrets Manager: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Failed to load voter encryption public key from AWS Secrets Manager: {ex.Message}");
             throw;
         }
     }
@@ -180,7 +180,7 @@ public class SecretsHelper
         if (!string.IsNullOrWhiteSpace(directPem))
         {
             _cachedVoterEncryptionPrivateKey = directPem;
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption private key loaded from environment variable (VOTER_ENCRYPTION_PRIVATE_KEY_PEM)");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter encryption private key loaded from environment variable (VOTER_ENCRYPTION_PRIVATE_KEY_PEM)");
             return _cachedVoterEncryptionPrivateKey;
         }
 
@@ -233,12 +233,12 @@ public class SecretsHelper
             if (string.IsNullOrWhiteSpace(_cachedVoterEncryptionPrivateKey))
                 throw new InvalidOperationException("Resolved voter encryption private key is empty");
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption private key loaded from AWS Secrets Manager ({secretId})");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter encryption private key loaded from AWS Secrets Manager ({secretId})");
             return _cachedVoterEncryptionPrivateKey;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to load voter encryption private key from AWS Secrets Manager: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Failed to load voter encryption private key from AWS Secrets Manager: {ex.Message}");
             throw;
         }
     }

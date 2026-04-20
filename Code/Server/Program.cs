@@ -218,28 +218,28 @@ try
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         if (await dbContext.Database.CanConnectAsync())
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Database connection successful!");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Database connection successful!");
         }
         else
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Database connection failed!");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Database connection failed!");
         }
     }
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Database connection error: {ex.Message}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Database connection error: {ex.Message}");
 }
 
 try
 {
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Preloading voter encryption public key from AWS Secrets Manager...");
     await SecretsHelper.GetVoterEncryptionPublicKeyPem();
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption public key preloaded successfully");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Voter encryption public key preloaded successfully");
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Voter encryption public key preload failed: {ex.Message}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Voter encryption public key preload failed: {ex.Message}");
     throw;
 }
 
@@ -247,7 +247,7 @@ try
 {
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Preloading voter encryption private key from AWS Secrets Manager...");
     var privateKeyPem = NormalizePem(await SecretsHelper.GetVoterEncryptionPrivateKeyPem());
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption private key preloaded successfully");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Voter encryption private key preloaded successfully");
 
     try
     {
@@ -258,24 +258,24 @@ try
 
         if (string.Equals(configuredPublicFingerprint, derivedPublicFingerprint, StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Voter encryption key pair validated (public/private match)");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Voter encryption key pair validated (public/private match)");
         }
         else
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter encryption key mismatch: configured public key does not match configured private key");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Public fingerprint:  {configuredPublicFingerprint}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Private->Public fingerprint: {derivedPublicFingerprint}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Voter encryption key mismatch: configured public key does not match configured private key");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Public fingerprint:  {configuredPublicFingerprint}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Private->Public fingerprint: {derivedPublicFingerprint}");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Unable to validate voter encryption key pair: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Unable to validate voter encryption key pair: {ex.Message}");
     }
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter encryption private key preload failed: {ex.Message}");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter fingerprint verification will return 503 until private key is configured");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Voter encryption private key preload failed: {ex.Message}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Voter fingerprint verification will return 503 until private key is configured");
 }
 Console.Out.Flush();
 
@@ -312,7 +312,7 @@ app.Use(async (context, next) =>
     
     if (method == "POST" && path.StartsWithSegments("/api/official/upload-fingerprint"))
     {
-        Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] 🔍 [MIDDLEWARE] Fingerprint upload request received");
+        Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] [DEBUG] [MIDDLEWARE] Fingerprint upload request received");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MIDDLEWARE] Content-Type: {context.Request.ContentType}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MIDDLEWARE] Content-Length: {context.Request.ContentLength}");
         
@@ -676,11 +676,11 @@ async Task<T> DecryptEnvelopePayloadAsync<T>(string wrappedDekBase64, string enc
 //===========================================
 // Multi-Layer Encryption Strategy:
 //
-// Layer 1: Transport Security (HTTPS/TLS) ✓
+// Layer 1: Transport Security (HTTPS/TLS)
 // - All traffic over HTTPS via Nginx reverse proxy
 // - TLS 1.2+ provides encryption for all requests and responses
 //
-// Layer 2: Application-Level Encryption (For Sensitive Requests) ✓
+// Layer 2: Application-Level Encryption (For Sensitive Requests)
 // - Login, access codes, fingerprints use AES-GCM with RSA-wrapped DEK
 // - Client encrypts using server's public key
 // - Server decrypts using private key via UnwrapRequestDekAsync
@@ -703,18 +703,13 @@ async Task<T> DecryptEnvelopePayloadAsync<T>(string wrappedDekBase64, string enc
 
 
 //===========================================
-// DATA INITIALIZATION
+// API ROUTE REGISTRATION
 //===========================================
 
-
-
-
-
-
 //===========================================
-// API ENDPOINTS - AUTHENTICATION
+// AUTHENTICATION & SESSION ENDPOINTS
 //===========================================
-// gets login from database and checks if official exists with those credentials, then generates JWT token with station and official info
+// Validates official credentials and issues JWT with station and constituency context.
 app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseService dbService, TokenCounter counter, OfficialService officialService,
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
     ConcurrentDictionary<string, (string County, string Constituency, string HashedCode)> officialPollingStationHashes) =>
@@ -739,7 +734,7 @@ app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseServ
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt official login payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt official login payload: {ex.Message}");
         return Results.BadRequest(new { success = false, message = "Invalid encrypted payload" });
     }
 
@@ -750,7 +745,7 @@ app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseServ
     
     if (official == null)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Authentication REJECTED - no matching official found for {request.Username}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Authentication REJECTED - no matching official found for {request.Username}");
         return Results.Unauthorized();
     }
     
@@ -758,7 +753,7 @@ app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseServ
     var officialId = official.OfficialId.ToString();
     if (officialService.IsOfficialAlreadyLoggedIn(officialId))
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Login REJECTED - Official {officialId} is already logged in elsewhere");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Login REJECTED - Official {officialId} is already logged in elsewhere");
         return Results.Conflict(new { 
             success = false, 
             message = "This account is currently active on another device or location. Only one device can be logged in per account at a time. Please have the other user logout first, or contact your administrator if you believe this is an error.",
@@ -769,7 +764,7 @@ app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseServ
     
     if (official.AssignedPollingStation == null)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No polling station assigned for {request.Username}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] No polling station assigned for {request.Username}");
         return Results.BadRequest(new { success = false, message = "No polling station assigned" });
     }
 
@@ -783,7 +778,7 @@ app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseServ
     
     // Store the hashed polling station code with county/constituency (direct from DB - NO re-hashing)
     officialPollingStationHashes[officialId] = (county, constituency, pollingStationCode);
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Stored polling station hash for official {officialId}:");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Stored polling station hash for official {officialId}:");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   County: {county}");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Constituency: {constituency}");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   Hash (length {pollingStationCode.Length}): {pollingStationCode}");
@@ -804,7 +799,7 @@ app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseServ
     
     var token = GenerateJwtToken($"official_{officialId}_{uniqueTokenId}", "official", additionalClaims);
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official login successful: {officialId} at {stationId} in {county}/{constituency} (Token ID: {uniqueTokenId})");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Official login successful: {officialId} at {stationId} in {county}/{constituency} (Token ID: {uniqueTokenId})");
     
     return Results.Ok(new { 
         success = true, 
@@ -837,7 +832,7 @@ app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
     
     if (string.IsNullOrEmpty(officialId))
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Logout failed: Official ID not found in token");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Logout failed: Official ID not found in token");
         return Results.BadRequest(new { success = false, message = "Official ID not found in token" });
     }
     
@@ -854,11 +849,11 @@ app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
         
         if (removed)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Removed official {officialId} from activeOfficials");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Removed official {officialId} from activeOfficials");
         }
         else
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Official {officialId} not found in activeOfficials");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN]  Official {officialId} not found in activeOfficials");
         }
     }
     
@@ -868,11 +863,11 @@ app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
     
     if (hashRemoved)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Removed polling station hash for official {officialId}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Removed polling station hash for official {officialId}");
     }
     else
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Polling station hash not found for official {officialId}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN]  Polling station hash not found for official {officialId}");
     }
     
     // 3. Clear their personal vote queue
@@ -888,14 +883,14 @@ app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
     
     if (queueRemoved)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Cleared vote queue for official {officialId} in {county}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Cleared vote queue for official {officialId} in {county}");
     }
     else
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Vote queue not found for official {officialId}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN]  Vote queue not found for official {officialId}");
     }
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official {officialId} fully logged out and removed from all channels");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Official {officialId} fully logged out and removed from all channels");
     
     return Results.Ok(new { 
         success = true, 
@@ -913,7 +908,7 @@ app.MapPost("/auth/voter-logout", (ClaimsPrincipal user, VoterService voterServi
 
     if (string.IsNullOrWhiteSpace(voterId))
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Voter logout failed: voter ID not found in token");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Voter logout failed: voter ID not found in token");
         return Results.BadRequest(new { success = false, message = "Voter ID not found in token" });
     }
 
@@ -921,11 +916,11 @@ app.MapPost("/auth/voter-logout", (ClaimsPrincipal user, VoterService voterServi
 
     if (removed)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter {voterId} logged out and session removed");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Voter {voterId} logged out and session removed");
     }
     else
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Voter {voterId} logout requested, but no active session was found");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN]  Voter {voterId} logout requested, but no active session was found");
     }
 
     return Results.Ok(new
@@ -938,6 +933,9 @@ app.MapPost("/auth/voter-logout", (ClaimsPrincipal user, VoterService voterServi
 .RequireAuthorization(policy => policy.RequireRole("voter"))
 .WithName("VoterLogout");
 
+//===========================================
+// CRYPTO KEY DISCOVERY ENDPOINTS
+//===========================================
 app.MapGet("/api/crypto/voter-public-key", async () =>
 {
     try
@@ -955,12 +953,15 @@ app.MapGet("/api/crypto/voter-public-key", async () =>
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to serve voter public key: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to serve voter public key: {ex.Message}");
         return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 })
 .WithName("GetVoterPublicKey");
 
+//===========================================
+// OFFICIAL REGISTRATION & ENROLLMENT ENDPOINTS
+//===========================================
 // Create a voter record in the database from official app input.
 app.MapPost("/api/official/create-voter", async (HttpContext httpContext, DatabaseService dbService) =>
 {
@@ -983,7 +984,7 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt create-voter payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt create-voter payload: {ex.Message}");
         return Results.BadRequest(new { success = false, message = "Invalid encrypted payload" });
     }
 
@@ -1142,7 +1143,7 @@ app.MapPost("/api/official/create-official", async (HttpContext httpContext, Dat
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt create-official payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt create-official payload: {ex.Message}");
         return Results.BadRequest(new { success = false, message = "Invalid encrypted payload" });
     }
 
@@ -1244,7 +1245,7 @@ app.MapPost("/api/official/set-access-code", async (HttpContext httpContext, Cla
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt set-access-code payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt set-access-code payload: {ex.Message}");
         return Results.BadRequest(new { success = false, message = "Invalid encrypted payload" });
     }
 
@@ -1289,7 +1290,7 @@ app.MapPost("/api/official/set-access-code", async (HttpContext httpContext, Cla
 
         if (existingStationWithSameCode != null)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official {officialId} attempted duplicate access code for station {stationId}. Existing station: {existingStationWithSameCode.PollingStationId} ({existingStationWithSameCode.County}/{existingStationWithSameCode.ConstituencyId})");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Official {officialId} attempted duplicate access code for station {stationId}. Existing station: {existingStationWithSameCode.PollingStationId} ({existingStationWithSameCode.County}/{existingStationWithSameCode.ConstituencyId})");
             return Results.Conflict(new { success = false, message = "Code already exists" });
         }
         
@@ -1306,24 +1307,20 @@ app.MapPost("/api/official/set-access-code", async (HttpContext httpContext, Cla
             officialPollingStationHashes[officialId] = (county, constituency, requestedAccessCode);
         }
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official {officialId} set access code for station {stationId}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Official {officialId} set access code for station {stationId}");
         
         return Results.Ok(new { success = true, message = "Access code set successfully" });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error setting access code: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Error setting access code: {ex.Message}");
         return Results.BadRequest(new { success = false, message = "Failed to set access code" });
     }
 })
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialSetAccessCode");
 
-
-
-
-
-
+// Voter-side validation of polling station access code.
 app.MapPost("/api/voter/verify-access-code", async (HttpContext httpContext, 
     [FromServices] ApplicationDbContext dbContext) =>
 {
@@ -1346,7 +1343,7 @@ app.MapPost("/api/voter/verify-access-code", async (HttpContext httpContext,
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt verify-access-code payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt verify-access-code payload: {ex.Message}");
         return Results.BadRequest(new VerifyAccessCodeResponse(false, "Invalid encrypted payload"));
     }
 
@@ -1377,16 +1374,16 @@ app.MapPost("/api/voter/verify-access-code", async (HttpContext httpContext,
         // Compare the pre-hashed codes directly (both are already hashed from their respective apps)
         if (station.PollingStationCode == request.AccessCode)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter verified access code for {request.County}/{request.Constituency}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Voter verified access code for {request.County}/{request.Constituency}");
             return Results.Ok(new VerifyAccessCodeResponse(true, "Access code verified successfully"));
         }
         
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Voter entered incorrect access code for {request.County}/{request.Constituency}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Voter entered incorrect access code for {request.County}/{request.Constituency}");
         return Results.BadRequest(new VerifyAccessCodeResponse(false, "Invalid access code"));
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error verifying access code: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Error verifying access code: {ex.Message}");
         return Results.BadRequest(new VerifyAccessCodeResponse(false, "Error verifying access code"));
     }
 })
@@ -1429,7 +1426,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt voter lookup payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt voter lookup payload: {ex.Message}");
         return Results.BadRequest(new VoterAuthLookupResponse(
             false,
             "Invalid encrypted payload.",
@@ -1458,7 +1455,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
         string.IsNullOrWhiteSpace(postCode) ||
         string.IsNullOrWhiteSpace(townOfBirth))
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Missing required identity fields for SDI lookup");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN]  Missing required identity fields for SDI lookup");
         return Results.BadRequest(new VoterAuthLookupResponse(
             false,
             "FirstName, LastName, DateOfBirth, PostCode, and TownOfBirth are required.",
@@ -1471,7 +1468,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
         ));
     }
 
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Attempting SDI lookup for {firstName} {lastName} ({dateOfBirth}) {postCode}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DEBUG] Attempting SDI lookup for {firstName} {lastName} ({dateOfBirth}) {postCode}");
 
     var dobInput = dateOfBirth.Trim();
     DateTime parsedDob;
@@ -1495,7 +1492,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
     }
     else
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Invalid DateOfBirth format: {dateOfBirth}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN]  Invalid DateOfBirth format: {dateOfBirth}");
         return Results.BadRequest(new VoterAuthLookupResponse(
             false,
             "DateOfBirth is invalid. Use yyyy-MM-dd.",
@@ -1521,7 +1518,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
     if (candidateVoters.Count > 0)
     {
         matchedBy = "SDI";
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Voter candidate(s) found by SDI: {candidateVoters.Count}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Voter candidate(s) found by SDI: {candidateVoters.Count}");
     }
 
     if (candidateVoters.Count == 1)
@@ -1535,7 +1532,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
             .Select(v => v.VoterId)
             .ToList();
 
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ SDI collision detected; requiring fingerprint disambiguation across {collisionCandidateIds.Count} candidates");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] SDI collision detected; requiring fingerprint disambiguation across {collisionCandidateIds.Count} candidates");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
 
         return Results.BadRequest(new VoterAuthLookupResponse(
@@ -1555,7 +1552,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
     {
         if (voter.HasVoted)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter {voter.VoterId} already voted - redirecting to official assistance");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Voter {voter.VoterId} already voted - redirecting to official assistance");
             return Results.BadRequest(new VoterAuthLookupResponse(
                 false,
                 "You have already voted. Please speak to an official.",
@@ -1569,7 +1566,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
         }
 
         var fullName = "Name protected";
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ VOTER AUTH LOOKUP SUCCESSFUL - VoterId: {voter.VoterId}, Matched By: {matchedBy}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] VOTER AUTH LOOKUP SUCCESSFUL - VoterId: {voter.VoterId}, Matched By: {matchedBy}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
         
         return Results.Ok(new VoterAuthLookupResponse(
@@ -1584,7 +1581,7 @@ app.MapPost("/api/voter/lookup-for-auth", async (HttpContext httpContext, Databa
         ));
     }
 
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ VOTER NOT FOUND - No matching voter found");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] VOTER NOT FOUND - No matching voter found");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ===== END VOTER AUTH LOOKUP =====\n");
     
     return Results.BadRequest(new VoterAuthLookupResponse(
@@ -1625,7 +1622,7 @@ app.MapPost("/api/voter/validate-proxy-authorization", async (HttpContext httpCo
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt proxy authorization payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt proxy authorization payload: {ex.Message}");
         return Results.BadRequest(new ProxyAuthorizationResponse(false, "Invalid encrypted payload."));
     }
 
@@ -1698,7 +1695,7 @@ app.MapPost("/api/official/assign-proxy-voter", async (HttpContext httpContext, 
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt assign-proxy payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt assign-proxy payload: {ex.Message}");
         return Results.BadRequest(new AssignProxyVoterResponse(false, "Invalid encrypted payload.", null, null));
     }
 
@@ -1780,7 +1777,7 @@ app.MapPost("/api/official/assign-proxy-voter", async (HttpContext httpContext, 
     catch (Exception ex)
     {
         var wrappedDekLength = representedVoter.WrappedDek?.Length ?? 0;
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to decrypt represented voter fingerprint for voter ID {representedVoter.VoterId}: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt represented voter fingerprint for voter ID {representedVoter.VoterId}: {ex.Message}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId={representedVoter.KeyId ?? "<null>"}, WrappedDekBytes={wrappedDekLength}");
         return Results.Json(new
         {
@@ -1829,7 +1826,10 @@ app.MapPost("/api/official/assign-proxy-voter", async (HttpContext httpContext, 
 .WithName("AssignProxyVoter");
 
 //===========================================
-// API ENDPOINTS - VOTER-OFFICIAL LINKING
+// API ENDPOINTS - VOTER LINKING & BALLOT CASTING
+//===========================================
+//===========================================
+// API ENDPOINTS - VOTER LINKING & BALLOT CASTING
 //===========================================
 app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request, 
     ConcurrentDictionary<string, (string OfficialId, string StationId, string Constituency, DateTime LoginTime, List<int> ConnectedVoters)> activeOfficials,
@@ -1861,14 +1861,14 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
         if (countyMatch && constituencyMatch && codeMatch)
         {
             matchingOfficialId = kvp.Key;
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ MATCH FOUND with official {kvp.Key}!");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] MATCH FOUND with official {kvp.Key}!");
             break;  // Found a match, stop searching
         }
     }
     
     if (string.IsNullOrEmpty(matchingOfficialId))
     {
-        Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ❌ No official found with matching county/constituency/code");
+        Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] [ERROR] No official found with matching county/constituency/code");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Available polling stations:");
         foreach (var kvp in officialPollingStationHashes)
         {
@@ -1891,7 +1891,7 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
     
     if (officialKey == null || !activeOfficials.TryGetValue(officialKey, out var officialInfo))
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official {matchingOfficialId} not currently online");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Official {matchingOfficialId} not currently online");
         return Results.BadRequest(new VoterLinkResponse(
             false,
             0,
@@ -1904,7 +1904,7 @@ app.MapPost("/api/voter/link-to-official", (VoterLinkRequest request,
     
     var assignedVoterId = (int)voterIdCounter.GetNextId();
     
-    Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] ✅ Assigned voter ID: {assignedVoterId}");
+    Console.WriteLine($"\n[{DateTime.Now:HH:mm:ss}] [OK] Assigned voter ID: {assignedVoterId}");
     
     // Add voter to official's connected voters list
     var updatedOfficialInfo = officialInfo with { ConnectedVoters = new List<int>(officialInfo.ConnectedVoters) { assignedVoterId } };
@@ -2155,7 +2155,7 @@ app.MapPost("/api/voter/cast-vote", async (CastVoteRequest request,
 
             await transaction.CommitAsync();
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Vote record inserted: {voteRecord.RecordId}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Vote record inserted: {voteRecord.RecordId}");
         }
         catch (Exception ex)
         {
@@ -2206,7 +2206,7 @@ app.MapPost("/api/voter/cast-vote", async (CastVoteRequest request,
                 officialId = individualNotification.OfficialId,
                 stationId = individualNotification.StationId
             });
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✓ Added vote to official {thisOfficialId} in constituency {request.Constituency}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Added vote to official {thisOfficialId} in constituency {request.Constituency}");
         }
         
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Vote successfully cast! Voter {request.VoterId} voted for {request.CandidateName}");
@@ -2259,7 +2259,7 @@ app.MapPost("/api/voter/cast-proxy-vote", async (HttpContext httpContext,
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt proxy vote cast payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt proxy vote cast payload: {ex.Message}");
         return Results.BadRequest(new CastVoteResponse(
             false,
             "Invalid encrypted payload",
@@ -2549,7 +2549,7 @@ app.MapPost("/api/voter/cast-proxy-vote", async (HttpContext httpContext,
 .WithName("CastProxyVote");
 
 //===========================================
-// DEVICE STATUS ENDPOINT
+// API ENDPOINTS - DEVICE TELEMETRY & REMOTE COMMANDS
 //===========================================
 app.MapPost("/api/voter/send-device-status", (SendDeviceStatusRequest request,
     ClaimsPrincipal user,
@@ -2858,6 +2858,9 @@ app.MapPost("/api/official/send-device-command", (SendDeviceCommandRequest reque
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialSendDeviceCommand");
 
+//===========================================
+// API ENDPOINTS - OFFICIAL DASHBOARD & ANALYTICS
+//===========================================
 app.MapGet("/api/official/polling-station-vote-count", async (
     ClaimsPrincipal user,
     DatabaseService dbService) =>
@@ -2981,7 +2984,7 @@ app.MapGet("/api/official/election-statistics", async (
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error fetching election statistics: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Error fetching election statistics: {ex.Message}");
         return Results.Json(new
         {
             success = false,
@@ -3000,7 +3003,7 @@ app.MapPost("/api/official/scan-duplicate-voter-fingerprints", async (
     const double MATCH_THRESHOLD = 40.0;
 
     var officialId = user.FindFirst("officialId")?.Value ?? "unknown";
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔍 Duplicate voter fingerprint scan started by official {officialId}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [DEBUG] Duplicate voter fingerprint scan started by official {officialId}");
 
     try
     {
@@ -3044,7 +3047,7 @@ app.MapPost("/api/official/scan-duplicate-voter-fingerprints", async (
             catch (Exception ex)
             {
                 failedDecryptions++;
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Skipping voter {voter.VoterId} during duplicate scan: {ex.Message}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Skipping voter {voter.VoterId} during duplicate scan: {ex.Message}");
             }
         }
 
@@ -3203,7 +3206,7 @@ app.MapPost("/api/official/scan-duplicate-voter-fingerprints", async (
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Failed to decrypt identity fields for SDI {sdiToken}: {ex.Message}");
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Failed to decrypt identity fields for SDI {sdiToken}: {ex.Message}");
                         readableEntries.Add($"[Decrypt failed] SDI: {sdiToken}");
                     }
                 }
@@ -3215,7 +3218,7 @@ app.MapPost("/api/official/scan-duplicate-voter-fingerprints", async (
             }
         }
 
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Duplicate scan complete. Compared {comparisonsPerformed} pairs, matched groups: {duplicateSdiGroups.Count}, suspicious rows: {suspiciousRecordCount}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Duplicate scan complete. Compared {comparisonsPerformed} pairs, matched groups: {duplicateSdiGroups.Count}, suspicious rows: {suspiciousRecordCount}");
 
         return Results.Ok(new
         {
@@ -3235,7 +3238,7 @@ app.MapPost("/api/official/scan-duplicate-voter-fingerprints", async (
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Duplicate voter fingerprint scan failed: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Duplicate voter fingerprint scan failed: {ex.Message}");
         return Results.Json(new
         {
             success = false,
@@ -3246,6 +3249,9 @@ app.MapPost("/api/official/scan-duplicate-voter-fingerprints", async (
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialScanDuplicateVoterFingerprints");
 
+//===========================================
+// API ENDPOINTS - ACCESS REQUEST UTILITIES
+//===========================================
 
 app.MapPost("/api/official/generate-code", (GenerateCodeRequest request, OfficialService officialService, ClaimsPrincipal user, IHubContext<VotingHub> hubContext) =>
 {
@@ -3358,7 +3364,7 @@ app.MapGet("/api/polling-stations", async (DatabaseService db) =>
     
     var pollingStations = await db.GetAllPollingStationsAsync();
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Returning {pollingStations.Count} polling stations");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Returning {pollingStations.Count} polling stations");
     return Results.Ok(pollingStations);
 })
 .WithName("GetPollingStations");
@@ -3370,7 +3376,7 @@ app.MapGet("/api/candidates", async (DatabaseService db) =>
     
     var candidates = await db.GetCandidatesByElectionIdAsync(currentElectionId);
     
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Returning {candidates.Count} candidates");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Returning {candidates.Count} candidates");
     return Results.Ok(candidates);
 })
 .WithName("GetCandidates");
@@ -3381,7 +3387,7 @@ app.MapGet("/api/candidates", async (DatabaseService db) =>
 app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, DatabaseService dbService) =>
 {
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ================== FINGERPRINT UPLOAD ENDPOINT CALLED ==================");
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 📸 Fingerprint upload request received");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [UPLOAD] Fingerprint upload request received");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Content-Type: {httpContext.Request.ContentType}");
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Content-Length: {httpContext.Request.ContentLength}");
 
@@ -3408,7 +3414,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
 
         if (!TryReadEncryptedEnvelope(root, out var wrappedDek, out var encryptedPayload))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing encrypted envelope");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Missing encrypted envelope");
             return Results.BadRequest(new
             {
                 success = false,
@@ -3428,7 +3434,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
 
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing credentials");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Missing credentials");
             return Results.BadRequest(new {
                 success = false,
                 message = "Username and password are required"
@@ -3441,7 +3447,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
             string.IsNullOrWhiteSpace(decryptedRequest.WrappedDek) ||
             string.IsNullOrWhiteSpace(encryptedFingerprintBase64))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Missing encrypted fingerprint data");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Missing encrypted fingerprint data");
             return Results.BadRequest(new {
                 success = false,
                 message = "Encrypted fingerprint payload is required"
@@ -3464,7 +3470,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
         
         if (updateSuccessful)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Fingerprint upload successful for {username}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] Fingerprint upload successful for {username}");
             return Results.Ok(new { 
                 success = true, 
                 message = "Fingerprint uploaded successfully",
@@ -3473,7 +3479,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
         }
         else
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Authentication failed for {username}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Authentication failed for {username}");
             return Results.Json(new {
                 success = false, 
                 message = "Invalid username or password" 
@@ -3482,7 +3488,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
     }
     catch (FormatException ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Invalid base64 format: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Invalid base64 format: {ex.Message}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
         return Results.BadRequest(new { 
             success = false, 
@@ -3492,7 +3498,7 @@ app.MapPost("/api/official/upload-fingerprint", async (HttpContext httpContext, 
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error uploading fingerprint: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Error uploading fingerprint: {ex.Message}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Exception type: {ex.GetType().FullName}");
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
         return Results.BadRequest(new { 
@@ -3539,7 +3545,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Failed to decrypt verify-prints payload: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt verify-prints payload: {ex.Message}");
         return Results.BadRequest(new
         {
             success = false,
@@ -3552,7 +3558,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
         // Validate UserType field
         if (string.IsNullOrEmpty(request.UserType))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing UserType indicator");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Missing UserType indicator");
             return Results.BadRequest(new { 
                 success = false, 
                 message = "UserType (official/voter) is required" 
@@ -3561,7 +3567,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
 
         if (request.UserType != "official" && request.UserType != "voter")
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid UserType: {request.UserType}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Invalid UserType: {request.UserType}");
             return Results.BadRequest(new { 
                 success = false, 
                 message = "UserType must be either 'official' or 'voter'" 
@@ -3570,7 +3576,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
 
         if (string.IsNullOrWhiteSpace(request.ScannedFingerprint))
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing scanned fingerprint in decrypted payload");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Missing scanned fingerprint in decrypted payload");
             return Results.BadRequest(new { 
                 success = false, 
                 message = "ScannedFingerprint is required" 
@@ -3587,12 +3593,12 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
         if (request.UserType == "official")
         {
             // OFFICIAL VERIFICATION PATH
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔐 Processing OFFICIAL fingerprint verification");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [SECURITY] Processing OFFICIAL fingerprint verification");
 
             // Validate official credentials
             if (string.IsNullOrEmpty(request.Username) || string.IsNullOrEmpty(request.Password))
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Missing username or password for official");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Missing username or password for official");
                 return Results.BadRequest(new { 
                     success = false, 
                     message = "Username and password are required for officials" 
@@ -3604,7 +3610,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
             
             if (official == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Record not found - no official with credentials for {request.Username}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Record not found - no official with credentials for {request.Username}");
                 return Results.BadRequest(new { 
                     success = false, 
                     message = "Record not found" 
@@ -3614,7 +3620,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
             // Get stored fingerprint from database
             if (official.FingerPrintScan == null || official.FingerPrintScan.Length == 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ No stored fingerprint found for official {request.Username}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] No stored fingerprint found for official {request.Username}");
                 return Results.BadRequest(new { 
                     success = false, 
                     message = "No stored fingerprint on record" 
@@ -3628,7 +3634,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
                 catch (Exception ex)
                 {
                     var wrappedDekLength = official.WrappedDek?.Length ?? 0;
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to decrypt official fingerprint for official {official.OfficialId}: {ex.Message}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to decrypt official fingerprint for official {official.OfficialId}: {ex.Message}");
                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId={official.KeyId ?? "<null>"}, WrappedDekBytes={wrappedDekLength}");
                     return Results.Json(new
                     {
@@ -3644,7 +3650,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
         else if (request.UserType == "voter")
         {
             // VOTER VERIFICATION PATH
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🗳️  Processing VOTER fingerprint verification");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VOTE]  Processing VOTER fingerprint verification");
 
             var hasSingleVoterId = !string.IsNullOrWhiteSpace(request.VoterId);
             var candidateIdStrings = request.CandidateVoterIds ?? new List<string>();
@@ -3652,7 +3658,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
 
             if (hasSingleVoterId == hasCandidateList)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid voter verification payload - expected either VoterId or CandidateVoterIds");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Invalid voter verification payload - expected either VoterId or CandidateVoterIds");
                 return Results.BadRequest(new { 
                     success = false, 
                     message = "Provide either VoterId or CandidateVoterIds for voter verification" 
@@ -3665,7 +3671,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
             {
                 if (!Guid.TryParse(request.VoterId, out Guid voterGuid))
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid VoterId format: {request.VoterId}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Invalid VoterId format: {request.VoterId}");
                     return Results.BadRequest(new {
                         success = false,
                         message = "VoterId must be a valid GUID"
@@ -3681,7 +3687,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
                 {
                     if (!Guid.TryParse(candidateId, out var parsedId))
                     {
-                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid candidate voter ID format: {candidateId}");
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Invalid candidate voter ID format: {candidateId}");
                         return Results.BadRequest(new
                         {
                             success = false,
@@ -3723,7 +3729,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
             var candidateVoters = await dbService.GetVotersByIdsAsync(candidateGuids);
             if (candidateVoters.Count == 0)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Record not found - no voter records for supplied candidate IDs");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Record not found - no voter records for supplied candidate IDs");
                 return Results.BadRequest(new {
                     success = false,
                     message = "Record not found"
@@ -3752,7 +3758,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
             {
                 if (candidate.FingerprintScan == null || candidate.FingerprintScan.Length == 0)
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Candidate {candidate.VoterId} has no stored fingerprint; skipping");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Candidate {candidate.VoterId} has no stored fingerprint; skipping");
                     continue;
                 }
 
@@ -3764,7 +3770,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
                 catch (Exception ex)
                 {
                     var wrappedDekLength = candidate.WrappedDek?.Length ?? 0;
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Failed to decrypt voter fingerprint for candidate {candidate.VoterId}: {ex.Message}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] Failed to decrypt voter fingerprint for candidate {candidate.VoterId}: {ex.Message}");
                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   KeyId={candidate.KeyId ?? "<null>"}, WrappedDekBytes={wrappedDekLength}");
                     continue;
                 }
@@ -3783,13 +3789,13 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
 
                 if (!candidateIsMatch)
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Candidate no-match - VOTER: {candidate.VoterId} (Score: {candidateScore:F2})");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Candidate no-match - VOTER: {candidate.VoterId} (Score: {candidateScore:F2})");
                     continue;
                 }
 
                 if (candidate.HasVoted)
                 {
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ FINGERPRINT MATCHED ALREADY-VOTED VOTER: {candidate.VoterId}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [WARN] FINGERPRINT MATCHED ALREADY-VOTED VOTER: {candidate.VoterId}");
                     return Results.BadRequest(new
                     {
                         success = false,
@@ -3803,7 +3809,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
                     });
                 }
 
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ FINGERPRINT MATCH - VOTER: {candidate.VoterId} (Score: {candidateScore:F2})");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] FINGERPRINT MATCH - VOTER: {candidate.VoterId} (Score: {candidateScore:F2})");
                 return Results.Ok(new
                 {
                     success = true,
@@ -3818,7 +3824,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
                 });
             }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ FINGERPRINT NO MATCH - VOTER candidates exhausted ({orderedCandidates.Count} checked)");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] FINGERPRINT NO MATCH - VOTER candidates exhausted ({orderedCandidates.Count} checked)");
             return Results.BadRequest(new
             {
                 success = false,
@@ -3834,7 +3840,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
         // COMMON FINGERPRINT COMPARISON LOGIC (applies to both official and voter)
         if (storedFingerprintBytes == null)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Failed to retrieve stored fingerprint");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Failed to retrieve stored fingerprint");
             return Results.BadRequest(new { success = false, message = "Failed to retrieve stored fingerprint" });
         }
 
@@ -3867,7 +3873,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
 
         if (isMatch)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ FINGERPRINT MATCH - {userType.ToUpper()}: {userIdentifier}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [OK] FINGERPRINT MATCH - {userType.ToUpper()}: {userIdentifier}");
             return Results.Ok(new 
             { 
                 success = true, 
@@ -3882,7 +3888,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
         }
         else
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ FINGERPRINT NO MATCH - {userType.ToUpper()}: {userIdentifier} (Score: {score:F2})");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] FINGERPRINT NO MATCH - {userType.ToUpper()}: {userIdentifier} (Score: {score:F2})");
             return Results.BadRequest(new { 
                 success = false, 
                 isMatch = false,
@@ -3896,7 +3902,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
     }
     catch (FormatException ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Invalid base64 format: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Invalid base64 format: {ex.Message}");
         return Results.BadRequest(new { 
             success = false, 
             message = "Invalid base64 format for scanned fingerprint" 
@@ -3904,7 +3910,7 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✗ Error during fingerprint verification: {ex.Message}");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ERROR] Error during fingerprint verification: {ex.Message}");
         return Results.BadRequest(new { 
             success = false, 
             message = $"Fingerprint verification failed: {ex.Message}" 
@@ -3913,6 +3919,9 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
 })
 .WithName("VerifyFingerprints");
 
+//===========================================
+// REAL-TIME HUB & ERROR FALLBACK
+//===========================================
 app.MapHub<VotingHub>("/hubs/voting");
 
 // Prevent production exception handler from returning 404 when /Error is invoked.
@@ -4168,3 +4177,4 @@ public class CertificateSecret
     public string Certificate { get; set; } = string.Empty;
     public string PrivateKey { get; set; } = string.Empty;
 }
+

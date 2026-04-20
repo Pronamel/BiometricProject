@@ -53,7 +53,7 @@ public class OfficialService
 
             if (official == null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Official '{username}' not found in database");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official '{username}' not found in database");
                 return false;
             }
 
@@ -61,18 +61,18 @@ public class OfficialService
 
             if (passwordMatch)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Official '{username}' credentials verified");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Official '{username}' credentials verified");
                 return true;
             }
             else
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Incorrect password for official '{username}'");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Incorrect password for official '{username}'");
                 return false;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error validating credentials: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error validating credentials: {ex.Message}");
             return false;
         }
     }
@@ -145,7 +145,7 @@ public class OfficialService
         
         if (isLoggedIn)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️  Official {officialId} is already logged in elsewhere");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Warning: Official {officialId} is already logged in elsewhere");
         }
         
         return isLoggedIn;

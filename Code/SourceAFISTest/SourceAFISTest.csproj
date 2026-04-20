@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <RootNamespace>SourceAFISTest</RootNamespace>
+    <AssemblyName>SourceAFISTest</AssemblyName>
+  </PropertyGroup>
+
+  <!-- Use the exact same SourceAFIS version as the server (3.14.0) -->
+  <ItemGroup>
+    <PackageReference Include="SourceAFIS" Version="3.14.0" />
+  </ItemGroup>
+
+</Project>

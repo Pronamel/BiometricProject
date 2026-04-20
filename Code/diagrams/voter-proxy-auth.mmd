@@ -1,0 +1,35 @@
+%%{init: {"sequence": {"messageMargin": 64, "noteMargin": 24, "boxMargin": 18, "wrap": true}}}%%
+sequenceDiagram
+    autonumber
+    actor User as Proxy Voter
+    participant App as Voting App
+    participant Server as API Server
+    participant DB as Database
+
+    User->>App: Enter represented voter details
+    App->>App: Encrypt payload
+    App->>Server: POST /api/voter/lookup-for-auth (represented)
+    Server->>DB: Find represented voter by SDI
+    DB-->>Server: Represented voter record
+    Server-->>App: Represented voterId
+
+    User->>App: Enter proxy voter details
+    App->>App: Encrypt payload
+    App->>Server: POST /api/voter/lookup-for-auth (proxy)
+    Server->>DB: Find proxy voter by SDI
+    DB-->>Server: Proxy voter record
+    Server-->>App: Proxy voterId
+
+    App->>App: Encrypt authorization payload
+    App->>Server: POST /api/voter/validate-proxy-authorization
+    Server->>DB: Load both voters + check proxy SDI match
+    DB-->>Server: Authorization data
+
+    alt Proxy is authorized
+        Server-->>App: 200 OK
+        App-->>User: Proxy authorized
+        Note over App,Server: Continues to voter-auth-dataflow-only using proxy fingerprint
+    else Not authorized or already voted
+        Server-->>App: 400 authorization failed
+        App-->>User: Stop and request official help
+    end
