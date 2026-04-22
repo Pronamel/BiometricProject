@@ -181,12 +181,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("ProductionCors", policy =>
     {
-        // Allow production domain via Nginx
-        policy.WithOrigins(
-                "https://34-238-14-248.nip.io",
-                "http://localhost:5000",
-                "https://localhost:5001"
-              )
+        // Allow any origin so load-test clients (and other non-browser callers)
+        // are not rejected by CORS during WebSocket upgrade.
+        // SetIsOriginAllowed (not AllowAnyOrigin) is used so AllowCredentials()
+        // remains valid — ASP.NET Core only blocks the wildcard "*" + credentials combo.
+        policy.SetIsOriginAllowed(_ => true)
               .AllowAnyMethod() 
               .AllowAnyHeader()
               .AllowCredentials();
@@ -815,6 +814,33 @@ app.MapPost("/auth/official-login", async (HttpContext httpContext, DatabaseServ
     });
 })
 .WithName("OfficialLogin");
+
+// ============================================
+// LOAD TEST TOKEN ENDPOINT
+// ============================================
+// Issues a JWT for load testing only. No DB lookup, no encryption.
+// Protected by requiring the raw JWT secret in the request body.
+app.MapPost("/auth/load-test-token", ([Microsoft.AspNetCore.Mvc.FromBody] LoadTestTokenRequest ltReq) =>
+{
+    if (string.IsNullOrWhiteSpace(ltReq.Key) || ltReq.Key != jwtSecret)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [LOAD-TEST] Rejected token request - invalid key");
+        return Results.Unauthorized();
+    }
+
+    var token = GenerateJwtToken($"load-test-{Guid.NewGuid():N}", "official", new Dictionary<string, object>
+    {
+        ["officialId"] = "999999",
+        ["county"]     = "Kent",
+        ["constituency"] = "Ashford",
+        ["station"]    = "load-test-station",
+        ["systemCode"] = "OFF-LOAD-TEST",
+        ["tokenId"]    = 0
+    });
+
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [LOAD-TEST] Token issued for load test");
+    return Results.Ok(new { token });
+});
 
 // ============================================
 // OFFICIAL LOGOUT ENDPOINT
@@ -3928,6 +3954,29 @@ app.MapHub<VotingHub>("/hubs/voting");
 app.Map("/Error", () => Results.Problem("An internal server error occurred."));
 
 //===========================================
+// SDI DETERMINISM TEST
+//===========================================
+Console.WriteLine();
+Console.WriteLine("=== SDI Hash Determinism Test ===");
+
+var testSecret = "test secret-key";
+
+// Test 1: Same input produces the same hash
+var hash1a = ComputeSdiHmacSha256("ALEX", testSecret);
+var hash1b = ComputeSdiHmacSha256("ALEX", testSecret);
+Console.WriteLine($"Test one: comparing the hash of ALEX");
+Console.WriteLine($"Hash 1:   {hash1a}");
+Console.WriteLine($"Hash 2:   {hash1b}");
+Console.WriteLine();
+
+// Test 2: Different input produces a different hash
+var hash2 = ComputeSdiHmacSha256("XELA", testSecret);
+Console.WriteLine($"Test two: comparing the hash of XELA against ALEX");
+Console.WriteLine($"Hash 1:   {hash2}");
+Console.WriteLine($"Hash 2:   {hash1a}");
+Console.WriteLine();
+
+//===========================================
 // START APPLICATION
 //===========================================
 app.Run();
@@ -3939,6 +3988,8 @@ record OfficialLoginRequest(
     string Username,
     string Password
 );
+
+record LoadTestTokenRequest(string Key);
 
 record CreateVoterRequest(
     string NationalInsuranceNumber,
