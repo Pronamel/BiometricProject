@@ -237,8 +237,8 @@ public class DatabaseService
         string keyId,
         string wrappedDekBase64,
         string encryptedNationalInsuranceNumber,
-        string encryptedFirstName,
-        string encryptedLastName,
+        string firstName,
+        string lastName,
         string encryptedDateOfBirth,
         string encryptedTownOfBirth,
         string encryptedPostCode,
@@ -253,8 +253,8 @@ public class DatabaseService
                 string.IsNullOrWhiteSpace(keyId) ||
                 string.IsNullOrWhiteSpace(wrappedDekBase64) ||
                 string.IsNullOrWhiteSpace(encryptedNationalInsuranceNumber) ||
-                string.IsNullOrWhiteSpace(encryptedFirstName) ||
-                string.IsNullOrWhiteSpace(encryptedLastName) ||
+                string.IsNullOrWhiteSpace(firstName) ||
+                string.IsNullOrWhiteSpace(lastName) ||
                 string.IsNullOrWhiteSpace(encryptedDateOfBirth) ||
                 string.IsNullOrWhiteSpace(encryptedTownOfBirth) ||
                 string.IsNullOrWhiteSpace(encryptedPostCode) ||
@@ -281,8 +281,6 @@ public class DatabaseService
 
             byte[] wrappedDek;
             byte[] encryptedNationalIdBytes;
-            byte[] encryptedFirstNameBytes;
-            byte[] encryptedLastNameBytes;
             byte[] encryptedDateOfBirthBytes;
             byte[] encryptedTownOfBirthBytes;
             byte[] encryptedPostCodeBytes;
@@ -292,8 +290,6 @@ public class DatabaseService
             {
                 wrappedDek = Convert.FromBase64String(wrappedDekBase64.Trim());
                 encryptedNationalIdBytes = Convert.FromBase64String(encryptedNationalInsuranceNumber.Trim());
-                encryptedFirstNameBytes = Convert.FromBase64String(encryptedFirstName.Trim());
-                encryptedLastNameBytes = Convert.FromBase64String(encryptedLastName.Trim());
                 encryptedDateOfBirthBytes = Convert.FromBase64String(encryptedDateOfBirth.Trim());
                 encryptedTownOfBirthBytes = Convert.FromBase64String(encryptedTownOfBirth.Trim());
                 encryptedPostCodeBytes = Convert.FromBase64String(encryptedPostCode.Trim());
@@ -310,8 +306,8 @@ public class DatabaseService
                 Sdi = sdi,
                 ConstituencyId = constituency.ConstituencyId,
                 WardId = constituencyHash.Trim().ToLowerInvariant(),
-                FirstName = encryptedFirstNameBytes,
-                LastName = encryptedLastNameBytes,
+                FirstName = System.Text.Encoding.UTF8.GetBytes(firstName.Trim()),
+                LastName = System.Text.Encoding.UTF8.GetBytes(lastName.Trim()),
                 DateOfBirth = encryptedDateOfBirthBytes,
                 TownOfBirth = encryptedTownOfBirthBytes,
                 Postcode = encryptedPostCodeBytes,

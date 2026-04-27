@@ -3220,11 +3220,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj",
+      "projectUniqueName": "c:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj",
       "projectName": "Server",
-      "projectPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj",
+      "projectPath": "c:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\Server.csproj",
       "packagesPath": "C:\\Users\\alexa\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\obj\\",
+      "outputPath": "c:\\Users\\alexa\\OneDrive\\Desktop\\dis\\BiometricProject\\Code\\Server\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\alexa\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -3329,7 +3329,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.106/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.107/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

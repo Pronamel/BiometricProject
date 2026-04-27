@@ -1202,8 +1202,6 @@ public class ApiService : IApiService
             string? keyId = null;
             string? wrappedDek = null;
             string? encryptedNationalInsuranceNumber = null;
-            string? encryptedFirstName = null;
-            string? encryptedLastName = null;
             string? encryptedDateOfBirth = null;
             string? encryptedTownOfBirth = null;
             string? encryptedPostCode = null;
@@ -1240,8 +1238,6 @@ public class ApiService : IApiService
                 wrappedDek = WrapDekWithRsaPublicKey(dek, _voterEncryptionPublicKeyPem);
 
                 encryptedNationalInsuranceNumber = EncryptStringToBase64(nationalInsuranceNumber ?? string.Empty, dek);
-                encryptedFirstName = EncryptStringToBase64(firstName, dek);
-                encryptedLastName = EncryptStringToBase64(lastName, dek);
                 encryptedDateOfBirth = EncryptStringToBase64(isoDateOfBirth, dek);
                 encryptedTownOfBirth = EncryptStringToBase64(townOfBirth, dek);
                 encryptedPostCode = EncryptStringToBase64(postCode, dek);
@@ -1275,8 +1271,6 @@ public class ApiService : IApiService
                 keyId,
                 wrappedDek,
                 encryptedNationalInsuranceNumber,
-                encryptedFirstName,
-                encryptedLastName,
                 encryptedDateOfBirth,
                 encryptedTownOfBirth,
                 encryptedPostCode,

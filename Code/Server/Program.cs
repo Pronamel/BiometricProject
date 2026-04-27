@@ -546,12 +546,12 @@ async Task<(string FirstName, string LastName, string NationalInsuranceNumber)> 
 
     if (voter.FirstName == null || voter.FirstName.Length == 0)
     {
-        throw new InvalidOperationException("Voter encrypted first name is missing");
+        throw new InvalidOperationException("Voter first name is missing");
     }
 
     if (voter.LastName == null || voter.LastName.Length == 0)
     {
-        throw new InvalidOperationException("Voter encrypted last name is missing");
+        throw new InvalidOperationException("Voter last name is missing");
     }
 
     if (voter.NationalId == null || voter.NationalId.Length == 0)
@@ -567,12 +567,9 @@ async Task<(string FirstName, string LastName, string NationalInsuranceNumber)> 
     byte[] dek = rsa.Decrypt(voter.WrappedDek, RSAEncryptionPadding.OaepSHA256);
     try
     {
-        var firstNameBytes = DecryptAesGcmPayload(voter.FirstName, dek);
-        var lastNameBytes = DecryptAesGcmPayload(voter.LastName, dek);
+        var firstName = Encoding.UTF8.GetString(voter.FirstName).Trim();
+        var lastName = Encoding.UTF8.GetString(voter.LastName).Trim();
         var nationalIdBytes = DecryptAesGcmPayload(voter.NationalId, dek);
-
-        var firstName = Encoding.UTF8.GetString(firstNameBytes).Trim();
-        var lastName = Encoding.UTF8.GetString(lastNameBytes).Trim();
         var nationalInsuranceNumber = Encoding.UTF8.GetString(nationalIdBytes).Trim();
 
         return (firstName, lastName, nationalInsuranceNumber);
@@ -1019,8 +1016,6 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
         string.IsNullOrWhiteSpace(request.KeyVersion) ||
         string.IsNullOrWhiteSpace(request.WrappedDek) ||
         string.IsNullOrWhiteSpace(request.EncryptedNationalInsuranceNumber) ||
-        string.IsNullOrWhiteSpace(request.EncryptedFirstName) ||
-        string.IsNullOrWhiteSpace(request.EncryptedLastName) ||
         string.IsNullOrWhiteSpace(request.EncryptedDateOfBirth) ||
         string.IsNullOrWhiteSpace(request.EncryptedTownOfBirth) ||
         string.IsNullOrWhiteSpace(request.EncryptedPostCode) ||
@@ -1119,8 +1114,8 @@ app.MapPost("/api/official/create-voter", async (HttpContext httpContext, Databa
         request.KeyId!,
         request.WrappedDek!,
         request.EncryptedNationalInsuranceNumber!,
-        request.EncryptedFirstName!,
-        request.EncryptedLastName!,
+        request.FirstName,
+        request.LastName,
         request.EncryptedDateOfBirth!,
         request.EncryptedTownOfBirth!,
         request.EncryptedPostCode!,
