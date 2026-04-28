@@ -148,7 +148,16 @@ public class VoterRealtimeService : IVoterRealtimeService
 
         connection.Closed += error =>
         {
-            ConnectionStateChanged?.Invoke($"Disconnected: {error?.Message ?? "connection closed"}");
+            var message = error?.Message ?? "connection closed";
+            ConnectionStateChanged?.Invoke($"Disconnected: {message}");
+
+            // All automatic reconnect attempts have been exhausted — the server is
+            // definitively unreachable. Treat this the same as a server shutdown so
+            // the client clears its session and returns to voter login immediately,
+            // rather than waiting on the 25-second auth-check timer.
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VoterRealtimeService] Reconnect exhausted – treating as server shutdown.");
+            ServerShutdown?.Invoke();
+
             return Task.CompletedTask;
         };
     }
