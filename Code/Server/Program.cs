@@ -924,6 +924,33 @@ app.MapPost("/auth/official-logout", (ClaimsPrincipal user,
 .RequireAuthorization(policy => policy.RequireRole("official"))
 .WithName("OfficialLogout");
 
+// Official username-only authentication endpoint used by the official auth screen.
+app.MapPost("/api/official/username-authenticate", (OfficialUsernameAuthenticateRequest request) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Username))
+    {
+        return Results.BadRequest(new OfficialUsernameAuthenticateResponse(false, "Username is required"));
+    }
+
+    if (!string.Equals(request.Platform, "macos", StringComparison.Ordinal))
+    {
+        return Results.Json(
+            new OfficialUsernameAuthenticateResponse(false, "Username authentication is only available on macOS devices"),
+            statusCode: StatusCodes.Status403Forbidden);
+    }
+
+    if (string.Equals(request.Username.Trim(), "Alexander", StringComparison.Ordinal))
+    {
+        return Results.Ok(new OfficialUsernameAuthenticateResponse(true, "Authentication message: access granted"));
+    }
+
+    return Results.Json(
+        new OfficialUsernameAuthenticateResponse(false, "Authentication denied"),
+        statusCode: StatusCodes.Status401Unauthorized);
+})
+.RequireAuthorization(policy => policy.RequireRole("official"))
+.WithName("OfficialUsernameAuthenticate");
+
 // Voter logout endpoint - revokes active voter session created during authentication
 app.MapPost("/auth/voter-logout", (ClaimsPrincipal user, VoterService voterService) =>
 {
@@ -3982,6 +4009,16 @@ app.Run();
 record OfficialLoginRequest(
     string Username,
     string Password
+);
+
+record OfficialUsernameAuthenticateRequest(
+    string Username,
+    string? Platform
+);
+
+record OfficialUsernameAuthenticateResponse(
+    bool Success,
+    string Message
 );
 
 record LoadTestTokenRequest(string Key);

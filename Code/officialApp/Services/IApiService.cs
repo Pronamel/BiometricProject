@@ -32,6 +32,7 @@ public interface IApiService
     // Fingerprint Verification
     Task<FingerprintComparisonResponse?> CompareFingerpringsAsync(byte[] fingerprint1, byte[] fingerprint2);
     Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint);
+    Task<OfficialUsernameAuthenticationResponse?> AuthenticateByUsernameAsync(string username);
     
     // Fingerprint Management
     Task<bool> UploadOfficialFingerprintAsync(string username, string password, byte[] fingerprintData);

@@ -380,6 +380,28 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
         SetImageSource("fingerPrint.png");
         SetStatusMessage(string.Empty);
 
+        if (OperatingSystem.IsMacOS())
+        {
+            CaptureStatusMessage = "Authenticating with server...";
+            var authResult = await _serverHandler.AuthenticateByUsernameAsync(Username);
+            if (authResult?.Success == true)
+            {
+                SetImageSource("fingerPrintCorrect.png");
+                SetStatusMessage("Authentication successful. Welcome, Official.");
+                CaptureStatusMessage = authResult.Message;
+                await Task.Delay(750);
+                SetImageSource("fingerPrint.png");
+                SetStatusMessage(string.Empty);
+                _navigationService.NavigateToOfficialMenu();
+                return;
+            }
+
+            SetImageSource("fingerPrintWrong.png");
+            SetStatusMessage(authResult?.Message ?? "Authentication failed.");
+            CaptureStatusMessage = "Username authentication rejected";
+            return;
+        }
+
         _scannerSessionActive = true;
         await StartScanningInternalAsync();
     }

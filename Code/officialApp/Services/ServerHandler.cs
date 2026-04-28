@@ -137,6 +137,9 @@ public class ServerHandler : IServerHandler
     public Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint)
         => _apiService.VerifyFingerprintAsync(username, password, scannedFingerprint);
 
+    public Task<OfficialUsernameAuthenticationResponse?> AuthenticateByUsernameAsync(string username)
+        => _apiService.AuthenticateByUsernameAsync(username);
+
     public Task<bool> SetAccessCodeAsync(string accessCode)
         => _apiService.SetAccessCodeAsync(accessCode);
 

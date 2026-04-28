@@ -46,6 +46,7 @@ public interface IServerHandler
         string proxyTownOfBirth,
         byte[] scannedFingerprint);
     Task<FingerprintComparisonResponse?> VerifyFingerprintAsync(string username, string password, byte[] scannedFingerprint);
+    Task<OfficialUsernameAuthenticationResponse?> AuthenticateByUsernameAsync(string username);
     Task<bool> SetAccessCodeAsync(string accessCode);
     Task<bool> SendDeviceCommandAsync(SendDeviceCommandRequest request);
     Task<PollingStationVoteCountResponse?> GetPollingStationVoteCountAsync();

@@ -952,6 +952,56 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task<OfficialUsernameAuthenticationResponse?> AuthenticateByUsernameAsync(string username)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                return new OfficialUsernameAuthenticationResponse
+                {
+                    Success = false,
+                    Message = "Username is required"
+                };
+            }
+
+            var request = new
+            {
+                username,
+                platform = OperatingSystem.IsMacOS() ? "macos" : OperatingSystem.IsWindows() ? "windows" : "other"
+            };
+
+            var jsonContent = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            var response = await SendAuthenticatedPostAsync("/api/official/username-authenticate", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            var parsed = JsonSerializer.Deserialize<OfficialUsernameAuthenticationResponse>(responseContent, _jsonOptions);
+            if (parsed != null)
+            {
+                return parsed;
+            }
+
+            return new OfficialUsernameAuthenticationResponse
+            {
+                Success = false,
+                Message = response.IsSuccessStatusCode
+                    ? "Username authentication returned an empty response"
+                    : "Username authentication failed"
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Error authenticating username: {ex.Message}");
+            return new OfficialUsernameAuthenticationResponse
+            {
+                Success = false,
+                Message = $"Error: {ex.Message}"
+            };
+        }
+    }
+
     public async Task<bool> UploadOfficialFingerprintAsync(string username, string password, byte[] fingerprintData)
     {
         try
