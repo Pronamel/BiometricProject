@@ -489,7 +489,7 @@ public class ApiService : IApiService
         }
     }
 
-    private void ClearLocalSession()
+    public void ClearLocalSession()
     {
         _jwtToken = null;
         _tokenExpiry = DateTime.MinValue;

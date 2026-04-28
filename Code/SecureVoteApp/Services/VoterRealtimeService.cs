@@ -15,6 +15,8 @@ public class VoterRealtimeService : IVoterRealtimeService
     public event Action<VoterCommandResponse>? CommandReceived;
     public event Action<CodeWaitResponse>? AccessCodeReceived;
     public event Action<string>? ConnectionStateChanged;
+    public event Action? OfficialDisconnected;
+    public event Action? ServerShutdown;
 
     public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
 
@@ -118,6 +120,18 @@ public class VoterRealtimeService : IVoterRealtimeService
         connection.On<CodeWaitResponse>("voter.v1.accessCodeGenerated", payload =>
         {
             AccessCodeReceived?.Invoke(payload);
+        });
+
+        connection.On<object>("voter.v1.officialDisconnected", _ =>
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VoterRealtimeService] Received officialDisconnected – forcing logout.");
+            OfficialDisconnected?.Invoke();
+        });
+
+        connection.On<object>("server.v1.shutdown", _ =>
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [VoterRealtimeService] Received server.v1.shutdown.");
+            ServerShutdown?.Invoke();
         });
 
         connection.Reconnecting += error =>

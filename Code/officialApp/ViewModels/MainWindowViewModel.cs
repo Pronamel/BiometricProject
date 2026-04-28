@@ -33,6 +33,7 @@ public partial class MainWindowViewModel : ViewModelBase
     // Navigation service
     private readonly INavigationService _navigationService;
     private readonly IRealtimeService _realtimeService;
+    private readonly IServerHandler _serverHandler;
 
     // ==========================================
     // CONSTRUCTOR
@@ -49,11 +50,13 @@ public partial class MainWindowViewModel : ViewModelBase
         ElectionStatisticsViewModel electionStatisticsViewModel,
         OfficialDuplicateFingerprintScanViewModel officialDuplicateFingerprintScanViewModel,
         INavigationService navigationService,
-        IRealtimeService realtimeService)
+        IRealtimeService realtimeService,
+        IServerHandler serverHandler)
     {
         // Get navigation service instance
         _navigationService = navigationService;
         _realtimeService = realtimeService;
+        _serverHandler = serverHandler;
         
         // Subscribe to navigation events
         _navigationService.NavigationRequested += OnNavigationRequested;
@@ -86,6 +89,7 @@ public partial class MainWindowViewModel : ViewModelBase
         CurrentView = _officialLoginView;
 
         _realtimeService.ConnectionStateChanged += OnRealtimeConnectionStateChanged;
+        _serverHandler.ServerShutdown += OnServerShutdown;
     }
 
     // ==========================================
@@ -103,5 +107,14 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Realtime disconnected. Staying on the current official screen.");
         }
+    }
+
+    private void OnServerShutdown()
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MainWindowViewModel] Server shutdown received. Returning to login.");
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _navigationService.NavigateToOfficialLogin();
+        });
     }
 }

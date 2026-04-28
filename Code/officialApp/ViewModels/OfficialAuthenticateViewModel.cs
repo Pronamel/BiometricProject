@@ -140,20 +140,9 @@ public partial class OfficialAuthenticateViewModel : ViewModelBase
 
     public async Task attemptHandler(int attempts, bool scanResult)
     {
-        if (attempts == 1 && scanResult == false)
+        if (scanResult == false)
         {
             SetImageSource("fingerPrintWrong.png");
-            SetStatusMessage("You have 2 attempts left.");
-        }
-        else if (attempts == 2 && scanResult == false)
-        {
-            SetImageSource("fingerPrintWrong.png");
-            SetStatusMessage("You have 1 attempts left.");
-        }
-        else if (attempts == 3 && scanResult == false)
-        {
-            SetImageSource("fingerPrintWrong.png");
-            SetStatusMessage("You have no attempts left. Please Contact an official.");
         }
         else if (scanResult == true)
         {

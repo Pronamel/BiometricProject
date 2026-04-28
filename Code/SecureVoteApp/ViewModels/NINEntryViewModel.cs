@@ -21,6 +21,7 @@ public partial class NINEntryViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IServerHandler _serverHandler;
     private readonly CountyService _countyService;
+    private readonly DeviceLockState _deviceLockState;
 
 
 
@@ -64,9 +65,24 @@ public partial class NINEntryViewModel : ViewModelBase
     [ObservableProperty]
     private bool isLooking = false;
 
+    [ObservableProperty]
+    private bool isLocked = false;
+
+    public bool IsFormEnabled => !IsLooking && !IsLocked;
+
     partial void OnStatusMessageChanged(string value)
     {
         OnPropertyChanged(nameof(HasStatusMessage));
+    }
+
+    partial void OnIsLookingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsFormEnabled));
+    }
+
+    partial void OnIsLockedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsFormEnabled));
     }
 
 
@@ -76,11 +92,27 @@ public partial class NINEntryViewModel : ViewModelBase
     // CONSTRUCTOR
     // ==========================================
     
-    public NINEntryViewModel(INavigationService navigationService, IServerHandler serverHandler, CountyService countyService)
+    public NINEntryViewModel(INavigationService navigationService, IServerHandler serverHandler, CountyService countyService, DeviceLockState deviceLockState)
     {
         _navigationService = navigationService;
         _serverHandler = serverHandler;
         _countyService = countyService;
+        _deviceLockState = deviceLockState;
+        _deviceLockState.LockStateChanged += OnDeviceLockStateChanged;
+    }
+
+    private void OnDeviceLockStateChanged(bool locked)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsLocked = locked;
+            if (!locked)
+            {
+                // Clear the already-voted banner when an official unlocks the device
+                ShowAlreadyVotedMessage = false;
+                AlreadyVotedMessage = string.Empty;
+            }
+        });
     }
 
     public void ResetSensitiveFields()
@@ -105,6 +137,7 @@ public partial class NINEntryViewModel : ViewModelBase
     [RelayCommand]
     private void Back()
     {
+        if (_deviceLockState.IsLocked) return;
         _navigationService.NavigateToMain();
     }
     
@@ -182,8 +215,10 @@ public partial class NINEntryViewModel : ViewModelBase
                 ShowAlreadyVotedMessage = true;
                 AlreadyVotedMessage = lookup.Message;
                 _serverHandler.CurrentDeviceStatus = "Already voted - official assistance required";
+                _deviceLockState.SetLocked(true);
+                await _serverHandler.SendDeviceStatusAsync(_serverHandler.CurrentDeviceStatus);
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ Voter already voted: {lookup.Message}");
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔄 Device status set for heartbeat delivery: {_serverHandler.CurrentDeviceStatus}");
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔒 Device locked and status sent to server.");
             }
             else
             {

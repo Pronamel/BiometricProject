@@ -33,6 +33,7 @@ public interface IApiService
     string GetRealtimeHubUrl();
     Task LogoutAsync();
     void Logout();
+    void ClearLocalSession();
     
     // Voter Access Management
     Task<bool> RequestAccessAsync(string? deviceName = null);

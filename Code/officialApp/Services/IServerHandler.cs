@@ -65,4 +65,5 @@ public interface IServerHandler
     event Action<DeviceManagementInfo>? DeviceDisconnected;
     event Action<DeviceManagementInfo>? DeviceInfoUpdated;
     event Action<string>? AccessCodeGenerated;
+    event Action? ServerShutdown;
 }

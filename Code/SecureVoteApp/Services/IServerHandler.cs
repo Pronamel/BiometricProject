@@ -41,4 +41,6 @@ public interface IServerHandler
     event Action<VoterCommandResponse>? OfficialCommandReceived;
     event Action<bool>? ConnectionStatusChanged;
     event Action<string>? StatusMessageReceived;
+    event Action? OfficialForceDisconnected;
+    event Action? ServerShutdown;
 }

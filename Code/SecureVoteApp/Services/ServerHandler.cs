@@ -21,6 +21,8 @@ public class ServerHandler : IServerHandler
     public event Action<VoterCommandResponse>? OfficialCommandReceived;
     public event Action<bool>? ConnectionStatusChanged;
     public event Action<string>? StatusMessageReceived;
+    public event Action? OfficialForceDisconnected;
+    public event Action? ServerShutdown;
     
     // Properties
     public bool IsAuthenticated => _apiService.IsAuthenticated;
@@ -60,6 +62,26 @@ public class ServerHandler : IServerHandler
 
             ConnectionStatusChanged?.Invoke(isConnectedOrReconnecting);
             StatusMessageReceived?.Invoke($"Realtime state: {state}");
+        };
+
+        _realtimeService.OfficialDisconnected += () =>
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ServerHandler] Official session ended. Forcing voter logout.");
+            StopContinuousListening();
+            _ = _apiService.LogoutAsync();
+            _ = _realtimeService.DisconnectAsync();
+            StatusMessageReceived?.Invoke("Session ended: the polling station has closed your connection.");
+            OfficialForceDisconnected?.Invoke();
+        };
+
+        _realtimeService.ServerShutdown += () =>
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ServerHandler] Server shutdown received. Clearing voter session immediately.");
+            StopContinuousListening();
+            _apiService.ClearLocalSession();
+            _ = _realtimeService.DisconnectAsync();
+            StatusMessageReceived?.Invoke("Connection lost: the voting server has shut down.");
+            ServerShutdown?.Invoke();
         };
     }
 

@@ -12,6 +12,8 @@ public interface IVoterRealtimeService
     event Action<VoterCommandResponse>? CommandReceived;
     event Action<CodeWaitResponse>? AccessCodeReceived;
     event Action<string>? ConnectionStateChanged;
+    event Action? OfficialDisconnected;
+    event Action? ServerShutdown;
 
     Task<bool> ConnectAsync(string? deviceId, CancellationToken cancellationToken = default);
     Task<bool> SendDeviceStatusAsync(string deviceId, string status, CancellationToken cancellationToken = default);

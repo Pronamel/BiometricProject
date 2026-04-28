@@ -12,6 +12,7 @@ public interface IApiService
     bool IsAuthenticated { get; }
     string? CurrentOfficialId { get; }
     Task<bool> LogoutAsync();
+    void ClearLocalSession();
     string? GetAuthToken();
     string GetRealtimeHubUrl();
     Task<bool> SendDeviceManagementInfoAsync(DeviceManagementInfo deviceInfo);

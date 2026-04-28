@@ -90,6 +90,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // If the realtime channel dies (e.g., server crash), force UI back to login.
         _serverHandler.ConnectionStatusChanged += OnServerConnectionStatusChanged;
+        _serverHandler.OfficialForceDisconnected += OnOfficialForceDisconnected;
+        _serverHandler.ServerShutdown += OnServerShutdown;
         _deviceLockState.LockStateChanged += OnDeviceLockStateChanged;
     }
 
@@ -166,6 +168,28 @@ public partial class MainWindowViewModel : ViewModelBase
         }, cancellationToken);
     }
 
+    private void OnOfficialForceDisconnected()
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MainWindowViewModel] Official force-disconnected. Returning immediately to voter login.");
+        _disconnectNavigationCancellation?.Cancel();
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            _navigationService.NavigateToVoterLogin();
+        });
+    }
+
+    private void OnServerShutdown()
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [MainWindowViewModel] Server shutdown. Returning immediately to voter login.");
+        _disconnectNavigationCancellation?.Cancel();
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            _navigationService.NavigateToVoterLogin();
+        });
+    }
+
     private void OnDeviceLockStateChanged(bool isLocked)
     {
         if (!isLocked)
@@ -177,6 +201,12 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // Authentication view handles locked state in-place by disabling its controls.
             if (CurrentView == _authenticateUserView)
+            {
+                return;
+            }
+
+            // NIN entry view handles locked state in-place (already-voted scenario).
+            if (CurrentView == _ninEntryView)
             {
                 return;
             }

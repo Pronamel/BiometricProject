@@ -145,14 +145,21 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- National Participation Card (BLANK) -->
+                    <!-- Election Name Card -->
                                           <Border Grid.Row="1" Grid.Column="2"
                                               Background="{StaticResource BannerBrush}"
                                               BorderThickness="2"
                                               BorderBrush="Black"
                                               CornerRadius="8"
                                               Padding="15">
-                        <StackPanel Orientation="Vertical" Spacing="8">
+                        <StackPanel Orientation="Vertical" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="2029 General Election"
+                                      Foreground="white"
+                                      FontSize="20"
+                                      FontWeight="Bold"
+                                      TextWrapping="Wrap"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </Grid>

@@ -26,7 +26,7 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     private bool _realtimeSubscriptionsRegistered;
     private bool _isConnectingRealtime;
     private readonly Dictionary<string, CancellationTokenSource> _pendingDisconnectRemovals = new();
-    private const int DisconnectedTemplateRemovalDelaySeconds = 15;
+    private const int DisconnectedTemplateRemovalDelaySeconds = 7;
 
     // ==========================================
     // OBSERVABLE PROPERTIES
@@ -108,9 +108,24 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
 
     public async Task ActivateAsync()
     {
+        // Reset state from any previous session so StartVoteListening always reconnects.
+        IsListeningForVotes = false;
+        _isConnectingRealtime = false;
+        ConnectedDevices.Clear();
+        _nextDeviceNumber = 1;
+
         SystemStatus = "Syncing polling data...";
         await StartVoteListening();
         await RefreshPollingStationVoteCountAsync();
+
+        // Populate devices that were already connected before this official session started
+        // (e.g. voter apps that auto-reconnected to the server before the official logged back in).
+        var existingDevices = await _realtimeService.GetConnectedVoterDevicesAsync();
+        foreach (var d in existingDevices)
+        {
+            OnDevicePresenceChanged(d.VoterId, d.DeviceId, true, d.Status);
+        }
+
         StatusMessages = $"Live feed ready. Device templates update in real-time.\nLast sync: {DateTime.Now:HH:mm:ss}\nConnected devices: {ConnectedDevices.Count}";
     }
 
@@ -126,7 +141,7 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     [RelayCommand]
     private async Task StartVoteListening()
     {
-        if (IsListeningForVotes)
+        if (IsListeningForVotes && _realtimeService.IsConnected)
         {
             return;
         }
@@ -194,10 +209,16 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
     }
 
     // Method to handle device status updates from voters
+    private static bool IsLockedStatus(string normalizedStatus) =>
+        normalizedStatus == "locked by official" ||
+        normalizedStatus == "device locked by official" ||
+        normalizedStatus.Contains("already voted") ||
+        normalizedStatus.Contains("authentication failed after 3 attempts");
+
     public void OnDeviceStatusReceived(int voterId, string deviceId, string status)
     {
         var normalizedStatus = status.Trim().ToLowerInvariant();
-        var isLocked = normalizedStatus == "locked by official" || normalizedStatus == "device locked by official";
+        var isLocked = IsLockedStatus(normalizedStatus);
         var isDisconnected = normalizedStatus == "disconnected";
 
         if (isDisconnected)
@@ -249,7 +270,7 @@ public partial class OfficialVotingPollingManagerViewModel : ViewModelBase
             ? (isOnline ? "Connected" : "Disconnected")
             : status;
         var normalizedStatus = resolvedStatus.Trim().ToLowerInvariant();
-        var isLocked = normalizedStatus == "locked by official" || normalizedStatus == "device locked by official";
+        var isLocked = IsLockedStatus(normalizedStatus);
 
         if (existingDevice != null)
         {

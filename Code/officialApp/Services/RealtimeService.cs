@@ -18,6 +18,7 @@ public class RealtimeService : IRealtimeService
     public event Action<DeviceStatus>? DeviceStatusReceived;
     public event Action<DevicePresenceUpdate>? DevicePresenceChanged;
     public event Action<string>? ConnectionStateChanged;
+    public event Action? ServerShutdown;
 
     public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
 
@@ -65,6 +66,41 @@ public class RealtimeService : IRealtimeService
         return true;
     }
 
+    public async Task<List<DevicePresenceUpdate>> GetConnectedVoterDevicesAsync()
+    {
+        if (_hubConnection == null || _hubConnection.State != HubConnectionState.Connected)
+        {
+            return new List<DevicePresenceUpdate>();
+        }
+
+        try
+        {
+            return await _hubConnection.InvokeAsync<List<DevicePresenceUpdate>>("GetConnectedVoterDevices");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [RealtimeService] GetConnectedVoterDevices failed: {ex.Message}");
+            return new List<DevicePresenceUpdate>();
+        }
+    }
+
+    public async Task SendLogoutNotificationAsync()
+    {
+        if (_hubConnection == null || _hubConnection.State != HubConnectionState.Connected)
+        {
+            return;
+        }
+
+        try
+        {
+            await _hubConnection.InvokeAsync("OfficialLogout");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [RealtimeService] OfficialLogout notification failed: {ex.Message}");
+        }
+    }
+
     public async Task DisconnectAsync()
     {
         if (_hubConnection == null)
@@ -76,6 +112,10 @@ public class RealtimeService : IRealtimeService
         {
             await _hubConnection.StopAsync();
         }
+
+        // Null the connection so the next ConnectAsync builds a fresh one with a fresh
+        // token and clean handler state — avoids reusing a stale object from a previous session.
+        _hubConnection = null;
 
         ConnectionStateChanged?.Invoke("Disconnected");
     }
@@ -109,6 +149,12 @@ public class RealtimeService : IRealtimeService
         connection.On<DevicePresenceUpdate>("official.v1.devicePresenceChanged", payload =>
         {
             DevicePresenceChanged?.Invoke(payload);
+        });
+
+        connection.On<object>("server.v1.shutdown", _ =>
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [RealtimeService] Received server.v1.shutdown.");
+            ServerShutdown?.Invoke();
         });
 
         connection.Reconnecting += error =>

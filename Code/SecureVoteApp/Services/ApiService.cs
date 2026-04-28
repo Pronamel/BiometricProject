@@ -1008,6 +1008,25 @@ public class ApiService : IApiService
         }
     }
 
+    public void ClearLocalSession()
+    {
+        _jwtToken = null;
+        _tokenExpiry = DateTime.MinValue;
+        _currentVoterId = null;
+        _authenticatedVoterDatabaseId = null;
+        _representedVoterDatabaseId = null;
+        _proxyVoterDatabaseId = null;
+        _isProxyVotingSession = false;
+        _assignedStationId = null;
+        _assignedStationGuid = null;
+        _assignedVoterId = 0;
+        _selectedCounty = string.Empty;
+        _pollingStationCode = string.Empty;
+        _selectedConstituency = string.Empty;
+        _deviceId = string.Empty;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Voter local session cleared.");
+    }
+
     public void Logout()
     {
         LogoutAsync().GetAwaiter().GetResult();

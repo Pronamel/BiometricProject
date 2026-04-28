@@ -3972,6 +3972,34 @@ app.MapPost("/api/verify-prints", async (HttpContext httpContext, DatabaseServic
 //===========================================
 app.MapHub<VotingHub>("/hubs/voting");
 
+// Broadcast a shutdown notice to every connected client before ASP.NET tears down
+// the SignalR connections, so both apps can log out immediately rather than
+// waiting for a reconnect timeout.
+var shutdownHubContext = app.Services.GetRequiredService<IHubContext<VotingHub>>();
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Server shutting down – notifying all connected clients.");
+    try
+    {
+        shutdownHubContext.Clients.All.SendAsync("server.v1.shutdown", new
+        {
+            reason = "server_shutdown",
+            timestamp = DateTime.UtcNow
+        }).GetAwaiter().GetResult();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Shutdown notification sent. Waiting for frames to flush...");
+
+        // SendAsync only queues the message into the WebSocket channel — it returns before
+        // the frames are actually written to the network. We pause here so Kestrel has time
+        // to flush the outgoing frames to every client before it tears down the connections.
+        Task.Delay(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Flush wait complete. Proceeding with shutdown.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Failed to send shutdown notification: {ex.Message}");
+    }
+});
+
 // Prevent production exception handler from returning 404 when /Error is invoked.
 app.Map("/Error", () => Results.Problem("An internal server error occurred."));
 

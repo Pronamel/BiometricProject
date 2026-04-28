@@ -11,18 +11,29 @@ namespace officialApp.Services;
 public class ServerHandler : IServerHandler
 {
     private readonly IApiService _apiService;
+    private readonly IRealtimeService _realtimeService;
     
     // Events for real-time updates
     public event Action<DeviceManagementInfo>? DeviceConnected;
     public event Action<DeviceManagementInfo>? DeviceDisconnected;
     public event Action<DeviceManagementInfo>? DeviceInfoUpdated;
     public event Action<string>? AccessCodeGenerated;
+    public event Action? ServerShutdown;
 
     public bool IsAuthenticated => _apiService.IsAuthenticated;
     
-    public ServerHandler(IApiService apiService)
+    public ServerHandler(IApiService apiService, IRealtimeService realtimeService)
     {
         _apiService = apiService;
+        _realtimeService = realtimeService;
+
+        _realtimeService.ServerShutdown += () =>
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [ServerHandler] Server shutdown received. Clearing official session.");
+            _apiService.ClearLocalSession();
+            _ = _realtimeService.DisconnectAsync();
+            ServerShutdown?.Invoke();
+        };
     }
 
     // ==========================================
@@ -44,8 +55,12 @@ public class ServerHandler : IServerHandler
     public Task<OfficialLoginResponse?> LoginAsync(string username, string password)
         => _apiService.LoginAsync(username, password);
 
-    public Task<bool> LogoutAsync()
-        => _apiService.LogoutAsync();
+    public async Task<bool> LogoutAsync()
+    {
+        // Notify the server to immediately disconnect voter devices before the token is invalidated.
+        await _realtimeService.SendLogoutNotificationAsync();
+        return await _apiService.LogoutAsync();
+    }
     
     // ==========================================
     // DEVICE MANAGEMENT (with data processing)

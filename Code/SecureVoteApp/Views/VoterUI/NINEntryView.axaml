@@ -154,7 +154,7 @@
                                     FontWeight="SemiBold"
                                     CornerRadius="10"
                                     Command="{Binding BackCommand}"
-                                    IsEnabled="{Binding !IsLooking}">
+                                    IsEnabled="{Binding IsFormEnabled}">
                                 <Button.Styles>
                                     <Style Selector="Button:pointerover">
                                         <Setter Property="Background" Value="#0F4C75"/>
@@ -172,7 +172,7 @@
                                     FontWeight="SemiBold"
                                     CornerRadius="10"
                                     Command="{Binding ContinueCommand}"
-                                    IsEnabled="{Binding !IsLooking}">
+                                    IsEnabled="{Binding IsFormEnabled}">
                                 <Button.Styles>
                                     <Style Selector="Button:pointerover">
                                         <Setter Property="Background" Value="#1B262C"/>
@@ -202,12 +202,6 @@
                                    FontSize="16"
                                    FontWeight="SemiBold"
                                    Foreground="#FFFFFF"
-                                   TextWrapping="Wrap"
-                                   TextAlignment="Center"/>
-
-                        <TextBlock Text="Please speak to an official for assistance."
-                                   FontSize="14"
-                                   Foreground="#FFD8DF"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"/>
                     </StackPanel>

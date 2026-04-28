@@ -15,7 +15,10 @@ public interface IRealtimeService
     event Action<DeviceStatus>? DeviceStatusReceived;
     event Action<DevicePresenceUpdate>? DevicePresenceChanged;
     event Action<string>? ConnectionStateChanged;
+    event Action? ServerShutdown;
 
     Task<bool> ConnectAsync(CancellationToken cancellationToken = default);
+    Task<List<DevicePresenceUpdate>> GetConnectedVoterDevicesAsync();
+    Task SendLogoutNotificationAsync();
     Task DisconnectAsync();
 }
